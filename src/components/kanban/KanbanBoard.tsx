@@ -5,7 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, MoreHorizontal, Trash2, GripVertical, Calendar } from "lucide-react";
+import { Plus, MoreHorizontal, Trash2, GripVertical, CalendarIcon } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -160,7 +163,7 @@ export function KanbanBoard({ boardId, onBack }: Props) {
                                   </span>
                                   {task.due_date && (
                                     <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium border flex items-center gap-0.5 ${getDueDateColor(task.due_date, task.created_at)}`}>
-                                      <Calendar className="h-2.5 w-2.5" />
+                                      <CalendarIcon className="h-2.5 w-2.5" />
                                       {format(new Date(task.due_date), "dd/MM", { locale: ptBR })}
                                     </span>
                                   )}
@@ -254,11 +257,32 @@ export function KanbanBoard({ boardId, onBack }: Props) {
               </div>
               <div>
                 <label className="text-sm font-medium">Prazo</label>
-                <Input
-                  type="date"
-                  value={editingTask.due_date ? format(new Date(editingTask.due_date), "yyyy-MM-dd") : ""}
-                  onChange={(e) => setEditingTask({ ...editingTask, due_date: e.target.value ? new Date(e.target.value).toISOString() : null })}
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !editingTask.due_date && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {editingTask.due_date
+                        ? format(new Date(editingTask.due_date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
+                        : "Selecionar prazo"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={editingTask.due_date ? new Date(editingTask.due_date) : undefined}
+                      onSelect={(date) => setEditingTask({ ...editingTask, due_date: date ? date.toISOString() : null })}
+                      disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="flex gap-2 justify-end">
                 <Button variant="destructive" size="sm" onClick={async () => { await deleteTask.mutateAsync(editingTask.id); setEditingTask(null); toast.success("Tarefa excluída"); }}>
