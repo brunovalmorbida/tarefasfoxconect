@@ -217,6 +217,79 @@ export type Database = {
         }
         Relationships: []
       }
+      recurring_task_completions: {
+        Row: {
+          completed_at: string
+          completed_by: string
+          id: string
+          period_start: string
+          recurring_task_id: string
+        }
+        Insert: {
+          completed_at?: string
+          completed_by: string
+          id?: string
+          period_start: string
+          recurring_task_id: string
+        }
+        Update: {
+          completed_at?: string
+          completed_by?: string
+          id?: string
+          period_start?: string
+          recurring_task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_task_completions_recurring_task_id_fkey"
+            columns: ["recurring_task_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recurring_tasks: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          frequency: string
+          id: string
+          team_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          frequency: string
+          id?: string
+          team_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          frequency?: string
+          id?: string
+          team_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_tasks_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           assignee_id: string | null

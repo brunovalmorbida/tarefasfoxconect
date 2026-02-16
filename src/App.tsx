@@ -12,6 +12,7 @@ import Boards from "./pages/Boards";
 import Teams from "./pages/Teams";
 import Notifications from "./pages/Notifications";
 import SettingsPage from "./pages/SettingsPage";
+import RecurringTasks from "./pages/RecurringTasks";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +30,7 @@ const App = () => (
             <Route element={<AppLayout />}>
               <Route path="/" element={<Dashboard />} />
               <Route path="/boards" element={<Boards />} />
+              <Route path="/recurring-tasks" element={<RecurringTasks />} />
               <Route path="/teams" element={<Teams />} />
               <Route path="/notifications" element={<Notifications />} />
               <Route path="/settings" element={<SettingsPage />} />
