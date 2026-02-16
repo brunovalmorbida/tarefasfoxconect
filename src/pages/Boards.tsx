@@ -1,14 +1,19 @@
 import { useState } from "react";
 import { useBoards } from "@/hooks/useBoards";
+import { useIsAppAdmin } from "@/hooks/useUserRole";
 import { CreateBoardDialog } from "@/components/kanban/CreateBoardDialog";
+import { BoardAccessDialog } from "@/components/kanban/BoardAccessDialog";
 import { KanbanBoard } from "@/components/kanban/KanbanBoard";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { LayoutGrid } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { LayoutGrid, Users } from "lucide-react";
 
 export default function Boards() {
   const { boards, isLoading } = useBoards();
+  const { data: isAdmin } = useIsAppAdmin();
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
+  const [accessBoard, setAccessBoard] = useState<{ id: string; name: string; teamId: string } | null>(null);
 
   if (selectedBoardId) {
     return <KanbanBoard boardId={selectedBoardId} onBack={() => setSelectedBoardId(null)} />;
@@ -37,23 +42,51 @@ export default function Boards() {
             return (
               <Card
                 key={board.id}
-                className="cursor-pointer hover:shadow-md transition-shadow hover:border-primary/30"
-                onClick={() => setSelectedBoardId(board.id)}
+                className="hover:shadow-md transition-shadow hover:border-primary/30"
               >
-                <CardHeader className="pb-3">
+                <CardHeader
+                  className="pb-3 cursor-pointer"
+                  onClick={() => setSelectedBoardId(board.id)}
+                >
                   <CardTitle className="text-lg">{board.name}</CardTitle>
                   {board.description && <CardDescription>{board.description}</CardDescription>}
                 </CardHeader>
                 <CardContent>
-                  <div className="flex gap-2">
-                    <Badge variant="secondary">{colCount} colunas</Badge>
-                    <Badge variant="secondary">{taskCount} tarefas</Badge>
+                  <div className="flex items-center justify-between">
+                    <div className="flex gap-2">
+                      <Badge variant="secondary">{colCount} colunas</Badge>
+                      <Badge variant="secondary">{taskCount} tarefas</Badge>
+                    </div>
+                    {isAdmin && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setAccessBoard({ id: board.id, name: board.name, teamId: board.team_id });
+                        }}
+                      >
+                        <Users className="h-3.5 w-3.5" />
+                        Acessos
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
             );
           })}
         </div>
+      )}
+
+      {accessBoard && (
+        <BoardAccessDialog
+          open={!!accessBoard}
+          onOpenChange={(open) => !open && setAccessBoard(null)}
+          boardId={accessBoard.id}
+          boardName={accessBoard.name}
+          teamId={accessBoard.teamId}
+        />
       )}
     </div>
   );
