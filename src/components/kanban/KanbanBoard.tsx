@@ -277,7 +277,7 @@ export function KanbanBoard({ boardId, onBack }: Props) {
                       mode="single"
                       selected={editingTask.due_date ? new Date(editingTask.due_date) : undefined}
                       onSelect={(date) => setEditingTask({ ...editingTask, due_date: date ? date.toISOString() : null })}
-                      disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                      disabled={(date) => date <= new Date(new Date().setHours(23, 59, 59, 999))}
                       initialFocus
                       className={cn("p-3 pointer-events-auto")}
                     />
