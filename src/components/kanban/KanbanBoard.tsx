@@ -5,12 +5,30 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, MoreHorizontal, Trash2, GripVertical } from "lucide-react";
+import { Plus, MoreHorizontal, Trash2, GripVertical, Calendar } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import { differenceInDays, format, isPast } from "date-fns";
+import { ptBR } from "date-fns/locale";
+
+function getDueDateColor(dueDate: string | null, createdAt: string): string {
+  if (!dueDate) return "";
+  const now = new Date();
+  const due = new Date(dueDate);
+  const created = new Date(createdAt);
+  if (isPast(due)) return "bg-destructive/15 text-destructive border-destructive/30";
+  const total = due.getTime() - created.getTime();
+  const elapsed = now.getTime() - created.getTime();
+  if (total <= 0) return "";
+  const pct = elapsed / total;
+  if (pct >= 0.9) return "bg-destructive/15 text-destructive border-destructive/30";
+  if (pct >= 0.7) return "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30";
+  if (pct >= 0.5) return "bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30";
+  return "bg-muted text-muted-foreground border-border";
+}
 
 const priorityColors: Record<string, string> = {
   low: "bg-muted text-muted-foreground",
@@ -78,6 +96,7 @@ export function KanbanBoard({ boardId, onBack }: Props) {
         title: editingTask.title,
         description: editingTask.description || null,
         priority: editingTask.priority,
+        due_date: editingTask.due_date || null,
       });
       setEditingTask(null);
       toast.success("Tarefa atualizada!");
@@ -135,10 +154,16 @@ export function KanbanBoard({ boardId, onBack }: Props) {
                               <div className="flex-1 space-y-1.5">
                                 <p className="text-sm font-medium leading-tight">{task.title}</p>
                                 {task.description && <p className="text-xs text-muted-foreground line-clamp-2">{task.description}</p>}
-                                <div className="flex items-center gap-1.5">
+                                <div className="flex items-center gap-1.5 flex-wrap">
                                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${priorityColors[task.priority]}`}>
                                     {priorityLabels[task.priority]}
                                   </span>
+                                  {task.due_date && (
+                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium border flex items-center gap-0.5 ${getDueDateColor(task.due_date, task.created_at)}`}>
+                                      <Calendar className="h-2.5 w-2.5" />
+                                      {format(new Date(task.due_date), "dd/MM", { locale: ptBR })}
+                                    </span>
+                                  )}
                                   {task.labels?.map((l: string) => (
                                     <Badge key={l} variant="outline" className="text-[10px] px-1.5 py-0">{l}</Badge>
                                   ))}
@@ -226,6 +251,14 @@ export function KanbanBoard({ boardId, onBack }: Props) {
                     <SelectItem value="urgent">Urgente</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Prazo</label>
+                <Input
+                  type="date"
+                  value={editingTask.due_date ? format(new Date(editingTask.due_date), "yyyy-MM-dd") : ""}
+                  onChange={(e) => setEditingTask({ ...editingTask, due_date: e.target.value ? new Date(e.target.value).toISOString() : null })}
+                />
               </div>
               <div className="flex gap-2 justify-end">
                 <Button variant="destructive" size="sm" onClick={async () => { await deleteTask.mutateAsync(editingTask.id); setEditingTask(null); toast.success("Tarefa excluída"); }}>
