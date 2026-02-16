@@ -1,6 +1,7 @@
-import { LayoutDashboard, Columns3, Users, Bell, Settings, LogOut, CheckSquare } from "lucide-react";
+import { LayoutDashboard, Columns3, Users, Bell, Settings, LogOut } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
+import logoFox from "@/assets/logo-fox.png";
 import {
   Sidebar,
   SidebarContent,
@@ -29,9 +30,9 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="p-4">
-        <div className="flex items-center gap-2 text-primary">
-          <CheckSquare className="h-6 w-6" />
-          <span className="text-lg font-bold tracking-tight">TaskFlow</span>
+        <div className="flex items-center gap-2">
+          <img src={logoFox} alt="TaskFox" className="h-8 w-auto" />
+          <span className="text-lg font-bold tracking-tight">TaskFox</span>
         </div>
       </SidebarHeader>
 
