@@ -329,6 +329,24 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -337,10 +355,12 @@ export type Database = {
       get_team_id_from_board: { Args: { _board_id: string }; Returns: string }
       get_team_id_from_column: { Args: { _column_id: string }; Returns: string }
       get_team_id_from_task: { Args: { _task_id: string }; Returns: string }
+      is_app_admin: { Args: never; Returns: boolean }
       is_team_admin: { Args: { _team_id: string }; Returns: boolean }
       is_team_member: { Args: { _team_id: string }; Returns: boolean }
     }
     Enums: {
+      app_role: "admin" | "user"
       task_priority: "low" | "medium" | "high" | "urgent"
       team_role: "admin" | "member"
     }
@@ -470,6 +490,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["admin", "user"],
       task_priority: ["low", "medium", "high", "urgent"],
       team_role: ["admin", "member"],
     },
