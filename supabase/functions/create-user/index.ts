@@ -33,15 +33,48 @@ Deno.serve(async (req) => {
       .eq("role", "admin")
       .maybeSingle();
 
-    if (!role) throw new Error("Sem permissão");
+    if (!role) throw new Error("Sem permissão de administrador");
 
-    const { userId } = await req.json();
-    if (!userId || userId === caller.id) throw new Error("Operação inválida");
+    const { name, email, password, teamIds } = await req.json();
 
-    const { error } = await adminClient.auth.admin.deleteUser(userId);
-    if (error) throw error;
+    // Validate inputs
+    if (!name || typeof name !== "string" || name.trim().length === 0) {
+      throw new Error("Nome é obrigatório");
+    }
+    if (!email || typeof email !== "string" || !email.includes("@")) {
+      throw new Error("E-mail inválido");
+    }
+    if (!password || typeof password !== "string" || password.length < 6) {
+      throw new Error("Senha deve ter pelo menos 6 caracteres");
+    }
 
-    return new Response(JSON.stringify({ success: true }), {
+    // Create user via admin API
+    const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
+      email: email.trim(),
+      password,
+      email_confirm: true,
+      user_metadata: { name: name.trim() },
+    });
+    if (createError) throw createError;
+
+    const userId = newUser.user.id;
+
+    // Add user to selected teams
+    if (teamIds && Array.isArray(teamIds) && teamIds.length > 0) {
+      const teamMembers = teamIds.map((teamId: string) => ({
+        team_id: teamId,
+        user_id: userId,
+        role: "member",
+      }));
+      const { error: tmError } = await adminClient
+        .from("team_members")
+        .insert(teamMembers);
+      if (tmError) {
+        console.error("Error adding team members:", tmError);
+      }
+    }
+
+    return new Response(JSON.stringify({ success: true, userId }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err: any) {
