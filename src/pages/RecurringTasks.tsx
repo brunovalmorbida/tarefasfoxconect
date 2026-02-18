@@ -257,54 +257,67 @@ function BoardDetail({
           </CardContent>
         </Card>
       ) : (
-        <Card>
-          <CardContent className="pt-6">
-            <ul className="space-y-2">
-              {tasks.map((task) => {
-                const completed = isTaskCompleted(task);
-                const active = isTaskActiveToday(task);
-                const Icon = taskFrequencyIcon(task.frequency);
-                return (
-                  <li
-                    key={task.id}
-                    className={`flex items-start gap-3 rounded-md border p-3 ${!active ? "opacity-50" : ""}`}
-                  >
-                    <Checkbox
-                      checked={completed}
-                      onCheckedChange={() => toggleCompletion.mutate({ task })}
-                      className="mt-0.5"
-                      disabled={!active}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <span className={completed ? "line-through text-muted-foreground" : ""}>
-                        {task.title}
-                      </span>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="outline" className="text-xs gap-1">
-                          <Icon className="h-3 w-3" />
-                          {getTaskFrequencyLabel(task)}
-                        </Badge>
-                      </div>
-                      {task.description && (
-                        <p className="text-xs text-muted-foreground mt-1">{task.description}</p>
-                      )}
-                    </div>
-                    {canManage && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-destructive"
-                        onClick={() => handleDelete(task.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </CardContent>
-        </Card>
+        <div className="flex gap-4 overflow-x-auto pb-4">
+          {(["daily", "weekly", "weekday", "monthly"] as const)
+            .map((freq) => {
+              const freqTasks = tasks.filter((t) => t.frequency === freq);
+              if (freqTasks.length === 0) return null;
+              const FreqIcon = taskFrequencyIcon(freq);
+              const freqLabel = freq === "daily" ? "Diária" : freq === "weekly" ? "Semanal" : freq === "weekday" ? "Dia da Semana" : "Dia do Mês";
+              return (
+                <div key={freq} className="min-w-[280px] w-[300px] flex-shrink-0">
+                  <div className="flex items-center gap-2 mb-3 px-1">
+                    <FreqIcon className="h-4 w-4 text-muted-foreground" />
+                    <h3 className="font-semibold text-sm">{freqLabel}</h3>
+                    <Badge variant="secondary" className="text-xs ml-auto">{freqTasks.length}</Badge>
+                  </div>
+                  <div className="space-y-2">
+                    {freqTasks.map((task) => {
+                      const completed = isTaskCompleted(task);
+                      const active = isTaskActiveToday(task);
+                      return (
+                        <Card key={task.id} className={`${!active ? "opacity-50" : ""}`}>
+                          <CardContent className="p-3">
+                            <div className="flex items-start gap-3">
+                              <Checkbox
+                                checked={completed}
+                                onCheckedChange={() => toggleCompletion.mutate({ task })}
+                                className="mt-0.5"
+                                disabled={!active}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <span className={`text-sm ${completed ? "line-through text-muted-foreground" : ""}`}>
+                                  {task.title}
+                                </span>
+                                {(task.frequency === "weekday" || task.frequency === "monthly") && (
+                                  <p className="text-xs text-muted-foreground mt-0.5">
+                                    {getTaskFrequencyLabel(task)}
+                                  </p>
+                                )}
+                                {task.description && (
+                                  <p className="text-xs text-muted-foreground mt-1">{task.description}</p>
+                                )}
+                              </div>
+                              {canManage && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-destructive flex-shrink-0"
+                                  onClick={() => handleDelete(task.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+        </div>
       )}
     </div>
   );
