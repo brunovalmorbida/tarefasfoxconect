@@ -120,12 +120,10 @@ export function useBoardDetail(boardId: string) {
       const col = boardQuery.data?.board_columns?.find((c: any) => c.id === columnId);
       await logActivity("Criou uma tarefa", { task_title: title, column_name: col?.name, board_name: boardQuery.data?.name }, getTeamId());
 
-      // Notify assignee via Z-API + in-app
-      if (assigneeId) {
-        supabase.functions.invoke("notify-task-assigned", {
-          body: { taskTitle: title, assigneeId, boardName: boardQuery.data?.name, assignedByName: user?.user_metadata?.name || user?.email },
-        }).catch(console.error);
-      }
+      // Notify via Z-API + in-app (always on task creation)
+      supabase.functions.invoke("notify-task-assigned", {
+        body: { taskTitle: title, assigneeId: assigneeId || null, boardName: boardQuery.data?.name, assignedByName: user?.user_metadata?.name || user?.email, isNewTask: true },
+      }).catch(console.error);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["board", boardId] }),
   });

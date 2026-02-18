@@ -15,10 +15,10 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
-    const { taskTitle, assigneeId, boardName, assignedByName } = await req.json();
+    const { taskTitle, assigneeId, boardName, assignedByName, isNewTask } = await req.json();
 
-    if (!assigneeId || !taskTitle) {
-      return new Response(JSON.stringify({ error: "taskTitle and assigneeId are required" }), {
+    if (!taskTitle) {
+      return new Response(JSON.stringify({ error: "taskTitle is required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -38,12 +38,16 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get assignee profile
-    const { data: assigneeProfile } = await adminClient
-      .from("profiles")
-      .select("user_id, name, whatsapp_number")
-      .eq("user_id", assigneeId)
-      .maybeSingle();
+    // Get assignee profile if exists
+    let assigneeProfile: any = null;
+    if (assigneeId) {
+      const { data } = await adminClient
+        .from("profiles")
+        .select("user_id, name, whatsapp_number")
+        .eq("user_id", assigneeId)
+        .maybeSingle();
+      assigneeProfile = data;
+    }
 
     // Get master user (brunovalmorbida@live.com)
     const { data: masterAuth } = await adminClient.auth.admin.listUsers();
@@ -61,13 +65,17 @@ Deno.serve(async (req) => {
 
     const results: Array<{ to: string; phone: string; status: string; error?: string }> = [];
 
+    const isAssignment = !!assigneeId;
+    const emoji = isNewTask ? "🆕" : "📌";
+    const title = isNewTask && !isAssignment ? "Nova Tarefa Criada" : "Nova Tarefa Atribuída";
+
     const sendMessage = async (phone: string, recipientName: string, label: string) => {
-      const message = `📌 *Nova Tarefa Atribuída*\n\n` +
+      const message = `${emoji} *${title}*\n\n` +
         `📋 *Tarefa:* ${taskTitle}\n` +
         `📊 *Quadro:* ${boardName || "—"}\n` +
-        `👤 *Responsável:* ${assigneeProfile?.name || "—"}\n` +
-        `🔔 *Atribuída por:* ${assignedByName || "—"}\n\n` +
-        `Olá ${recipientName}, uma nova tarefa foi atribuída. Verifique no sistema!`;
+        (isAssignment ? `👤 *Responsável:* ${assigneeProfile?.name || "—"}\n` : "") +
+        `🔔 *Criada por:* ${assignedByName || "—"}\n\n` +
+        `Olá ${recipientName}, ${isAssignment ? "uma tarefa foi atribuída" : "uma nova tarefa foi criada"}. Verifique no sistema!`;
 
       try {
         const zapiUrl = `https://api.z-api.io/instances/${zapiConfig.instance_id}/token/${zapiConfig.token}/send-text`;
@@ -91,13 +99,13 @@ Deno.serve(async (req) => {
       }
     };
 
-    // Send to assignee
+    // Send to assignee (if exists)
     if (assigneeProfile?.whatsapp_number) {
       await sendMessage(assigneeProfile.whatsapp_number, assigneeProfile.name, "assignee");
     }
 
-    // Send to master user (if different from assignee)
-    if (masterProfile?.whatsapp_number && masterProfile.user_id !== assigneeId) {
+    // Always send to master user (if different from assignee)
+    if (masterProfile?.whatsapp_number && (!assigneeId || masterProfile.user_id !== assigneeId)) {
       await sendMessage(masterProfile.whatsapp_number, masterProfile.name, "master");
     }
 
@@ -105,15 +113,17 @@ Deno.serve(async (req) => {
     if (assigneeProfile) {
       await adminClient.from("notifications").insert({
         user_id: assigneeId,
-        title: "Nova tarefa atribuída",
-        message: `A tarefa "${taskTitle}" foi atribuída a você no quadro ${boardName || "—"}.`,
+        title: isAssignment ? "Nova tarefa atribuída" : "Nova tarefa criada",
+        message: `A tarefa "${taskTitle}" foi ${isAssignment ? "atribuída a você" : "criada"} no quadro ${boardName || "—"}.`,
       });
     }
-    if (masterUser && masterUser.id !== assigneeId) {
+    if (masterUser && (!assigneeId || masterUser.id !== assigneeId)) {
       await adminClient.from("notifications").insert({
         user_id: masterUser.id,
-        title: "Tarefa atribuída",
-        message: `A tarefa "${taskTitle}" foi atribuída a ${assigneeProfile?.name || "um usuário"} no quadro ${boardName || "—"}.`,
+        title: isNewTask ? "Nova tarefa criada" : "Tarefa atribuída",
+        message: isAssignment
+          ? `A tarefa "${taskTitle}" foi atribuída a ${assigneeProfile?.name || "um usuário"} no quadro ${boardName || "—"}.`
+          : `A tarefa "${taskTitle}" foi criada no quadro ${boardName || "—"}.`,
       });
     }
 
