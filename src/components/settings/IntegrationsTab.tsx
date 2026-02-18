@@ -4,10 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { MessageSquare, Loader2 } from "lucide-react";
+import { MessageSquare, Loader2, Send } from "lucide-react";
 
 export function IntegrationsTab() {
   const { toast } = useToast();
@@ -17,6 +18,8 @@ export function IntegrationsTab() {
   const [clientToken, setClientToken] = useState("");
   const [isActive, setIsActive] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState<{ sent: number; errors: number; total_overdue: number } | null>(null);
 
   const { data: config, isLoading } = useQuery({
     queryKey: ["zapi-config"],
@@ -130,6 +133,56 @@ export function IntegrationsTab() {
             {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
             {config ? "Atualizar Configuração" : "Salvar Configuração"}
           </Button>
+
+          {config && isActive && (
+            <>
+              <Separator />
+              <div className="space-y-3">
+                <div>
+                  <h4 className="text-sm font-medium">Enviar Notificações</h4>
+                  <p className="text-xs text-muted-foreground">
+                    Envia notificações via WhatsApp sobre tarefas atrasadas para os responsáveis cadastrados.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    setSending(true);
+                    setSendResult(null);
+                    try {
+                      const { data, error } = await supabase.functions.invoke("notify-overdue-tasks", {
+                        body: {},
+                      });
+                      if (error) throw error;
+                      if (data?.error) throw new Error(data.error);
+                      setSendResult({ sent: data.sent, errors: data.errors, total_overdue: data.total_overdue });
+                      if (data.sent > 0) {
+                        toast({ title: `${data.sent} notificação(ões) enviada(s) com sucesso!` });
+                      } else {
+                        toast({ title: data.message || "Nenhuma notificação enviada", description: "Verifique se há tarefas atrasadas com responsáveis e WhatsApp cadastrado." });
+                      }
+                    } catch (e: any) {
+                      toast({ title: "Erro ao enviar", description: e.message, variant: "destructive" });
+                    } finally {
+                      setSending(false);
+                    }
+                  }}
+                  disabled={sending}
+                  className="w-full"
+                >
+                  {sending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
+                  {sending ? "Enviando..." : "Enviar Notificações de Tarefas Atrasadas"}
+                </Button>
+                {sendResult && (
+                  <div className="text-xs text-muted-foreground rounded-md border p-3 space-y-1">
+                    <p>📊 Tarefas atrasadas: <strong>{sendResult.total_overdue}</strong></p>
+                    <p>✅ Enviadas: <strong>{sendResult.sent}</strong></p>
+                    {sendResult.errors > 0 && <p>❌ Erros: <strong>{sendResult.errors}</strong></p>}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>
