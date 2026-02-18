@@ -133,15 +133,18 @@ export function useRecurringTaskBoards(teamId?: string) {
       frequencyType: "weekday" | "weekly" | "monthly";
       weekday?: number;
       assignedUserId?: string | null;
+      teamId?: string;
     }) => {
+      const updateData: any = {
+        name: params.name,
+        frequency_type: params.frequencyType,
+        weekday: params.frequencyType === "weekday" ? (params.weekday ?? 0) : null,
+        assigned_user_id: params.assignedUserId || null,
+      };
+      if (params.teamId) updateData.team_id = params.teamId;
       const { error } = await supabase
         .from("recurring_task_boards" as any)
-        .update({
-          name: params.name,
-          frequency_type: params.frequencyType,
-          weekday: params.frequencyType === "weekday" ? (params.weekday ?? 0) : null,
-          assigned_user_id: params.assignedUserId || null,
-        })
+        .update(updateData)
         .eq("id", params.id);
       if (error) throw error;
     },
