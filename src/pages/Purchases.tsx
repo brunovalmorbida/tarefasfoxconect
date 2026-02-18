@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, ShoppingCart, PackageCheck, Trash2, Clock } from "lucide-react";
+import { Plus, ShoppingCart, PackageCheck, Trash2, Clock, X } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
@@ -52,13 +52,21 @@ export default function Purchases() {
   const [showPurchaseDialog, setShowPurchaseDialog] = useState<PurchaseRequest | null>(null);
   const [showReceiveDialog, setShowReceiveDialog] = useState<PurchaseRequest | null>(null);
 
-  // Form state for new request
-  const [newTitle, setNewTitle] = useState("");
-  const [newDescription, setNewDescription] = useState("");
-  const [newQuantity, setNewQuantity] = useState("1");
-  const [newCategory, setNewCategory] = useState("other");
-  const [newUrgency, setNewUrgency] = useState("medium");
-  const [newEstimatedValue, setNewEstimatedValue] = useState("");
+  type ListItem = {
+    title: string;
+    quantity: string;
+    category: string;
+    urgency: string;
+    estimated_value: string;
+    description: string;
+  };
+
+  const emptyItem = (): ListItem => ({
+    title: "", quantity: "1", category: "other", urgency: "medium", estimated_value: "", description: "",
+  });
+
+  // Form state - list of items
+  const [listItems, setListItems] = useState<ListItem[]>([emptyItem()]);
   const [newBuyerId, setNewBuyerId] = useState("");
 
   // Purchase dialog state
@@ -78,24 +86,38 @@ export default function Purchases() {
     enabled: !!user,
   });
 
+  const updateListItem = (index: number, field: keyof ListItem, value: string) => {
+    setListItems((prev) => prev.map((item, i) => i === index ? { ...item, [field]: value } : item));
+  };
+
+  const addListItem = () => setListItems((prev) => [...prev, emptyItem()]);
+
+  const removeListItem = (index: number) => {
+    if (listItems.length <= 1) return;
+    setListItems((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleCreate = () => {
-    if (!newTitle.trim()) return;
-    createPurchase.mutate({
-      title: newTitle.trim(),
-      description: newDescription.trim() || undefined,
-      quantity: parseInt(newQuantity) || 1,
-      category: newCategory,
-      urgency: newUrgency,
-      estimated_value: newEstimatedValue ? parseFloat(newEstimatedValue) : undefined,
-      buyer_id: newBuyerId || undefined,
-    }, {
-      onSuccess: () => {
-        setShowCreateDialog(false);
-        setNewTitle(""); setNewDescription(""); setNewQuantity("1");
-        setNewCategory("other"); setNewUrgency("medium"); setNewEstimatedValue("");
-        setNewBuyerId("");
-      },
-    });
+    const validItems = listItems.filter((item) => item.title.trim());
+    if (validItems.length === 0) return;
+    createPurchase.mutate(
+      validItems.map((item) => ({
+        title: item.title.trim(),
+        description: item.description.trim() || undefined,
+        quantity: parseInt(item.quantity) || 1,
+        category: item.category,
+        urgency: item.urgency,
+        estimated_value: item.estimated_value ? parseFloat(item.estimated_value) : undefined,
+        buyer_id: newBuyerId || undefined,
+      })),
+      {
+        onSuccess: () => {
+          setShowCreateDialog(false);
+          setListItems([emptyItem()]);
+          setNewBuyerId("");
+        },
+      }
+    );
   };
 
   const handleMarkPurchased = () => {
@@ -252,51 +274,14 @@ export default function Purchases() {
 
       {/* Create Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Nova Solicitação de Compra</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
+          <div className="space-y-4">
+            {/* Shared buyer for all items */}
             <div>
-              <Label>Item *</Label>
-              <Input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Nome do item" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Quantidade</Label>
-                <Input type="number" min="1" value={newQuantity} onChange={(e) => setNewQuantity(e.target.value)} />
-              </div>
-              <div>
-                <Label>Valor Estimado (R$)</Label>
-                <Input type="number" step="0.01" value={newEstimatedValue} onChange={(e) => setNewEstimatedValue(e.target.value)} placeholder="0.00" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Categoria</Label>
-                <Select value={newCategory} onValueChange={setNewCategory}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(categoryLabels).map(([k, v]) => (
-                      <SelectItem key={k} value={k}>{v}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Urgência</Label>
-                <Select value={newUrgency} onValueChange={setNewUrgency}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(urgencyLabels).map(([k, v]) => (
-                      <SelectItem key={k} value={k}>{v}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div>
-              <Label>Responsável pela compra</Label>
+              <Label>Responsável pela compra (todos os itens)</Label>
               <Select value={newBuyerId} onValueChange={setNewBuyerId}>
                 <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                 <SelectContent>
@@ -306,15 +291,89 @@ export default function Purchases() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label>Observações</Label>
-              <Textarea value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="Detalhes adicionais..." rows={2} />
+
+            {/* Items list */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-semibold">Itens ({listItems.length})</Label>
+                <Button type="button" variant="outline" size="sm" onClick={addListItem}>
+                  <Plus className="h-3 w-3 mr-1" /> Adicionar Item
+                </Button>
+              </div>
+
+              {listItems.map((item, index) => (
+                <Card key={index} className="relative">
+                  <CardContent className="pt-3 pb-3 px-3 space-y-2">
+                    {listItems.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute top-1 right-1 h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                        onClick={() => removeListItem(index)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    )}
+                    <div className="pr-6">
+                      <Label className="text-xs">Item {index + 1} *</Label>
+                      <Input
+                        value={item.title}
+                        onChange={(e) => updateListItem(index, "title", e.target.value)}
+                        placeholder="Nome do item"
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div className="grid grid-cols-4 gap-2">
+                      <div>
+                        <Label className="text-xs">Qtd</Label>
+                        <Input type="number" min="1" value={item.quantity} onChange={(e) => updateListItem(index, "quantity", e.target.value)} className="h-8 text-sm" />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Valor Est. (R$)</Label>
+                        <Input type="number" step="0.01" value={item.estimated_value} onChange={(e) => updateListItem(index, "estimated_value", e.target.value)} placeholder="0.00" className="h-8 text-sm" />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Categoria</Label>
+                        <Select value={item.category} onValueChange={(v) => updateListItem(index, "category", v)}>
+                          <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(categoryLabels).map(([k, v]) => (
+                              <SelectItem key={k} value={k}>{v}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="text-xs">Urgência</Label>
+                        <Select value={item.urgency} onValueChange={(v) => updateListItem(index, "urgency", v)}>
+                          <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(urgencyLabels).map(([k, v]) => (
+                              <SelectItem key={k} value={k}>{v}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Observações</Label>
+                      <Input
+                        value={item.description}
+                        onChange={(e) => updateListItem(index, "description", e.target.value)}
+                        placeholder="Detalhes..."
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreateDialog(false)}>Cancelar</Button>
-            <Button onClick={handleCreate} disabled={!newTitle.trim() || createPurchase.isPending}>
-              {createPurchase.isPending ? "Criando..." : "Criar Solicitação"}
+            <Button onClick={handleCreate} disabled={!listItems.some((i) => i.title.trim()) || createPurchase.isPending}>
+              {createPurchase.isPending ? "Criando..." : `Criar ${listItems.filter((i) => i.title.trim()).length} Item(ns)`}
             </Button>
           </DialogFooter>
         </DialogContent>
