@@ -15,7 +15,7 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
-    const { taskTitle, assigneeId, boardName, assignedByName, isNewTask } = await req.json();
+    const { taskTitle, assigneeId, boardName, assignedByName, isNewTask, dueDate } = await req.json();
 
     if (!taskTitle) {
       return new Response(JSON.stringify({ error: "taskTitle is required" }), {
@@ -70,9 +70,11 @@ Deno.serve(async (req) => {
     const title = isNewTask && !isAssignment ? "Nova Tarefa Criada" : "Nova Tarefa Atribuída";
 
     const sendMessage = async (phone: string, recipientName: string, label: string) => {
+      const formattedDueDate = dueDate ? new Date(dueDate).toLocaleDateString("pt-BR") : "—";
       const message = `${emoji} *${title}*\n\n` +
         `📋 *Tarefa:* ${taskTitle}\n` +
         `📊 *Quadro:* ${boardName || "—"}\n` +
+        `📅 *Prazo:* ${formattedDueDate}\n` +
         (isAssignment ? `👤 *Responsável:* ${assigneeProfile?.name || "—"}\n` : "") +
         `🔔 *Criada por:* ${assignedByName || "—"}\n\n` +
         `Olá ${recipientName}, ${isAssignment ? "uma tarefa foi atribuída" : "uma nova tarefa foi criada"}. Verifique no sistema!`;
