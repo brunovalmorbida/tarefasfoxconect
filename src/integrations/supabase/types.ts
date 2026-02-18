@@ -304,9 +304,11 @@ export type Database = {
           description: string | null
           frequency: string
           id: string
+          month_day: number | null
           team_id: string
           title: string
           updated_at: string
+          weekday: number | null
         }
         Insert: {
           board_id?: string | null
@@ -315,9 +317,11 @@ export type Database = {
           description?: string | null
           frequency: string
           id?: string
+          month_day?: number | null
           team_id: string
           title: string
           updated_at?: string
+          weekday?: number | null
         }
         Update: {
           board_id?: string | null
@@ -326,9 +330,11 @@ export type Database = {
           description?: string | null
           frequency?: string
           id?: string
+          month_day?: number | null
           team_id?: string
           title?: string
           updated_at?: string
+          weekday?: number | null
         }
         Relationships: [
           {
