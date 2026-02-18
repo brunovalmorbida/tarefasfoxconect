@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Trash2, Loader2, Plus, Pencil } from "lucide-react";
+import { Trash2, Loader2, Plus, Pencil, Shield } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { UserPermissionsDialog } from "./UserPermissionsDialog";
 
 interface Profile {
   id: string;
@@ -48,6 +49,11 @@ export function UsersTab() {
   const [editPassword, setEditPassword] = useState("");
   const [editTeams, setEditTeams] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+
+  // Permissions dialog state
+  const [permOpen, setPermOpen] = useState(false);
+  const [permUserId, setPermUserId] = useState("");
+  const [permUserName, setPermUserName] = useState("");
 
   const { data: profiles, isLoading } = useQuery({
     queryKey: ["admin-profiles"],
@@ -304,6 +310,20 @@ export function UsersTab() {
                           <Pencil className="h-4 w-4" />
                         </Button>
                         {!isAdmin && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-muted-foreground hover:text-primary"
+                            onClick={() => {
+                              setPermUserId(profile.user_id);
+                              setPermUserName(profile.name);
+                              setPermOpen(true);
+                            }}
+                          >
+                            <Shield className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {!isAdmin && (
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive">
@@ -338,6 +358,14 @@ export function UsersTab() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Permissions Dialog */}
+      <UserPermissionsDialog
+        open={permOpen}
+        onOpenChange={setPermOpen}
+        userId={permUserId}
+        userName={permUserName}
+      />
 
       {/* Edit User Dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
