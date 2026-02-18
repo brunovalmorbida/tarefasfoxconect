@@ -119,15 +119,36 @@ export function useBoardDetail(boardId: string) {
       if (error) throw error;
       const col = boardQuery.data?.board_columns?.find((c: any) => c.id === columnId);
       await logActivity("Criou uma tarefa", { task_title: title, column_name: col?.name, board_name: boardQuery.data?.name }, getTeamId());
+
+      // Notify assignee via Z-API + in-app
+      if (assigneeId) {
+        supabase.functions.invoke("notify-task-assigned", {
+          body: { taskTitle: title, assigneeId, boardName: boardQuery.data?.name, assignedByName: user?.user_metadata?.name || user?.email },
+        }).catch(console.error);
+      }
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["board", boardId] }),
   });
 
   const updateTask = useMutation({
     mutationFn: async ({ id, ...updates }: { id: string } & Partial<TablesInsert<"tasks">>) => {
+      // Find previous assignee to detect changes
+      let previousAssigneeId: string | null = null;
+      boardQuery.data?.board_columns?.forEach((col: any) => {
+        const task = col.tasks?.find((t: any) => t.id === id);
+        if (task) previousAssigneeId = task.assignee_id;
+      });
+
       const { error } = await supabase.from("tasks").update(updates).eq("id", id);
       if (error) throw error;
       await logActivity("Atualizou uma tarefa", { task_title: updates.title, board_name: boardQuery.data?.name }, getTeamId());
+
+      // Notify if assignee changed
+      if (updates.assignee_id && updates.assignee_id !== previousAssigneeId) {
+        supabase.functions.invoke("notify-task-assigned", {
+          body: { taskTitle: updates.title, assigneeId: updates.assignee_id, boardName: boardQuery.data?.name, assignedByName: user?.user_metadata?.name || user?.email },
+        }).catch(console.error);
+      }
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["board", boardId] }),
   });
