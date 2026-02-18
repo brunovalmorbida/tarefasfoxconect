@@ -17,7 +17,9 @@ export default function Dashboard() {
     boards.forEach((board: any) => {
       board.board_columns?.forEach((col: any) => {
         col.tasks?.forEach((task: any) => {
-          allTasks.push({ ...task, columnName: col.name, boardName: board.name });
+          if (task.assignee_id === user?.id) {
+            allTasks.push({ ...task, columnName: col.name, boardName: board.name });
+          }
         });
       });
     });
@@ -39,7 +41,7 @@ export default function Dashboard() {
     }).length;
 
     return { total, inProgress, done, overdue, tasks: allTasks };
-  }, [boards]);
+  }, [boards, user]);
 
   const overdueTasks = useMemo(() => {
     return stats.tasks.filter((t) => {
