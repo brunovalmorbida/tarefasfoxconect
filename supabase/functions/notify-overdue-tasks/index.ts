@@ -43,6 +43,17 @@ Deno.serve(async (req) => {
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
+    // Parse body first
+    let testMode = false;
+    let testPhone = "";
+    try {
+      const body = await req.json();
+      testMode = body?.testMode === true;
+      testPhone = body?.testPhone || "";
+    } catch {
+      // No body
+    }
+
     // Check if Z-API is configured and active
     const { data: zapiConfig } = await adminClient
       .from("zapi_config")
@@ -58,39 +69,34 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get overdue tasks with assignees who have WhatsApp numbers
-    const { data: overdueTasks, error: tasksError } = await adminClient
+    // Get overdue tasks - in test mode, don't require assignee
+    let query = adminClient
       .from("tasks")
-      .select(`
-        id, title, due_date, assignee_id, priority,
-        column_id
-      `)
+      .select("id, title, due_date, assignee_id, priority, column_id")
       .not("due_date", "is", null)
-      .not("assignee_id", "is", null)
       .lt("due_date", new Date().toISOString());
+
+    if (!testMode) {
+      query = query.not("assignee_id", "is", null);
+    }
+
+    const { data: overdueTasks, error: tasksError } = await query;
 
     if (tasksError) throw tasksError;
 
     if (!overdueTasks || overdueTasks.length === 0) {
-      return new Response(JSON.stringify({ message: "Nenhuma tarefa atrasada com responsável encontrada", sent: 0 }), {
+      return new Response(JSON.stringify({ message: "Nenhuma tarefa atrasada encontrada", sent: 0 }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     // Get assignee profiles with WhatsApp numbers
     const assigneeIds = [...new Set(overdueTasks.map(t => t.assignee_id).filter(Boolean))];
-    const { data: profiles } = await adminClient
-      .from("profiles")
-      .select("user_id, name, whatsapp_number")
-      .in("user_id", assigneeIds);
+    const { data: profiles } = assigneeIds.length > 0
+      ? await adminClient.from("profiles").select("user_id, name, whatsapp_number").in("user_id", assigneeIds)
+      : { data: [] };
 
-    if (!profiles) {
-      return new Response(JSON.stringify({ message: "Nenhum perfil encontrado", sent: 0 }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const profileMap = new Map(profiles.map(p => [p.user_id, p]));
+    const profileMap = new Map((profiles || []).map(p => [p.user_id, p]));
 
     // Get board names for context
     const columnIds = [...new Set(overdueTasks.map(t => t.column_id))];
@@ -100,33 +106,23 @@ Deno.serve(async (req) => {
       .in("id", columnIds);
 
     const boardIds = columns ? [...new Set(columns.map(c => c.board_id))] : [];
-    const { data: boards } = await adminClient
-      .from("boards")
-      .select("id, name")
-      .in("id", boardIds);
+    const { data: boards } = boardIds.length > 0
+      ? await adminClient.from("boards").select("id, name").in("id", boardIds)
+      : { data: [] };
 
     const columnBoardMap = new Map(columns?.map(c => [c.id, c.board_id]) || []);
     const boardNameMap = new Map(boards?.map(b => [b.id, b.name]) || []);
 
     const results: Array<{ task: string; phone: string; status: string; error?: string }> = [];
 
-    // Parse optional body for test mode
-    let testMode = false;
-    let testPhone = "";
-    try {
-      const body = await req.json();
-      testMode = body?.testMode === true;
-      testPhone = body?.testPhone || "";
-    } catch {
-      // No body, proceed normally
-    }
-
     for (const task of overdueTasks) {
-      const profile = profileMap.get(task.assignee_id);
-      if (!profile) continue;
+      const profile = task.assignee_id ? profileMap.get(task.assignee_id) : null;
 
-      const phone = testMode && testPhone ? testPhone : profile.whatsapp_number;
+      // In test mode, use test phone; otherwise require profile with whatsapp
+      const phone = testMode && testPhone ? testPhone : profile?.whatsapp_number;
       if (!phone) continue;
+
+      const userName = profile?.name || "Responsável";
 
       const boardId = columnBoardMap.get(task.column_id);
       const boardName = boardId ? boardNameMap.get(boardId) : "Desconhecido";
@@ -146,7 +142,7 @@ Deno.serve(async (req) => {
         `📊 *Quadro:* ${boardName}\n` +
         `📅 *Prazo:* ${formattedDate}\n` +
         `🔴 *Prioridade:* ${priorityLabels[task.priority] || task.priority}\n\n` +
-        `Olá ${profile.name}, esta tarefa está atrasada. Por favor, verifique o mais breve possível.`;
+        `Olá ${userName}, esta tarefa está atrasada. Por favor, verifique o mais breve possível.`;
 
       // Send via Z-API
       try {
