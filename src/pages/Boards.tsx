@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useBoards } from "@/hooks/useBoards";
-import { useIsAppAdmin } from "@/hooks/useUserRole";
+import { useCanManage } from "@/hooks/useUserRole";
 import { CreateBoardDialog } from "@/components/kanban/CreateBoardDialog";
 import { EditBoardDialog } from "@/components/kanban/EditBoardDialog";
 import { KanbanBoard } from "@/components/kanban/KanbanBoard";
@@ -11,7 +11,7 @@ import { LayoutGrid, Pencil, User } from "lucide-react";
 
 export default function Boards() {
   const { boards, isLoading } = useBoards();
-  const { data: isAdmin } = useIsAppAdmin();
+  const canManageBoards = useCanManage("can_manage_boards");
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
   const [editBoard, setEditBoard] = useState<{ id: string; name: string; description: string | null; team_id: string } | null>(null);
 
@@ -64,7 +64,7 @@ export default function Boards() {
                       )}
                     </div>
                     <div className="flex justify-end">
-                      {isAdmin && (
+                      {canManageBoards && (
                         <Button
                           variant="outline"
                           size="sm"
