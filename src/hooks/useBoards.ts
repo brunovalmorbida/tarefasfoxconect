@@ -227,12 +227,24 @@ export function useTeamMembers(teamId?: string) {
   return useQuery({
     queryKey: ["team-members", teamId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: members, error } = await supabase
         .from("team_members")
-        .select("user_id, role, profiles:user_id(name, user_id)")
+        .select("user_id, role")
         .eq("team_id", teamId!);
       if (error) throw error;
-      return data;
+
+      const userIds = members.map((m) => m.user_id);
+      const { data: profiles, error: pError } = await supabase
+        .from("profiles")
+        .select("user_id, name")
+        .in("user_id", userIds);
+      if (pError) throw pError;
+
+      const profileMap = new Map(profiles.map((p) => [p.user_id, p]));
+      return members.map((m) => ({
+        ...m,
+        profiles: profileMap.get(m.user_id) ?? { user_id: m.user_id, name: "Usuário" },
+      }));
     },
     enabled: !!user && !!teamId,
   });
