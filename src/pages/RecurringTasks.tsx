@@ -329,11 +329,12 @@ export default function RecurringTasks() {
   const [editOpen, setEditOpen] = useState(false);
   const [editId, setEditId] = useState("");
   const [editName, setEditName] = useState("");
+  const [editTeamId, setEditTeamId] = useState("");
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const handleEdit = async () => {
-    if (!editName.trim() || !editId) return;
+    if (!editName.trim() || !editId || !editTeamId) return;
     try {
       await updateBoard.mutateAsync({
         id: editId,
@@ -341,6 +342,7 @@ export default function RecurringTasks() {
         frequencyType: "weekly",
         weekday: 0,
         assignedUserId: null,
+        teamId: editTeamId,
       });
       setEditOpen(false);
       toast({ title: "Quadro atualizado" });
@@ -474,7 +476,7 @@ export default function RecurringTasks() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                      <DropdownMenuItem onClick={() => { setEditId(board.id); setEditName(board.name); setEditOpen(true); }}>
+                      <DropdownMenuItem onClick={() => { setEditId(board.id); setEditName(board.name); setEditTeamId(board.team_id); setEditOpen(true); }}>
                         <Pencil className="h-4 w-4 mr-2" /> Editar
                       </DropdownMenuItem>
                       <DropdownMenuItem className="text-destructive" onClick={() => setDeleteId(board.id)}>
@@ -504,6 +506,21 @@ export default function RecurringTasks() {
           </DialogHeader>
           <div className="space-y-4">
             <Input placeholder="Nome do quadro" value={editName} onChange={(e) => setEditName(e.target.value)} />
+            {teams && teams.length > 1 && (
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Equipe</label>
+                <Select value={editTeamId} onValueChange={setEditTeamId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a equipe" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {teams.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <Button onClick={handleEdit} disabled={!editName.trim() || updateBoard.isPending} className="w-full">Salvar</Button>
           </div>
         </DialogContent>
