@@ -7,7 +7,7 @@ import { KanbanBoard } from "@/components/kanban/KanbanBoard";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { LayoutGrid, Users } from "lucide-react";
+import { LayoutGrid, Users, User } from "lucide-react";
 
 export default function Boards() {
   const { boards, isLoading } = useBoards();
@@ -52,25 +52,33 @@ export default function Boards() {
                   {board.description && <CardDescription>{board.description}</CardDescription>}
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center justify-between">
-                    <div className="flex gap-2">
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <Badge variant="secondary">{colCount} colunas</Badge>
                       <Badge variant="secondary">{taskCount} tarefas</Badge>
+                      {board.assigned_user_id && (
+                        <Badge variant="outline" className="gap-1">
+                          <User className="h-3 w-3" />
+                          Atribuído
+                        </Badge>
+                      )}
                     </div>
-                    {isAdmin && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1.5"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setAccessBoard({ id: board.id, name: board.name, teamId: board.team_id });
-                        }}
-                      >
-                        <Users className="h-3.5 w-3.5" />
-                        Acessos
-                      </Button>
-                    )}
+                    <div className="flex justify-end">
+                      {isAdmin && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setAccessBoard({ id: board.id, name: board.name, teamId: board.team_id });
+                          }}
+                        >
+                          <Users className="h-3.5 w-3.5" />
+                          Acessos
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
