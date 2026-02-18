@@ -1,0 +1,130 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+};
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const adminClient = createClient(supabaseUrl, serviceRoleKey);
+
+    const { taskTitle, assigneeId, boardName, assignedByName } = await req.json();
+
+    if (!assigneeId || !taskTitle) {
+      return new Response(JSON.stringify({ error: "taskTitle and assigneeId are required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Get Z-API config
+    const { data: zapiConfig } = await adminClient
+      .from("zapi_config")
+      .select("*")
+      .eq("is_active", true)
+      .limit(1)
+      .maybeSingle();
+
+    if (!zapiConfig) {
+      return new Response(JSON.stringify({ skipped: true, reason: "Z-API não configurada ou inativa" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Get assignee profile
+    const { data: assigneeProfile } = await adminClient
+      .from("profiles")
+      .select("user_id, name, whatsapp_number")
+      .eq("user_id", assigneeId)
+      .maybeSingle();
+
+    // Get master user (brunovalmorbida@live.com)
+    const { data: masterAuth } = await adminClient.auth.admin.listUsers();
+    const masterUser = masterAuth?.users?.find((u: any) => u.email === "brunovalmorbida@live.com");
+    
+    let masterProfile: any = null;
+    if (masterUser) {
+      const { data } = await adminClient
+        .from("profiles")
+        .select("user_id, name, whatsapp_number")
+        .eq("user_id", masterUser.id)
+        .maybeSingle();
+      masterProfile = data;
+    }
+
+    const results: Array<{ to: string; phone: string; status: string; error?: string }> = [];
+
+    const sendMessage = async (phone: string, recipientName: string, label: string) => {
+      const message = `📌 *Nova Tarefa Atribuída*\n\n` +
+        `📋 *Tarefa:* ${taskTitle}\n` +
+        `📊 *Quadro:* ${boardName || "—"}\n` +
+        `👤 *Responsável:* ${assigneeProfile?.name || "—"}\n` +
+        `🔔 *Atribuída por:* ${assignedByName || "—"}\n\n` +
+        `Olá ${recipientName}, uma nova tarefa foi atribuída. Verifique no sistema!`;
+
+      try {
+        const zapiUrl = `https://api.z-api.io/instances/${zapiConfig.instance_id}/token/${zapiConfig.token}/send-text`;
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (zapiConfig.client_token) headers["Client-Token"] = zapiConfig.client_token;
+
+        const response = await fetch(zapiUrl, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ phone: phone.replace(/\D/g, ""), message }),
+        });
+        const responseData = await response.json();
+
+        if (response.ok) {
+          results.push({ to: label, phone, status: "sent" });
+        } else {
+          results.push({ to: label, phone, status: "error", error: JSON.stringify(responseData) });
+        }
+      } catch (e: any) {
+        results.push({ to: label, phone, status: "error", error: e.message });
+      }
+    };
+
+    // Send to assignee
+    if (assigneeProfile?.whatsapp_number) {
+      await sendMessage(assigneeProfile.whatsapp_number, assigneeProfile.name, "assignee");
+    }
+
+    // Send to master user (if different from assignee)
+    if (masterProfile?.whatsapp_number && masterProfile.user_id !== assigneeId) {
+      await sendMessage(masterProfile.whatsapp_number, masterProfile.name, "master");
+    }
+
+    // Create in-app notifications
+    if (assigneeProfile) {
+      await adminClient.from("notifications").insert({
+        user_id: assigneeId,
+        title: "Nova tarefa atribuída",
+        message: `A tarefa "${taskTitle}" foi atribuída a você no quadro ${boardName || "—"}.`,
+      });
+    }
+    if (masterUser && masterUser.id !== assigneeId) {
+      await adminClient.from("notifications").insert({
+        user_id: masterUser.id,
+        title: "Tarefa atribuída",
+        message: `A tarefa "${taskTitle}" foi atribuída a ${assigneeProfile?.name || "um usuário"} no quadro ${boardName || "—"}.`,
+      });
+    }
+
+    return new Response(JSON.stringify({ success: true, results }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (err: any) {
+    console.error("Error in notify-task-assigned:", err);
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});
