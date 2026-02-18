@@ -15,78 +15,53 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { purchaseId, action } = await req.json();
-    // action: "created" | "purchased" | "received"
+    const { listId, action } = await req.json();
 
-    if (!purchaseId || !action) {
-      return new Response(JSON.stringify({ error: "purchaseId and action required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    if (!listId || !action) {
+      return new Response(JSON.stringify({ error: "listId and action required" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Fetch purchase request
-    const { data: purchase, error: purchaseError } = await supabase
-      .from("purchase_requests")
-      .select("*")
-      .eq("id", purchaseId)
-      .single();
-
-    if (purchaseError || !purchase) {
-      return new Response(JSON.stringify({ error: "Purchase not found" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    // Fetch list with items
+    const { data: list, error: listError } = await supabase
+      .from("purchase_lists").select("*").eq("id", listId).single();
+    if (listError || !list) {
+      return new Response(JSON.stringify({ error: "List not found" }), {
+        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const { data: items } = await supabase
+      .from("purchase_list_items").select("*").eq("list_id", listId);
 
     // Fetch Z-API config
     const { data: zapiConfig } = await supabase
-      .from("zapi_config")
-      .select("*")
-      .eq("is_active", true)
-      .limit(1)
-      .single();
+      .from("zapi_config").select("*").eq("is_active", true).limit(1).single();
 
-    // Get master admin profile
+    // Get master admin
     const { data: masterProfile } = await supabase
-      .from("profiles")
-      .select("user_id, name, whatsapp_number")
-      .ilike("name", "%bruno%")
-      .limit(1)
-      .single();
+      .from("profiles").select("user_id, name, whatsapp_number")
+      .ilike("name", "%bruno%").limit(1).single();
 
-    // Get requester profile
+    // Get requester
     const { data: requesterProfile } = await supabase
-      .from("profiles")
-      .select("user_id, name, whatsapp_number")
-      .eq("user_id", purchase.requested_by)
-      .single();
+      .from("profiles").select("user_id, name, whatsapp_number")
+      .eq("user_id", list.requested_by).single();
 
-    // Get buyer profile if exists
+    // Get buyer
     let buyerProfile = null;
-    if (purchase.buyer_id) {
+    if (list.buyer_id) {
       const { data } = await supabase
-        .from("profiles")
-        .select("user_id, name, whatsapp_number")
-        .eq("user_id", purchase.buyer_id)
-        .single();
+        .from("profiles").select("user_id, name, whatsapp_number")
+        .eq("user_id", list.buyer_id).single();
       buyerProfile = data;
     }
 
-    const urgencyLabels: Record<string, string> = {
-      low: "Baixa",
-      medium: "Média",
-      high: "Alta",
-      urgent: "Urgente",
-    };
-
+    const urgencyLabels: Record<string, string> = { low: "Baixa", medium: "Média", high: "Alta", urgent: "Urgente" };
     const categoryLabels: Record<string, string> = {
-      office: "Escritório",
-      cleaning: "Limpeza",
-      technology: "Tecnologia",
-      maintenance: "Manutenção",
-      food: "Alimentação",
-      other: "Outros",
+      office: "Escritório", cleaning: "Limpeza", technology: "Tecnologia",
+      maintenance: "Manutenção", food: "Alimentação", other: "Outros",
     };
 
     const sendWhatsApp = async (phone: string, message: string) => {
@@ -95,72 +70,76 @@ Deno.serve(async (req) => {
       const url = `https://api.z-api.io/instances/${zapiConfig.instance_id}/token/${zapiConfig.token}/send-text`;
       await fetch(url, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Client-Token": zapiConfig.client_token || "",
-        },
+        headers: { "Content-Type": "application/json", "Client-Token": zapiConfig.client_token || "" },
         body: JSON.stringify({ phone: cleanPhone, message }),
       });
+    };
+
+    // Build items list text
+    const buildItemsList = (showActual = false) => {
+      return (items || []).map((item: any, i: number) => {
+        let line = `  ${i + 1}. ${item.name} (x${item.quantity}) - ${categoryLabels[item.category] || item.category}`;
+        if (item.estimated_value && !showActual) line += ` | Est: R$ ${Number(item.estimated_value).toFixed(2)}`;
+        if (item.actual_value && showActual) line += ` | R$ ${Number(item.actual_value).toFixed(2)}`;
+        if (item.description) line += ` | ${item.description}`;
+        return line;
+      }).join("\n");
     };
 
     const notifications: Array<{ user_id: string; title: string; message: string }> = [];
     const results: string[] = [];
 
     if (action === "created") {
-      // Notify admin master: new purchase request
-      const msg = `🛒 *Nova Solicitação de Compra*\n\n` +
-        `📦 *Item:* ${purchase.title}\n` +
-        `📊 *Qtd:* ${purchase.quantity}\n` +
-        `📂 *Categoria:* ${categoryLabels[purchase.category] || purchase.category}\n` +
-        `⚡ *Urgência:* ${urgencyLabels[purchase.urgency] || purchase.urgency}\n` +
-        (purchase.estimated_value ? `💰 *Valor estimado:* R$ ${Number(purchase.estimated_value).toFixed(2)}\n` : "") +
-        (purchase.description ? `📝 *Obs:* ${purchase.description}\n` : "") +
-        `👤 *Solicitado por:* ${requesterProfile?.name || "Desconhecido"}`;
+      const msg = `🛒 *Nova Lista de Compras*\n\n` +
+        `📋 *${list.title}*\n` +
+        `⚡ *Urgência:* ${urgencyLabels[list.urgency] || list.urgency}\n` +
+        `👤 *Solicitado por:* ${requesterProfile?.name || "Desconhecido"}\n\n` +
+        `📦 *Itens (${(items || []).length}):*\n${buildItemsList()}`;
 
       if (masterProfile?.whatsapp_number) {
         await sendWhatsApp(masterProfile.whatsapp_number, msg);
         results.push("WhatsApp sent to admin");
       }
       if (masterProfile) {
+        const itemNames = (items || []).map((i: any) => i.name).join(", ");
         notifications.push({
           user_id: masterProfile.user_id,
-          title: "Nova solicitação de compra",
-          message: `${requesterProfile?.name || "Alguém"} solicitou a compra de ${purchase.quantity}x ${purchase.title}`,
+          title: "Nova lista de compras",
+          message: `${requesterProfile?.name || "Alguém"} solicitou: ${itemNames}`,
         });
       }
     } else if (action === "purchased") {
-      // Notify requester: item was purchased
+      const totalValue = (items || []).reduce((sum: number, i: any) => sum + (Number(i.actual_value) || 0), 0);
       const msg = `✅ *Compra Realizada*\n\n` +
-        `📦 *Item:* ${purchase.title}\n` +
-        `📊 *Qtd:* ${purchase.quantity}\n` +
-        (purchase.actual_value ? `💰 *Valor:* R$ ${Number(purchase.actual_value).toFixed(2)}\n` : "") +
-        (purchase.purchase_notes ? `📝 *Obs:* ${purchase.purchase_notes}\n` : "") +
-        `🛍️ *Comprado por:* ${buyerProfile?.name || "Desconhecido"}`;
+        `📋 *${list.title}*\n` +
+        `🛍️ *Comprado por:* ${buyerProfile?.name || "Desconhecido"}\n` +
+        (totalValue > 0 ? `💰 *Total:* R$ ${totalValue.toFixed(2)}\n` : "") +
+        (list.purchase_notes ? `📝 *Obs:* ${list.purchase_notes}\n` : "") +
+        `\n📦 *Itens:*\n${buildItemsList(true)}`;
 
       if (requesterProfile?.whatsapp_number) {
         await sendWhatsApp(requesterProfile.whatsapp_number, msg);
         results.push("WhatsApp sent to requester");
       }
+      const itemNames = (items || []).map((i: any) => i.name).join(", ");
       notifications.push({
-        user_id: purchase.requested_by,
+        user_id: list.requested_by,
         title: "Compra realizada",
-        message: `O item "${purchase.title}" foi comprado por ${buyerProfile?.name || "alguém"}`,
+        message: `${buyerProfile?.name || "Alguém"} comprou: ${itemNames}`,
       });
-      // Also notify admin
-      if (masterProfile && masterProfile.user_id !== purchase.requested_by) {
+      if (masterProfile && masterProfile.user_id !== list.requested_by) {
         notifications.push({
           user_id: masterProfile.user_id,
           title: "Compra realizada",
-          message: `${buyerProfile?.name || "Alguém"} comprou o item "${purchase.title}"`,
+          message: `${buyerProfile?.name || "Alguém"} comprou a lista "${list.title}"`,
         });
       }
     } else if (action === "received") {
-      // Notify admin: material arrived
       const msg = `📬 *Material Recebido*\n\n` +
-        `📦 *Item:* ${purchase.title}\n` +
-        `📊 *Qtd:* ${purchase.quantity}\n` +
-        (purchase.receive_notes ? `📝 *Obs:* ${purchase.receive_notes}\n` : "") +
-        `👤 *Recebido por:* ${requesterProfile?.name || "Desconhecido"}`;
+        `📋 *${list.title}*\n` +
+        `👤 *Recebido por:* ${requesterProfile?.name || "Desconhecido"}\n` +
+        (list.receive_notes ? `📝 *Obs:* ${list.receive_notes}\n` : "") +
+        `\n📦 *Itens:*\n${buildItemsList(true)}`;
 
       if (masterProfile?.whatsapp_number) {
         await sendWhatsApp(masterProfile.whatsapp_number, msg);
@@ -170,15 +149,14 @@ Deno.serve(async (req) => {
         notifications.push({
           user_id: masterProfile.user_id,
           title: "Material recebido",
-          message: `${requesterProfile?.name || "Alguém"} confirmou o recebimento de "${purchase.title}"`,
+          message: `${requesterProfile?.name || "Alguém"} recebeu a lista "${list.title}"`,
         });
       }
     }
 
-    // Insert in-app notifications
     if (notifications.length > 0) {
       await supabase.from("notifications").insert(notifications);
-      results.push(`${notifications.length} in-app notifications created`);
+      results.push(`${notifications.length} in-app notifications`);
     }
 
     return new Response(JSON.stringify({ success: true, results }), {
@@ -186,8 +164,7 @@ Deno.serve(async (req) => {
     });
   } catch (error) {
     return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
