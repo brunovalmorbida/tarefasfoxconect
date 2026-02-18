@@ -14,6 +14,7 @@ export function IntegrationsTab() {
   const queryClient = useQueryClient();
   const [instanceId, setInstanceId] = useState("");
   const [token, setToken] = useState("");
+  const [clientToken, setClientToken] = useState("");
   const [isActive, setIsActive] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -34,6 +35,7 @@ export function IntegrationsTab() {
     if (config) {
       setInstanceId(config.instance_id);
       setToken(config.token);
+      setClientToken((config as any).client_token || "");
       setIsActive(config.is_active);
     }
   }, [config]);
@@ -48,13 +50,13 @@ export function IntegrationsTab() {
       if (config) {
         const { error } = await supabase
           .from("zapi_config")
-          .update({ instance_id: instanceId, token, is_active: isActive })
+          .update({ instance_id: instanceId, token, client_token: clientToken, is_active: isActive } as any)
           .eq("id", config.id);
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from("zapi_config")
-          .insert({ instance_id: instanceId, token, is_active: isActive });
+          .insert({ instance_id: instanceId, token, client_token: clientToken, is_active: isActive } as any);
         if (error) throw error;
       }
       queryClient.invalidateQueries({ queryKey: ["zapi-config"] });
@@ -104,6 +106,16 @@ export function IntegrationsTab() {
               placeholder="Seu Token da Z-API"
               value={token}
               onChange={(e) => setToken(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="client-token">Client-Token (Token de Segurança da Conta)</Label>
+            <Input
+              id="client-token"
+              type="password"
+              placeholder="Seu Client-Token da Z-API (aba Segurança)"
+              value={clientToken}
+              onChange={(e) => setClientToken(e.target.value)}
             />
           </div>
           <div className="flex items-center justify-between">
