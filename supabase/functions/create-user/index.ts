@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
 
     if (!role) throw new Error("Sem permissão de administrador");
 
-    const { name, email, password, teamIds } = await req.json();
+    const { name, email, password, whatsappNumber, teamIds } = await req.json();
 
     // Validate inputs
     if (!name || typeof name !== "string" || name.trim().length === 0) {
@@ -58,6 +58,14 @@ Deno.serve(async (req) => {
     if (createError) throw createError;
 
     const userId = newUser.user.id;
+
+    // Update whatsapp number if provided
+    if (whatsappNumber && typeof whatsappNumber === "string" && whatsappNumber.trim()) {
+      await adminClient
+        .from("profiles")
+        .update({ whatsapp_number: whatsappNumber.trim() })
+        .eq("user_id", userId);
+    }
 
     // Add user to selected teams
     if (teamIds && Array.isArray(teamIds) && teamIds.length > 0) {
