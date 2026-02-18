@@ -220,6 +220,47 @@ export type Database = {
         }
         Relationships: []
       }
+      recurring_task_boards: {
+        Row: {
+          created_at: string
+          created_by: string
+          frequency_type: string
+          id: string
+          name: string
+          team_id: string
+          updated_at: string
+          weekday: number | null
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          frequency_type: string
+          id?: string
+          name: string
+          team_id: string
+          updated_at?: string
+          weekday?: number | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          frequency_type?: string
+          id?: string
+          name?: string
+          team_id?: string
+          updated_at?: string
+          weekday?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_task_boards_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recurring_task_completions: {
         Row: {
           completed_at: string
@@ -254,6 +295,7 @@ export type Database = {
       }
       recurring_tasks: {
         Row: {
+          board_id: string | null
           created_at: string
           created_by: string
           description: string | null
@@ -264,6 +306,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          board_id?: string | null
           created_at?: string
           created_by: string
           description?: string | null
@@ -274,6 +317,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          board_id?: string | null
           created_at?: string
           created_by?: string
           description?: string | null
@@ -284,6 +328,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "recurring_tasks_board_id_fkey"
+            columns: ["board_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_task_boards"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "recurring_tasks_team_id_fkey"
             columns: ["team_id"]
