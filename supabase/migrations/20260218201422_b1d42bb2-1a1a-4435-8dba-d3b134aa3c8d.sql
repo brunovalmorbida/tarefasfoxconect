@@ -1,0 +1,1 @@
+ALTER TABLE public.zapi_config ADD COLUMN client_token text;

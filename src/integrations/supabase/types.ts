@@ -518,6 +518,7 @@ export type Database = {
       }
       zapi_config: {
         Row: {
+          client_token: string | null
           created_at: string
           id: string
           instance_id: string
@@ -526,6 +527,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          client_token?: string | null
           created_at?: string
           id?: string
           instance_id: string
@@ -534,6 +536,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          client_token?: string | null
           created_at?: string
           id?: string
           instance_id?: string
