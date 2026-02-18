@@ -62,6 +62,7 @@ export function KanbanBoard({ boardId, onBack }: Props) {
   const [addingTaskCol, setAddingTaskCol] = useState<string | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskAssignee, setNewTaskAssignee] = useState<string>("");
+  const [newTaskDueDate, setNewTaskDueDate] = useState<Date | undefined>(undefined);
   const [editingTask, setEditingTask] = useState<any>(null);
 
   // Fetch team members for assignee selection
@@ -106,14 +107,20 @@ export function KanbanBoard({ boardId, onBack }: Props) {
 
   const handleAddTask = async (columnId: string) => {
     if (!newTaskTitle.trim()) return;
+    if (!newTaskDueDate) {
+      toast.error("O prazo é obrigatório");
+      return;
+    }
     try {
       await addTask.mutateAsync({
         columnId,
         title: newTaskTitle.trim(),
         assigneeId: newTaskAssignee && newTaskAssignee !== "none" ? newTaskAssignee : undefined,
+        dueDate: newTaskDueDate.toISOString(),
       });
       setNewTaskTitle("");
       setNewTaskAssignee("");
+      setNewTaskDueDate(undefined);
       setAddingTaskCol(null);
     } catch { toast.error("Erro ao criar tarefa"); }
   };
@@ -132,6 +139,10 @@ export function KanbanBoard({ boardId, onBack }: Props) {
 
   const handleUpdateTask = async () => {
     if (!editingTask) return;
+    if (!editingTask.due_date) {
+      toast.error("O prazo é obrigatório");
+      return;
+    }
     try {
       await updateTask.mutateAsync({
         id: editingTask.id,
@@ -251,9 +262,35 @@ export function KanbanBoard({ boardId, onBack }: Props) {
                       ))}
                     </SelectContent>
                   </Select>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "h-8 text-xs w-full justify-start text-left font-normal",
+                          !newTaskDueDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-3 w-3" />
+                        {newTaskDueDate
+                          ? format(newTaskDueDate, "dd/MM/yyyy", { locale: ptBR })
+                          : "Prazo *"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={newTaskDueDate}
+                        onSelect={setNewTaskDueDate}
+                        disabled={(date) => date <= new Date(new Date().setHours(23, 59, 59, 999))}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
                   <div className="flex gap-2">
-                    <Button size="sm" onClick={() => handleAddTask(col.id)} disabled={!newTaskTitle.trim()}>Adicionar</Button>
-                    <Button size="sm" variant="ghost" onClick={() => { setAddingTaskCol(null); setNewTaskTitle(""); setNewTaskAssignee(""); }}>Cancelar</Button>
+                    <Button size="sm" onClick={() => handleAddTask(col.id)} disabled={!newTaskTitle.trim() || !newTaskDueDate}>Adicionar</Button>
+                    <Button size="sm" variant="ghost" onClick={() => { setAddingTaskCol(null); setNewTaskTitle(""); setNewTaskAssignee(""); setNewTaskDueDate(undefined); }}>Cancelar</Button>
                   </div>
                 </div>
               ) : (
