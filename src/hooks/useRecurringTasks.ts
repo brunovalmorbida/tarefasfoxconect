@@ -9,6 +9,7 @@ export type RecurringTaskBoard = {
   name: string;
   frequency_type: "weekday" | "weekly" | "monthly";
   weekday: number | null; // 0=Monday..6=Sunday
+  assigned_user_id: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -86,12 +87,14 @@ export function useRecurringTaskBoards(teamId?: string) {
       frequencyType: "weekday" | "weekly" | "monthly";
       weekday?: number;
       teamId: string;
+      assignedUserId?: string | null;
     }) => {
       const { error } = await supabase.from("recurring_task_boards" as any).insert({
         name: params.name,
         frequency_type: params.frequencyType,
         weekday: params.frequencyType === "weekday" ? (params.weekday ?? 0) : null,
         team_id: params.teamId,
+        assigned_user_id: params.assignedUserId || null,
         created_by: user!.id,
       });
       if (error) throw error;
@@ -105,6 +108,7 @@ export function useRecurringTaskBoards(teamId?: string) {
       name: string;
       frequencyType: "weekday" | "weekly" | "monthly";
       weekday?: number;
+      assignedUserId?: string | null;
     }) => {
       const { error } = await supabase
         .from("recurring_task_boards" as any)
@@ -112,6 +116,7 @@ export function useRecurringTaskBoards(teamId?: string) {
           name: params.name,
           frequency_type: params.frequencyType,
           weekday: params.frequencyType === "weekday" ? (params.weekday ?? 0) : null,
+          assigned_user_id: params.assignedUserId || null,
         })
         .eq("id", params.id);
       if (error) throw error;

@@ -222,6 +222,7 @@ export type Database = {
       }
       recurring_task_boards: {
         Row: {
+          assigned_user_id: string | null
           created_at: string
           created_by: string
           frequency_type: string
@@ -232,6 +233,7 @@ export type Database = {
           weekday: number | null
         }
         Insert: {
+          assigned_user_id?: string | null
           created_at?: string
           created_by: string
           frequency_type: string
@@ -242,6 +244,7 @@ export type Database = {
           weekday?: number | null
         }
         Update: {
+          assigned_user_id?: string | null
           created_at?: string
           created_by?: string
           frequency_type?: string
