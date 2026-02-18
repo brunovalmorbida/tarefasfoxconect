@@ -220,6 +220,69 @@ export type Database = {
         }
         Relationships: []
       }
+      purchase_requests: {
+        Row: {
+          actual_value: number | null
+          buyer_id: string | null
+          category: Database["public"]["Enums"]["purchase_category"]
+          created_at: string
+          description: string | null
+          estimated_value: number | null
+          id: string
+          purchase_notes: string | null
+          purchased_at: string | null
+          quantity: number
+          receive_notes: string | null
+          received_at: string | null
+          received_by: string | null
+          requested_by: string
+          status: Database["public"]["Enums"]["purchase_status"]
+          title: string
+          updated_at: string
+          urgency: Database["public"]["Enums"]["purchase_urgency"]
+        }
+        Insert: {
+          actual_value?: number | null
+          buyer_id?: string | null
+          category?: Database["public"]["Enums"]["purchase_category"]
+          created_at?: string
+          description?: string | null
+          estimated_value?: number | null
+          id?: string
+          purchase_notes?: string | null
+          purchased_at?: string | null
+          quantity?: number
+          receive_notes?: string | null
+          received_at?: string | null
+          received_by?: string | null
+          requested_by: string
+          status?: Database["public"]["Enums"]["purchase_status"]
+          title: string
+          updated_at?: string
+          urgency?: Database["public"]["Enums"]["purchase_urgency"]
+        }
+        Update: {
+          actual_value?: number | null
+          buyer_id?: string | null
+          category?: Database["public"]["Enums"]["purchase_category"]
+          created_at?: string
+          description?: string | null
+          estimated_value?: number | null
+          id?: string
+          purchase_notes?: string | null
+          purchased_at?: string | null
+          quantity?: number
+          receive_notes?: string | null
+          received_at?: string | null
+          received_by?: string | null
+          requested_by?: string
+          status?: Database["public"]["Enums"]["purchase_status"]
+          title?: string
+          updated_at?: string
+          urgency?: Database["public"]["Enums"]["purchase_urgency"]
+        }
+        Relationships: []
+      }
       recurring_task_boards: {
         Row: {
           assigned_user_id: string | null
@@ -564,6 +627,15 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
+      purchase_category:
+        | "office"
+        | "cleaning"
+        | "technology"
+        | "maintenance"
+        | "food"
+        | "other"
+      purchase_status: "pending" | "purchased" | "received"
+      purchase_urgency: "low" | "medium" | "high" | "urgent"
       task_priority: "low" | "medium" | "high" | "urgent"
       team_role: "admin" | "member"
     }
@@ -694,6 +766,16 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
+      purchase_category: [
+        "office",
+        "cleaning",
+        "technology",
+        "maintenance",
+        "food",
+        "other",
+      ],
+      purchase_status: ["pending", "purchased", "received"],
+      purchase_urgency: ["low", "medium", "high", "urgent"],
       task_priority: ["low", "medium", "high", "urgent"],
       team_role: ["admin", "member"],
     },
