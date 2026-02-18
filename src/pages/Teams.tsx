@@ -7,8 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Users } from "lucide-react";
+import { Plus, Users, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -20,6 +21,13 @@ export default function Teams() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [creating, setCreating] = useState(false);
+
+  // Edit state
+  const [editOpen, setEditOpen] = useState(false);
+  const [editId, setEditId] = useState("");
+  const [editName, setEditName] = useState("");
+  const [editDesc, setEditDesc] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,6 +45,40 @@ export default function Teams() {
       toast.error(err.message || "Erro ao criar equipe");
     } finally {
       setCreating(false);
+    }
+  };
+
+  const openEdit = (team: { id: string; name: string; description: string | null }) => {
+    setEditId(team.id);
+    setEditName(team.name);
+    setEditDesc(team.description ?? "");
+    setEditOpen(true);
+  };
+
+  const handleUpdate = async () => {
+    if (!editName.trim()) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase.from("teams").update({ name: editName.trim(), description: editDesc.trim() || null }).eq("id", editId);
+      if (error) throw error;
+      toast.success("Equipe atualizada!");
+      queryClient.invalidateQueries({ queryKey: ["teams"] });
+      setEditOpen(false);
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao atualizar equipe");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      const { error } = await supabase.from("teams").delete().eq("id", id);
+      if (error) throw error;
+      toast.success("Equipe excluída!");
+      queryClient.invalidateQueries({ queryKey: ["teams"] });
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao excluir equipe");
     }
   };
 
@@ -80,7 +122,35 @@ export default function Teams() {
           {teams.map((team) => (
             <Card key={team.id}>
               <CardHeader>
-                <CardTitle className="text-lg">{team.name}</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">{team.name}</CardTitle>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(team)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Excluir equipe?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Todos os quadros e tarefas desta equipe serão excluídos. Esta ação não pode ser desfeita.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleDelete(team.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                            Excluir
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </div>
                 {team.description && <CardDescription>{team.description}</CardDescription>}
               </CardHeader>
               <CardContent>
@@ -90,6 +160,26 @@ export default function Teams() {
           ))}
         </div>
       )}
+
+      {/* Edit dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Editar Equipe</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-foreground">Nome</label>
+              <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-foreground">Descrição (opcional)</label>
+              <Textarea value={editDesc} onChange={(e) => setEditDesc(e.target.value)} rows={3} />
+            </div>
+            <Button onClick={handleUpdate} className="w-full" disabled={!editName.trim() || saving}>
+              {saving ? "Salvando..." : "Salvar"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
