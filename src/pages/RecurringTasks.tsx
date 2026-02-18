@@ -6,18 +6,20 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Trash2, Plus, CalendarDays, CalendarRange, Calendar, Pencil, ArrowLeft, User } from "lucide-react";
+import { Trash2, Plus, Pencil, ArrowLeft, User, CalendarDays, CalendarRange, Calendar, Clock } from "lucide-react";
 import {
   useRecurringTaskBoards,
   useRecurringTasks,
   getWeekdayName,
+  getTaskFrequencyLabel,
+  isTaskActiveToday,
   RecurringTaskBoard,
   RecurringTask,
 } from "@/hooks/useRecurringTasks";
 import { useTeams, useTeamMembers } from "@/hooks/useBoards";
 import { useCanManage } from "@/hooks/useUserRole";
 import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
 
 const WEEKDAYS = [
   { value: "0", label: "Segunda" },
@@ -29,15 +31,15 @@ const WEEKDAYS = [
   { value: "6", label: "Domingo" },
 ];
 
-function frequencyLabel(board: RecurringTaskBoard): string {
-  if (board.frequency_type === "weekday") return getWeekdayName(board.weekday ?? 0);
-  if (board.frequency_type === "weekly") return "Semanal";
-  return "Mensal";
-}
+const MONTH_DAYS = Array.from({ length: 31 }, (_, i) => ({
+  value: String(i + 1),
+  label: String(i + 1),
+}));
 
-function frequencyIcon(type: string) {
-  if (type === "weekday") return CalendarDays;
-  if (type === "weekly") return CalendarRange;
+function taskFrequencyIcon(freq: string) {
+  if (freq === "daily") return Clock;
+  if (freq === "weekday") return CalendarDays;
+  if (freq === "weekly") return CalendarRange;
   return Calendar;
 }
 
@@ -61,9 +63,11 @@ function BoardDetail({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newDesc, setNewDesc] = useState("");
+  const [newFrequency, setNewFrequency] = useState<"daily" | "weekly" | "weekday" | "monthly">("daily");
+  const [newWeekday, setNewWeekday] = useState("0");
+  const [newMonthDay, setNewMonthDay] = useState("1");
+
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [freqType, setFreqType] = useState<"weekday" | "weekly" | "monthly">(board.frequency_type);
-  const [weekday, setWeekday] = useState(String(board.weekday ?? 0));
   const [assignedUser, setAssignedUser] = useState(board.assigned_user_id ?? "");
 
   const handleSaveSettings = async () => {
@@ -71,8 +75,8 @@ function BoardDetail({
       await onUpdateBoard({
         id: board.id,
         name: board.name,
-        frequencyType: freqType,
-        weekday: parseInt(weekday),
+        frequencyType: board.frequency_type,
+        weekday: board.weekday ?? 0,
         assignedUserId: assignedUser && assignedUser !== "none" ? assignedUser : null,
       });
       setSettingsOpen(false);
@@ -90,9 +94,15 @@ function BoardDetail({
         description: newDesc.trim(),
         boardId: board.id,
         teamId: board.team_id,
+        frequency: newFrequency,
+        weekday: newFrequency === "weekday" ? parseInt(newWeekday) : null,
+        monthDay: newFrequency === "monthly" ? parseInt(newMonthDay) : null,
       });
       setNewTitle("");
       setNewDesc("");
+      setNewFrequency("daily");
+      setNewWeekday("0");
+      setNewMonthDay("1");
       setDialogOpen(false);
       toast({ title: "Tarefa criada com sucesso" });
     } catch {
@@ -109,8 +119,6 @@ function BoardDetail({
     }
   };
 
-  const Icon = frequencyIcon(board.frequency_type);
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -119,11 +127,8 @@ function BoardDetail({
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-              <Icon className="h-5 w-5 text-primary" />
-              {board.name}
-            </h1>
-            <p className="text-muted-foreground">{frequencyLabel(board)}</p>
+            <h1 className="text-2xl font-bold tracking-tight">{board.name}</h1>
+            <p className="text-muted-foreground">Tarefas recorrentes</p>
           </div>
         </div>
         {canManage && (
@@ -139,31 +144,7 @@ function BoardDetail({
                   <DialogTitle>Configurações do Quadro</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
-                  <Select value={freqType} onValueChange={(v) => setFreqType(v as any)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="weekday">Dia da semana</SelectItem>
-                      <SelectItem value="weekly">Semanal</SelectItem>
-                      <SelectItem value="monthly">Mensal</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {freqType === "weekday" && (
-                    <Select value={weekday} onValueChange={setWeekday}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {WEEKDAYS.map((d) => (
-                          <SelectItem key={d.value} value={d.value}>
-                            {d.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                  <Select value={assignedUser} onValueChange={setAssignedUser}>
+                  <Select value={assignedUser || "none"} onValueChange={setAssignedUser}>
                     <SelectTrigger>
                       <SelectValue placeholder="Todos da equipe (sem atribuição)" />
                     </SelectTrigger>
@@ -203,6 +184,54 @@ function BoardDetail({
                     value={newDesc}
                     onChange={(e) => setNewDesc(e.target.value)}
                   />
+                  <div>
+                    <label className="text-sm font-medium mb-1.5 block">Frequência</label>
+                    <Select value={newFrequency} onValueChange={(v) => setNewFrequency(v as any)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="daily">Diária</SelectItem>
+                        <SelectItem value="weekly">Semanal</SelectItem>
+                        <SelectItem value="weekday">Dia da semana específico</SelectItem>
+                        <SelectItem value="monthly">Dia do mês específico</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {newFrequency === "weekday" && (
+                    <div>
+                      <label className="text-sm font-medium mb-1.5 block">Dia da semana</label>
+                      <Select value={newWeekday} onValueChange={setNewWeekday}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {WEEKDAYS.map((d) => (
+                            <SelectItem key={d.value} value={d.value}>
+                              {d.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  {newFrequency === "monthly" && (
+                    <div>
+                      <label className="text-sm font-medium mb-1.5 block">Dia do mês</label>
+                      <Select value={newMonthDay} onValueChange={setNewMonthDay}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {MONTH_DAYS.map((d) => (
+                            <SelectItem key={d.value} value={d.value}>
+                              {d.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   <Button
                     onClick={handleCreate}
                     disabled={!newTitle.trim() || createTask.isPending}
@@ -230,18 +259,30 @@ function BoardDetail({
           <CardContent className="pt-6">
             <ul className="space-y-2">
               {tasks.map((task) => {
-                const completed = isTaskCompleted(task, board);
+                const completed = isTaskCompleted(task);
+                const active = isTaskActiveToday(task);
+                const Icon = taskFrequencyIcon(task.frequency);
                 return (
-                  <li key={task.id} className="flex items-start gap-3 rounded-md border p-3">
+                  <li
+                    key={task.id}
+                    className={`flex items-start gap-3 rounded-md border p-3 ${!active ? "opacity-50" : ""}`}
+                  >
                     <Checkbox
                       checked={completed}
-                      onCheckedChange={() => toggleCompletion.mutate({ task, board })}
+                      onCheckedChange={() => toggleCompletion.mutate({ task })}
                       className="mt-0.5"
+                      disabled={!active}
                     />
                     <div className="flex-1 min-w-0">
                       <span className={completed ? "line-through text-muted-foreground" : ""}>
                         {task.title}
                       </span>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge variant="outline" className="text-xs gap-1">
+                          <Icon className="h-3 w-3" />
+                          {getTaskFrequencyLabel(task)}
+                        </Badge>
+                      </div>
                       {task.description && (
                         <p className="text-xs text-muted-foreground mt-1">{task.description}</p>
                       )}
@@ -273,14 +314,13 @@ export default function RecurringTasks() {
   const canManage = useCanManage("can_manage_recurring_tasks");
   const [selectedTeam, setSelectedTeam] = useState<string>("");
   const teamId = selectedTeam || teams?.[0]?.id || "";
-  const { boards, isLoading, createBoard, updateBoard, deleteBoard, isActiveToday } =
+  const { boards, isLoading, createBoard, updateBoard, deleteBoard } =
     useRecurringTaskBoards(teamId);
   const { data: teamMembers } = useTeamMembers(teamId);
   const { toast } = useToast();
 
   const [selectedBoard, setSelectedBoard] = useState<RecurringTaskBoard | null>(null);
 
-  // Create board dialog
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState("");
 
@@ -393,38 +433,26 @@ export default function RecurringTasks() {
         </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {boards.map((board) => {
-            const Icon = frequencyIcon(board.frequency_type);
-            const active = isActiveToday(board);
-            return (
-              <Card
-                key={board.id}
-                className={`cursor-pointer transition-colors hover:border-primary/50 ${!active ? "opacity-50" : ""}`}
-                onClick={() => setSelectedBoard(board)}
-              >
-                <CardHeader className="pb-2">
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <Icon className="h-4 w-4 text-primary" />
-                      {board.name}
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">{frequencyLabel(board)}</p>
-                  {board.assigned_user_id && (
-                    <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                      <User className="h-3 w-3" /> {getMemberName(board.assigned_user_id)}
-                    </p>
-                  )}
-                  {!active && (
-                    <p className="text-xs text-muted-foreground mt-1">Não ativo hoje</p>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
+          {boards.map((board) => (
+            <Card
+              key={board.id}
+              className="cursor-pointer transition-colors hover:border-primary/50"
+              onClick={() => setSelectedBoard(board)}
+            >
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">{board.name}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {board.assigned_user_id && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <User className="h-3 w-3" /> {getMemberName(board.assigned_user_id)}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          ))}
         </div>
       )}
-
     </div>
   );
 }

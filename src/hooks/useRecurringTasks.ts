@@ -8,7 +8,7 @@ export type RecurringTaskBoard = {
   team_id: string;
   name: string;
   frequency_type: "weekday" | "weekly" | "monthly";
-  weekday: number | null; // 0=Monday..6=Sunday
+  weekday: number | null;
   assigned_user_id: string | null;
   created_by: string;
   created_at: string;
@@ -21,7 +21,9 @@ export type RecurringTask = {
   board_id: string | null;
   title: string;
   description: string | null;
-  frequency: "daily" | "weekly" | "monthly";
+  frequency: "daily" | "weekly" | "weekday" | "monthly";
+  weekday: number | null;
+  month_day: number | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -41,9 +43,23 @@ export function getWeekdayName(weekday: number): string {
   return WEEKDAY_NAMES[weekday] ?? "";
 }
 
-function getCurrentPeriodStart(frequencyType: "weekday" | "weekly" | "monthly", weekday?: number | null): string {
+export function getTaskFrequencyLabel(task: RecurringTask): string {
+  switch (task.frequency) {
+    case "daily":
+      return "Diária";
+    case "weekly":
+      return "Semanal";
+    case "weekday":
+      return getWeekdayName(task.weekday ?? 0);
+    case "monthly":
+      return `Dia ${task.month_day ?? 1} do mês`;
+  }
+}
+
+function getTaskPeriodStart(task: RecurringTask): string {
   const now = new Date();
-  switch (frequencyType) {
+  switch (task.frequency) {
+    case "daily":
     case "weekday":
       return format(startOfDay(now), "yyyy-MM-dd");
     case "weekly":
@@ -53,12 +69,21 @@ function getCurrentPeriodStart(frequencyType: "weekday" | "weekly" | "monthly", 
   }
 }
 
+export function isTaskActiveToday(task: RecurringTask): boolean {
+  if (task.frequency === "weekday" && task.weekday !== null) {
+    const jsDay = getDay(new Date());
+    const ourDay = jsDay === 0 ? 6 : jsDay - 1;
+    return ourDay === task.weekday;
+  }
+  if (task.frequency === "monthly" && task.month_day !== null) {
+    return new Date().getDate() === task.month_day;
+  }
+  return true; // daily and weekly are always "active"
+}
+
 function isActiveToday(board: RecurringTaskBoard): boolean {
-  if (board.frequency_type !== "weekday" || board.weekday === null) return true;
-  // JS getDay: 0=Sun,1=Mon..6=Sat → convert to our 0=Mon..6=Sun
-  const jsDay = getDay(new Date());
-  const ourDay = jsDay === 0 ? 6 : jsDay - 1;
-  return ourDay === board.weekday;
+  // Boards no longer control frequency, always active
+  return true;
 }
 
 export function useRecurringTaskBoards(teamId?: string) {
@@ -71,7 +96,6 @@ export function useRecurringTaskBoards(teamId?: string) {
       let query = supabase
         .from("recurring_task_boards" as any)
         .select("*")
-        .order("frequency_type")
         .order("name");
       if (teamId) query = query.eq("team_id", teamId);
       const { data, error } = await query;
@@ -179,16 +203,16 @@ export function useRecurringTasks(boardId?: string) {
     enabled: !!user && !!tasksQuery.data,
   });
 
-  const isTaskCompleted = (task: RecurringTask, board: RecurringTaskBoard): boolean => {
-    const periodStart = getCurrentPeriodStart(board.frequency_type, board.weekday);
+  const isTaskCompleted = (task: RecurringTask): boolean => {
+    const periodStart = getTaskPeriodStart(task);
     return (completionsQuery.data ?? []).some(
       (c) => c.recurring_task_id === task.id && c.period_start === periodStart
     );
   };
 
   const toggleCompletion = useMutation({
-    mutationFn: async ({ task, board }: { task: RecurringTask; board: RecurringTaskBoard }) => {
-      const periodStart = getCurrentPeriodStart(board.frequency_type, board.weekday);
+    mutationFn: async ({ task }: { task: RecurringTask }) => {
+      const periodStart = getTaskPeriodStart(task);
       const existing = (completionsQuery.data ?? []).find(
         (c) => c.recurring_task_id === task.id && c.period_start === periodStart
       );
@@ -220,14 +244,19 @@ export function useRecurringTasks(boardId?: string) {
       description?: string;
       boardId: string;
       teamId: string;
+      frequency: "daily" | "weekly" | "weekday" | "monthly";
+      weekday?: number | null;
+      monthDay?: number | null;
     }) => {
       const { error } = await supabase.from("recurring_tasks" as any).insert({
         title: params.title,
         description: params.description || null,
-        frequency: "daily", // legacy field, frequency is now on board
+        frequency: params.frequency,
         board_id: params.boardId,
         team_id: params.teamId,
         created_by: user!.id,
+        weekday: params.frequency === "weekday" ? (params.weekday ?? 0) : null,
+        month_day: params.frequency === "monthly" ? (params.monthDay ?? 1) : null,
       });
       if (error) throw error;
     },
