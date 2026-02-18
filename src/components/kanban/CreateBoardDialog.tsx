@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus } from "lucide-react";
-import { useBoards, useTeams } from "@/hooks/useBoards";
+import { useBoards, useTeams, useTeamMembers } from "@/hooks/useBoards";
 import { toast } from "sonner";
 
 export function CreateBoardDialog() {
@@ -13,18 +13,26 @@ export function CreateBoardDialog() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [teamId, setTeamId] = useState("");
+  const [assignedUserId, setAssignedUserId] = useState("");
   const { createBoard } = useBoards();
   const { data: teams } = useTeams();
+  const { data: members } = useTeamMembers(teamId || undefined);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !teamId) return;
     try {
-      await createBoard.mutateAsync({ name: name.trim(), description: description.trim(), teamId });
+      await createBoard.mutateAsync({
+        name: name.trim(),
+        description: description.trim(),
+        teamId,
+        assignedUserId: assignedUserId && assignedUserId !== "__none__" ? assignedUserId : undefined,
+      });
       toast.success("Quadro criado com sucesso!");
       setName("");
       setDescription("");
       setTeamId("");
+      setAssignedUserId("");
       setOpen(false);
     } catch (err: any) {
       toast.error(err.message || "Erro ao criar quadro");
@@ -43,7 +51,7 @@ export function CreateBoardDialog() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="text-sm font-medium text-foreground">Equipe</label>
-            <Select value={teamId} onValueChange={setTeamId}>
+            <Select value={teamId} onValueChange={(v) => { setTeamId(v); setAssignedUserId(""); }}>
               <SelectTrigger><SelectValue placeholder="Selecione uma equipe" /></SelectTrigger>
               <SelectContent>
                 {teams?.map((t) => (
@@ -62,6 +70,23 @@ export function CreateBoardDialog() {
           <div>
             <label className="text-sm font-medium text-foreground">Descrição (opcional)</label>
             <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descreva o quadro..." rows={3} />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-foreground">Atribuir a usuário (opcional)</label>
+            <Select value={assignedUserId} onValueChange={setAssignedUserId}>
+              <SelectTrigger><SelectValue placeholder="Visível para toda a equipe" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Toda a equipe</SelectItem>
+                {members?.map((m: any) => (
+                  <SelectItem key={m.user_id} value={m.user_id}>
+                    {m.profiles?.name || "Usuário"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground mt-1">
+              Se não atribuído, o quadro será visível para toda a equipe.
+            </p>
           </div>
           <Button type="submit" className="w-full" disabled={!name.trim() || !teamId || createBoard.isPending}>
             {createBoard.isPending ? "Criando..." : "Criar Quadro"}

@@ -24,10 +24,10 @@ export function useBoards(teamId?: string) {
   });
 
   const createBoard = useMutation({
-    mutationFn: async ({ name, description, teamId }: { name: string; description?: string; teamId: string }) => {
+    mutationFn: async ({ name, description, teamId, assignedUserId }: { name: string; description?: string; teamId: string; assignedUserId?: string }) => {
       const { data, error } = await supabase
         .from("boards")
-        .insert({ name, description: description || null, team_id: teamId, created_by: user!.id })
+        .insert({ name, description: description || null, team_id: teamId, created_by: user!.id, assigned_user_id: assignedUserId || null })
         .select()
         .single();
       if (error) throw error;
@@ -159,5 +159,21 @@ export function useTeams() {
       return data;
     },
     enabled: !!user,
+  });
+}
+
+export function useTeamMembers(teamId?: string) {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["team-members", teamId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("team_members")
+        .select("user_id, role, profiles:user_id(name, user_id)")
+        .eq("team_id", teamId!);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user && !!teamId,
   });
 }
