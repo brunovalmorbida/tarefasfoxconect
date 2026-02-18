@@ -104,7 +104,7 @@ export function useBoardDetail(boardId: string) {
   });
 
   const addTask = useMutation({
-    mutationFn: async ({ columnId, title, priority, description }: { columnId: string; title: string; priority?: string; description?: string }) => {
+    mutationFn: async ({ columnId, title, priority, description, assigneeId }: { columnId: string; title: string; priority?: string; description?: string; assigneeId?: string }) => {
       const colTasks = boardQuery.data?.board_columns?.find((c: any) => c.id === columnId)?.tasks ?? [];
       const position = colTasks.length;
       const { error } = await supabase.from("tasks").insert({
@@ -114,6 +114,7 @@ export function useBoardDetail(boardId: string) {
         description: description || null,
         position,
         created_by: user!.id,
+        assignee_id: assigneeId || null,
       });
       if (error) throw error;
       const col = boardQuery.data?.board_columns?.find((c: any) => c.id === columnId);
