@@ -1,11 +1,14 @@
 import { useState } from "react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { useBoardDetail } from "@/hooks/useBoards";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, MoreHorizontal, Trash2, GripVertical, CalendarIcon } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Plus, MoreHorizontal, Trash2, GripVertical, CalendarIcon, User } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -58,7 +61,38 @@ export function KanbanBoard({ boardId, onBack }: Props) {
   const [addingColumn, setAddingColumn] = useState(false);
   const [addingTaskCol, setAddingTaskCol] = useState<string | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newTaskAssignee, setNewTaskAssignee] = useState<string>("");
   const [editingTask, setEditingTask] = useState<any>(null);
+
+  // Fetch team members for assignee selection
+  const { data: teamMembers } = useQuery({
+    queryKey: ["team-members-profiles", board?.team_id],
+    queryFn: async () => {
+      const { data: members, error: mErr } = await supabase
+        .from("team_members")
+        .select("user_id")
+        .eq("team_id", board!.team_id);
+      if (mErr) throw mErr;
+      const userIds = members.map((m) => m.user_id);
+      if (userIds.length === 0) return [];
+      const { data: profiles, error: pErr } = await supabase
+        .from("profiles")
+        .select("user_id, name")
+        .in("user_id", userIds);
+      if (pErr) throw pErr;
+      return profiles ?? [];
+    },
+    enabled: !!board?.team_id,
+  });
+
+  const getAssigneeName = (assigneeId: string | null) => {
+    if (!assigneeId || !teamMembers) return null;
+    return teamMembers.find((m) => m.user_id === assigneeId)?.name ?? null;
+  };
+
+  const getInitials = (name: string) => {
+    return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
+  };
 
   const handleAddColumn = async () => {
     if (!newColumnName.trim()) return;
@@ -73,8 +107,13 @@ export function KanbanBoard({ boardId, onBack }: Props) {
   const handleAddTask = async (columnId: string) => {
     if (!newTaskTitle.trim()) return;
     try {
-      await addTask.mutateAsync({ columnId, title: newTaskTitle.trim() });
+      await addTask.mutateAsync({
+        columnId,
+        title: newTaskTitle.trim(),
+        assigneeId: newTaskAssignee && newTaskAssignee !== "none" ? newTaskAssignee : undefined,
+      });
       setNewTaskTitle("");
+      setNewTaskAssignee("");
       setAddingTaskCol(null);
     } catch { toast.error("Erro ao criar tarefa"); }
   };
@@ -100,6 +139,7 @@ export function KanbanBoard({ boardId, onBack }: Props) {
         description: editingTask.description || null,
         priority: editingTask.priority,
         due_date: editingTask.due_date || null,
+        assignee_id: editingTask.assignee_id || null,
       });
       setEditingTask(null);
       toast.success("Tarefa atualizada!");
@@ -141,42 +181,51 @@ export function KanbanBoard({ boardId, onBack }: Props) {
               <Droppable droppableId={col.id}>
                 {(provided) => (
                   <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-2 min-h-[40px]">
-                    {col.tasks?.map((task: any, index: number) => (
-                      <Draggable key={task.id} draggableId={task.id} index={index}>
-                        {(provided, snapshot) => (
-                          <Card
-                            ref={provided.innerRef}
-                            {...provided.draggableProps}
-                            className={`p-3 cursor-pointer hover:shadow-md transition-shadow ${snapshot.isDragging ? "shadow-lg ring-2 ring-primary/20" : ""}`}
-                            onClick={() => setEditingTask({ ...task })}
-                          >
-                            <div className="flex items-start gap-2">
-                              <div {...provided.dragHandleProps} className="mt-0.5">
-                                <GripVertical className="h-4 w-4 text-muted-foreground" />
-                              </div>
-                              <div className="flex-1 space-y-1.5">
-                                <p className="text-sm font-medium leading-tight">{task.title}</p>
-                                {task.description && <p className="text-xs text-muted-foreground line-clamp-2">{task.description}</p>}
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${priorityColors[task.priority]}`}>
-                                    {priorityLabels[task.priority]}
-                                  </span>
-                                  {task.due_date && (
-                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium border flex items-center gap-0.5 ${getDueDateColor(task.due_date, task.created_at)}`}>
-                                      <CalendarIcon className="h-2.5 w-2.5" />
-                                      {format(new Date(task.due_date), "dd/MM", { locale: ptBR })}
+                    {col.tasks?.map((task: any, index: number) => {
+                      const assigneeName = getAssigneeName(task.assignee_id);
+                      return (
+                        <Draggable key={task.id} draggableId={task.id} index={index}>
+                          {(provided, snapshot) => (
+                            <Card
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              className={`p-3 cursor-pointer hover:shadow-md transition-shadow ${snapshot.isDragging ? "shadow-lg ring-2 ring-primary/20" : ""}`}
+                              onClick={() => setEditingTask({ ...task })}
+                            >
+                              <div className="flex items-start gap-2">
+                                <div {...provided.dragHandleProps} className="mt-0.5">
+                                  <GripVertical className="h-4 w-4 text-muted-foreground" />
+                                </div>
+                                <div className="flex-1 space-y-1.5">
+                                  <p className="text-sm font-medium leading-tight">{task.title}</p>
+                                  {task.description && <p className="text-xs text-muted-foreground line-clamp-2">{task.description}</p>}
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${priorityColors[task.priority]}`}>
+                                      {priorityLabels[task.priority]}
                                     </span>
-                                  )}
-                                  {task.labels?.map((l: string) => (
-                                    <Badge key={l} variant="outline" className="text-[10px] px-1.5 py-0">{l}</Badge>
-                                  ))}
+                                    {task.due_date && (
+                                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium border flex items-center gap-0.5 ${getDueDateColor(task.due_date, task.created_at)}`}>
+                                        <CalendarIcon className="h-2.5 w-2.5" />
+                                        {format(new Date(task.due_date), "dd/MM", { locale: ptBR })}
+                                      </span>
+                                    )}
+                                    {assigneeName && (
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-accent text-accent-foreground flex items-center gap-0.5">
+                                        <User className="h-2.5 w-2.5" />
+                                        {assigneeName.split(" ")[0]}
+                                      </span>
+                                    )}
+                                    {task.labels?.map((l: string) => (
+                                      <Badge key={l} variant="outline" className="text-[10px] px-1.5 py-0">{l}</Badge>
+                                    ))}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          </Card>
-                        )}
-                      </Draggable>
-                    ))}
+                            </Card>
+                          )}
+                        </Draggable>
+                      );
+                    })}
                     {provided.placeholder}
                   </div>
                 )}
@@ -191,9 +240,20 @@ export function KanbanBoard({ boardId, onBack }: Props) {
                     autoFocus
                     onKeyDown={(e) => e.key === "Enter" && handleAddTask(col.id)}
                   />
+                  <Select value={newTaskAssignee} onValueChange={setNewTaskAssignee}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="Responsável (opcional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sem responsável</SelectItem>
+                      {teamMembers?.map((m) => (
+                        <SelectItem key={m.user_id} value={m.user_id}>{m.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <div className="flex gap-2">
                     <Button size="sm" onClick={() => handleAddTask(col.id)} disabled={!newTaskTitle.trim()}>Adicionar</Button>
-                    <Button size="sm" variant="ghost" onClick={() => { setAddingTaskCol(null); setNewTaskTitle(""); }}>Cancelar</Button>
+                    <Button size="sm" variant="ghost" onClick={() => { setAddingTaskCol(null); setNewTaskTitle(""); setNewTaskAssignee(""); }}>Cancelar</Button>
                   </div>
                 </div>
               ) : (
@@ -242,6 +302,21 @@ export function KanbanBoard({ boardId, onBack }: Props) {
               <div>
                 <label className="text-sm font-medium">Descrição</label>
                 <Textarea value={editingTask.description || ""} onChange={(e) => setEditingTask({ ...editingTask, description: e.target.value })} rows={3} />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Responsável</label>
+                <Select
+                  value={editingTask.assignee_id || "none"}
+                  onValueChange={(v) => setEditingTask({ ...editingTask, assignee_id: v === "none" ? null : v })}
+                >
+                  <SelectTrigger><SelectValue placeholder="Selecionar responsável" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sem responsável</SelectItem>
+                    {teamMembers?.map((m) => (
+                      <SelectItem key={m.user_id} value={m.user_id}>{m.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <label className="text-sm font-medium">Prioridade</label>
