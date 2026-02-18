@@ -3,10 +3,39 @@ import { useIsAppAdmin } from "@/hooks/useUserRole";
 import { UsersTab } from "@/components/settings/UsersTab";
 import { IntegrationsTab } from "@/components/settings/IntegrationsTab";
 import { ActivityLogTab } from "@/components/settings/ActivityLogTab";
-import { Settings, Users, Plug, ScrollText } from "lucide-react";
+import { Settings, Users, Plug, ScrollText, Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
+import { toast } from "sonner";
 
 export default function SettingsPage() {
   const { data: isAdmin } = useIsAppAdmin();
+  const [exporting, setExporting] = useState(false);
+
+  const handleExportBackup = async () => {
+    setExporting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("export-backup");
+      if (error) throw error;
+
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `backup-${new Date().toISOString().split("T")[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("Backup exportado com sucesso!");
+    } catch (err: any) {
+      toast.error("Erro ao exportar backup: " + err.message);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -38,8 +67,28 @@ export default function SettingsPage() {
           )}
         </TabsList>
 
-        <TabsContent value="general" className="mt-6">
+        <TabsContent value="general" className="mt-6 space-y-4">
           <p className="text-muted-foreground">Configurações gerais do sistema.</p>
+
+          {isAdmin && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Download className="h-5 w-5" />
+                  Backup do Sistema
+                </CardTitle>
+                <CardDescription>
+                  Exporte todos os dados do sistema em formato JSON para migração ou backup.
+                  Inclui equipes, quadros, tarefas, usuários, permissões, configurações e logs.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button onClick={handleExportBackup} disabled={exporting}>
+                  {exporting ? "Exportando..." : "Exportar Backup Completo"}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {isAdmin && (
