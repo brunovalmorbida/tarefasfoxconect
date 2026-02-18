@@ -64,7 +64,7 @@ export function usePurchases() {
   });
 
   const createPurchase = useMutation({
-    mutationFn: async (data: {
+    mutationFn: async (items: Array<{
       title: string;
       description?: string;
       quantity: number;
@@ -72,27 +72,29 @@ export function usePurchases() {
       urgency: string;
       estimated_value?: number;
       buyer_id?: string;
-    }) => {
-      const { data: result, error } = await supabase
+    }>) => {
+      const rows = items.map((item) => ({
+        ...item,
+        requested_by: user!.id,
+      }));
+      const { data: results, error } = await supabase
         .from("purchase_requests")
-        .insert({
-          ...data,
-          requested_by: user!.id,
-        } as any)
-        .select()
-        .single();
+        .insert(rows as any)
+        .select();
       if (error) throw error;
 
-      // Notify
-      supabase.functions.invoke("notify-purchase", {
-        body: { purchaseId: result.id, action: "created" },
-      });
+      // Notify for each created item
+      for (const result of results) {
+        supabase.functions.invoke("notify-purchase", {
+          body: { purchaseId: result.id, action: "created" },
+        });
+      }
 
-      return result;
+      return results;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["purchases"] });
-      toast({ title: "Solicitação criada com sucesso!" });
+      toast({ title: `${data.length} item(ns) criado(s) com sucesso!` });
     },
     onError: (e: any) => {
       toast({ title: "Erro ao criar solicitação", description: e.message, variant: "destructive" });
