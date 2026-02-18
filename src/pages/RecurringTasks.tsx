@@ -6,7 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Trash2, Plus, Pencil, ArrowLeft, User, CalendarDays, CalendarRange, Calendar, Clock } from "lucide-react";
+import { Trash2, Plus, Pencil, ArrowLeft, User, CalendarDays, CalendarRange, Calendar, Clock, MoreVertical } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import {
   useRecurringTaskBoards,
   useRecurringTasks,
@@ -324,6 +326,29 @@ export default function RecurringTasks() {
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState("");
 
+  const [editOpen, setEditOpen] = useState(false);
+  const [editId, setEditId] = useState("");
+  const [editName, setEditName] = useState("");
+
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  const handleEdit = async () => {
+    if (!editName.trim() || !editId) return;
+    try {
+      await updateBoard.mutateAsync({
+        id: editId,
+        name: editName.trim(),
+        frequencyType: "weekly",
+        weekday: 0,
+        assignedUserId: null,
+      });
+      setEditOpen(false);
+      toast({ title: "Quadro atualizado" });
+    } catch {
+      toast({ title: "Erro ao atualizar quadro", variant: "destructive" });
+    }
+  };
+
   const handleCreate = async () => {
     if (!newName.trim() || !teamId) return;
     try {
@@ -436,11 +461,28 @@ export default function RecurringTasks() {
           {boards.map((board) => (
             <Card
               key={board.id}
-              className="cursor-pointer transition-colors hover:border-primary/50"
+              className="cursor-pointer transition-colors hover:border-primary/50 relative"
               onClick={() => setSelectedBoard(board)}
             >
-              <CardHeader className="pb-2">
+              <CardHeader className="pb-2 flex flex-row items-start justify-between">
                 <CardTitle className="text-base">{board.name}</CardTitle>
+                {canManage && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 -mt-1 -mr-2">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                      <DropdownMenuItem onClick={() => { setEditId(board.id); setEditName(board.name); setEditOpen(true); }}>
+                        <Pencil className="h-4 w-4 mr-2" /> Editar
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="text-destructive" onClick={() => setDeleteId(board.id)}>
+                        <Trash2 className="h-4 w-4 mr-2" /> Excluir
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </CardHeader>
               <CardContent>
                 {board.assigned_user_id && (
@@ -453,6 +495,33 @@ export default function RecurringTasks() {
           ))}
         </div>
       )}
+
+      {/* Edit Board Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Quadro</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input placeholder="Nome do quadro" value={editName} onChange={(e) => setEditName(e.target.value)} />
+            <Button onClick={handleEdit} disabled={!editName.trim() || updateBoard.isPending} className="w-full">Salvar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Board Confirmation */}
+      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir quadro?</AlertDialogTitle>
+            <AlertDialogDescription>Esta ação não pode ser desfeita. Todas as tarefas deste quadro serão removidas.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { if (deleteId) { handleDelete(deleteId); setDeleteId(null); } }}>Excluir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
