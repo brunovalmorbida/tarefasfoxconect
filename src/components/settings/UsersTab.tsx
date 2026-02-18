@@ -26,6 +26,7 @@ interface Profile {
   user_id: string;
   name: string;
   job_title: string | null;
+  whatsapp_number: string | null;
   created_at: string;
 }
 
@@ -38,6 +39,7 @@ export function UsersTab() {
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [newWhatsapp, setNewWhatsapp] = useState("");
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
 
@@ -46,6 +48,7 @@ export function UsersTab() {
   const [editUserId, setEditUserId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editJobTitle, setEditJobTitle] = useState("");
+  const [editWhatsapp, setEditWhatsapp] = useState("");
   const [editPassword, setEditPassword] = useState("");
   const [editTeams, setEditTeams] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
@@ -123,6 +126,7 @@ export function UsersTab() {
     setEditUserId(profile.user_id);
     setEditName(profile.name);
     setEditJobTitle(profile.job_title || "");
+    setEditWhatsapp(profile.whatsapp_number || "");
     setEditPassword("");
     setEditTeams(getTeamIdsForUser(profile.user_id));
     setEditOpen(true);
@@ -138,6 +142,7 @@ export function UsersTab() {
           name: newName.trim(),
           email: newEmail.trim(),
           password: newPassword,
+          whatsappNumber: newWhatsapp.trim() || undefined,
           teamIds: selectedTeams,
         },
       });
@@ -149,6 +154,7 @@ export function UsersTab() {
       setNewName("");
       setNewEmail("");
       setNewPassword("");
+      setNewWhatsapp("");
       setSelectedTeams([]);
       setCreateOpen(false);
     } catch (err: any) {
@@ -168,6 +174,7 @@ export function UsersTab() {
           userId: editUserId,
           name: editName.trim(),
           jobTitle: editJobTitle.trim(),
+          whatsappNumber: editWhatsapp.trim() || null,
           password: editPassword || undefined,
           teamIds: editTeams,
         },
@@ -239,6 +246,10 @@ export function UsersTab() {
                 <div className="space-y-2">
                   <Label>Senha</Label>
                   <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Mínimo 6 caracteres" />
+                </div>
+                <div className="space-y-2">
+                  <Label>WhatsApp</Label>
+                  <Input value={newWhatsapp} onChange={(e) => setNewWhatsapp(e.target.value)} placeholder="Ex: 5511999999999" />
                 </div>
                 {teams && teams.length > 0 && (
                   <div className="space-y-2">
@@ -381,6 +392,10 @@ export function UsersTab() {
             <div className="space-y-2">
               <Label>Cargo</Label>
               <Input value={editJobTitle} onChange={(e) => setEditJobTitle(e.target.value)} placeholder="Ex: Desenvolvedor" />
+            </div>
+            <div className="space-y-2">
+              <Label>WhatsApp</Label>
+              <Input value={editWhatsapp} onChange={(e) => setEditWhatsapp(e.target.value)} placeholder="Ex: 5511999999999" />
             </div>
             <div className="space-y-2">
               <Label>Nova Senha (opcional)</Label>
