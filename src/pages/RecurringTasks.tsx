@@ -338,6 +338,7 @@ export default function RecurringTasks() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState("");
+  const [newAssignedUser, setNewAssignedUser] = useState("");
 
   const [editOpen, setEditOpen] = useState(false);
   const [editId, setEditId] = useState("");
@@ -366,15 +367,20 @@ export default function RecurringTasks() {
 
   const handleCreate = async () => {
     if (!newName.trim() || !teamId) return;
+    if (!newAssignedUser) {
+      toast({ title: "Selecione um responsável", variant: "destructive" });
+      return;
+    }
     try {
       await createBoard.mutateAsync({
         name: newName.trim(),
         frequencyType: "weekly",
         weekday: 0,
         teamId,
-        assignedUserId: null,
+        assignedUserId: newAssignedUser,
       });
       setNewName("");
+      setNewAssignedUser("");
       setCreateOpen(false);
       toast({ title: "Quadro criado com sucesso" });
     } catch {
@@ -449,9 +455,24 @@ export default function RecurringTasks() {
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
                   />
+                  <div>
+                    <label className="text-sm font-medium mb-1.5 block">Responsável *</label>
+                    <Select value={newAssignedUser} onValueChange={setNewAssignedUser}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o responsável" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(teamMembers as any[])?.map((m: any) => (
+                          <SelectItem key={m.user_id} value={m.user_id}>
+                            {m.profiles?.name ?? m.user_id}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <Button
                     onClick={handleCreate}
-                    disabled={!newName.trim() || createBoard.isPending}
+                    disabled={!newName.trim() || !newAssignedUser || createBoard.isPending}
                     className="w-full"
                   >
                     Criar Quadro
