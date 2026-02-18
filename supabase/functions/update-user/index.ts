@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
 
     if (!role) throw new Error("Sem permissão de administrador");
 
-    const { userId, name, jobTitle, whatsappNumber, password, teamIds } = await req.json();
+    const { userId, name, jobTitle, whatsappNumber, password, teamIds, isAdmin } = await req.json();
     if (!userId) throw new Error("userId é obrigatório");
 
     // Update profile
@@ -59,14 +59,12 @@ Deno.serve(async (req) => {
 
     // Update team memberships
     if (teamIds !== undefined && Array.isArray(teamIds)) {
-      // Remove all current memberships (except admin ones handled by trigger)
       const { error: delError } = await adminClient
         .from("team_members")
         .delete()
         .eq("user_id", userId);
       if (delError) throw delError;
 
-      // Add new memberships
       if (teamIds.length > 0) {
         const rows = teamIds.map((tid: string) => ({
           team_id: tid,
@@ -77,6 +75,51 @@ Deno.serve(async (req) => {
           .from("team_members")
           .insert(rows);
         if (insError) throw insError;
+      }
+    }
+
+    // Update admin role if provided (only master admin can do this)
+    if (isAdmin !== undefined) {
+      // Verify caller is the master admin
+      const { data: callerProfile } = await adminClient
+        .from("profiles")
+        .select("user_id")
+        .eq("user_id", caller.id)
+        .single();
+      
+      const { data: callerAuth } = await adminClient.auth.admin.getUserById(caller.id);
+      const callerEmail = callerAuth?.user?.email;
+      
+      if (callerEmail !== "brunovalmorbida@live.com") {
+        throw new Error("Apenas o administrador master pode alterar papéis");
+      }
+
+      if (isAdmin) {
+        // Add admin role if not exists
+        const { data: existingRole } = await adminClient
+          .from("user_roles")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("role", "admin")
+          .maybeSingle();
+        
+        if (!existingRole) {
+          const { error: roleError } = await adminClient
+            .from("user_roles")
+            .insert({ user_id: userId, role: "admin" });
+          if (roleError) throw roleError;
+        }
+      } else {
+        // Remove admin role (don't allow removing own admin)
+        if (userId === caller.id) {
+          throw new Error("Você não pode remover seu próprio papel de admin");
+        }
+        const { error: roleError } = await adminClient
+          .from("user_roles")
+          .delete()
+          .eq("user_id", userId)
+          .eq("role", "admin");
+        if (roleError) throw roleError;
       }
     }
 

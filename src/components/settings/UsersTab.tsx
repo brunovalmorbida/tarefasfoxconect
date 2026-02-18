@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTeams } from "@/hooks/useBoards";
+import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Trash2, Loader2, Plus, Pencil, Shield } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -31,6 +33,7 @@ interface Profile {
 }
 
 export function UsersTab() {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -51,6 +54,7 @@ export function UsersTab() {
   const [editWhatsapp, setEditWhatsapp] = useState("");
   const [editPassword, setEditPassword] = useState("");
   const [editTeams, setEditTeams] = useState<string[]>([]);
+  const [editIsAdmin, setEditIsAdmin] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // Permissions dialog state
@@ -122,6 +126,8 @@ export function UsersTab() {
     );
   };
 
+  const isMasterAdmin = user?.email === "brunovalmorbida@live.com";
+
   const openEditDialog = (profile: Profile) => {
     setEditUserId(profile.user_id);
     setEditName(profile.name);
@@ -129,6 +135,7 @@ export function UsersTab() {
     setEditWhatsapp(profile.whatsapp_number || "");
     setEditPassword("");
     setEditTeams(getTeamIdsForUser(profile.user_id));
+    setEditIsAdmin(getRoleForUser(profile.user_id) === "Admin");
     setEditOpen(true);
   };
 
@@ -177,6 +184,7 @@ export function UsersTab() {
           whatsappNumber: editWhatsapp.trim() || null,
           password: editPassword || undefined,
           teamIds: editTeams,
+          isAdmin: isMasterAdmin ? editIsAdmin : undefined,
         },
       });
       if (error) throw error;
@@ -184,6 +192,7 @@ export function UsersTab() {
       toast.success("Usuário atualizado com sucesso!");
       queryClient.invalidateQueries({ queryKey: ["admin-profiles"] });
       queryClient.invalidateQueries({ queryKey: ["admin-team-members"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-roles"] });
       setEditOpen(false);
     } catch (err: any) {
       toast.error(err.message || "Erro ao atualizar usuário");
@@ -420,6 +429,15 @@ export function UsersTab() {
                     ))}
                   </div>
                 </ScrollArea>
+              </div>
+            )}
+            {isMasterAdmin && editUserId !== user?.id && (
+              <div className="flex items-center justify-between rounded-md border p-3">
+                <div className="space-y-0.5">
+                  <Label>Administrador</Label>
+                  <p className="text-xs text-muted-foreground">Conceder privilégios de administrador ao usuário.</p>
+                </div>
+                <Switch checked={editIsAdmin} onCheckedChange={setEditIsAdmin} />
               </div>
             )}
             <Button type="submit" className="w-full" disabled={!editName.trim() || saving}>
