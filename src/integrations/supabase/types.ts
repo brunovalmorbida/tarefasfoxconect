@@ -402,6 +402,39 @@ export type Database = {
         }
         Relationships: []
       }
+      user_permissions: {
+        Row: {
+          can_manage_boards: boolean
+          can_manage_columns: boolean
+          can_manage_recurring_tasks: boolean
+          can_manage_tasks: boolean
+          created_at: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          can_manage_boards?: boolean
+          can_manage_columns?: boolean
+          can_manage_recurring_tasks?: boolean
+          can_manage_tasks?: boolean
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          can_manage_boards?: boolean
+          can_manage_columns?: boolean
+          can_manage_recurring_tasks?: boolean
+          can_manage_tasks?: boolean
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
@@ -428,6 +461,10 @@ export type Database = {
       get_team_id_from_board: { Args: { _board_id: string }; Returns: string }
       get_team_id_from_column: { Args: { _column_id: string }; Returns: string }
       get_team_id_from_task: { Args: { _task_id: string }; Returns: string }
+      has_permission: {
+        Args: { _permission: string; _user_id: string }
+        Returns: boolean
+      }
       is_app_admin: { Args: never; Returns: boolean }
       is_team_admin: { Args: { _team_id: string }; Returns: boolean }
       is_team_member: { Args: { _team_id: string }; Returns: boolean }

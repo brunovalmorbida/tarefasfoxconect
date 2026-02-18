@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Trash2, Plus, CalendarDays, CalendarRange, Calendar } from "lucide-react";
 import { useRecurringTasks, RecurringTask } from "@/hooks/useRecurringTasks";
 import { useTeams } from "@/hooks/useBoards";
-import { useIsAppAdmin } from "@/hooks/useUserRole";
+import { useCanManage } from "@/hooks/useUserRole";
 import { useToast } from "@/hooks/use-toast";
 
 function TaskSection({
@@ -76,7 +76,7 @@ function TaskSection({
 
 export default function RecurringTasks() {
   const { data: teams } = useTeams();
-  const { data: isAdmin } = useIsAppAdmin();
+  const canManageRecurring = useCanManage("can_manage_recurring_tasks");
   const [selectedTeam, setSelectedTeam] = useState<string>("");
   const teamId = selectedTeam || teams?.[0]?.id || "";
   const {
@@ -142,7 +142,7 @@ export default function RecurringTasks() {
               </SelectContent>
             </Select>
           )}
-          {isAdmin && (
+          {canManageRecurring && (
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
                 <Button><Plus className="h-4 w-4 mr-2" /> Nova Tarefa</Button>
@@ -178,9 +178,9 @@ export default function RecurringTasks() {
         <p className="text-muted-foreground">Carregando...</p>
       ) : (
         <div className="grid gap-6 md:grid-cols-3">
-          <TaskSection title="Diárias" icon={CalendarDays} tasks={dailyTasks} isCompleted={isTaskCompleted} onToggle={handleToggle} onDelete={handleDelete} isAdmin={!!isAdmin} />
-          <TaskSection title="Semanais" icon={CalendarRange} tasks={weeklyTasks} isCompleted={isTaskCompleted} onToggle={handleToggle} onDelete={handleDelete} isAdmin={!!isAdmin} />
-          <TaskSection title="Mensais" icon={Calendar} tasks={monthlyTasks} isCompleted={isTaskCompleted} onToggle={handleToggle} onDelete={handleDelete} isAdmin={!!isAdmin} />
+          <TaskSection title="Diárias" icon={CalendarDays} tasks={dailyTasks} isCompleted={isTaskCompleted} onToggle={handleToggle} onDelete={handleDelete} isAdmin={!!canManageRecurring} />
+          <TaskSection title="Semanais" icon={CalendarRange} tasks={weeklyTasks} isCompleted={isTaskCompleted} onToggle={handleToggle} onDelete={handleDelete} isAdmin={!!canManageRecurring} />
+          <TaskSection title="Mensais" icon={Calendar} tasks={monthlyTasks} isCompleted={isTaskCompleted} onToggle={handleToggle} onDelete={handleDelete} isAdmin={!!canManageRecurring} />
         </div>
       )}
     </div>

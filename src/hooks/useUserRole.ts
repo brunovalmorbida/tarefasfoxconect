@@ -19,3 +19,26 @@ export function useIsAppAdmin() {
     enabled: !!user,
   });
 }
+
+export function useUserPermissions() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["user-permissions", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("user_permissions")
+        .select("*")
+        .eq("user_id", user!.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+}
+
+export function useCanManage(permission: "can_manage_boards" | "can_manage_columns" | "can_manage_tasks" | "can_manage_recurring_tasks") {
+  const { data: isAdmin } = useIsAppAdmin();
+  const { data: permissions } = useUserPermissions();
+  return isAdmin || (permissions?.[permission] ?? false);
+}
