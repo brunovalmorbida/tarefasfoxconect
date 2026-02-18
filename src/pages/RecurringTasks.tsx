@@ -46,10 +46,14 @@ function BoardDetail({
   board,
   onBack,
   canManage,
+  teamMembers,
+  onUpdateBoard,
 }: {
   board: RecurringTaskBoard;
   onBack: () => void;
   canManage: boolean;
+  teamMembers: any[];
+  onUpdateBoard: (params: { id: string; name: string; frequencyType: "weekday" | "weekly" | "monthly"; weekday: number; assignedUserId: string | null }) => Promise<void>;
 }) {
   const { tasks, isLoading, isTaskCompleted, toggleCompletion, createTask, deleteTask } =
     useRecurringTasks(board.id);
@@ -57,6 +61,26 @@ function BoardDetail({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newDesc, setNewDesc] = useState("");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [freqType, setFreqType] = useState<"weekday" | "weekly" | "monthly">(board.frequency_type);
+  const [weekday, setWeekday] = useState(String(board.weekday ?? 0));
+  const [assignedUser, setAssignedUser] = useState(board.assigned_user_id ?? "");
+
+  const handleSaveSettings = async () => {
+    try {
+      await onUpdateBoard({
+        id: board.id,
+        name: board.name,
+        frequencyType: freqType,
+        weekday: parseInt(weekday),
+        assignedUserId: assignedUser && assignedUser !== "none" ? assignedUser : null,
+      });
+      setSettingsOpen(false);
+      toast({ title: "Configurações salvas" });
+    } catch {
+      toast({ title: "Erro ao salvar", variant: "destructive" });
+    }
+  };
 
   const handleCreate = async () => {
     if (!newTitle.trim()) return;
@@ -103,37 +127,93 @@ function BoardDetail({
           </div>
         </div>
         {canManage && (
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" /> Nova Tarefa
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Nova Tarefa</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <Input
-                  placeholder="Título da tarefa"
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                />
-                <Textarea
-                  placeholder="Descrição (opcional)"
-                  value={newDesc}
-                  onChange={(e) => setNewDesc(e.target.value)}
-                />
-                <Button
-                  onClick={handleCreate}
-                  disabled={!newTitle.trim() || createTask.isPending}
-                  className="w-full"
-                >
-                  Criar Tarefa
+          <div className="flex items-center gap-2">
+            <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="icon">
+                  <Pencil className="h-4 w-4" />
                 </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Configurações do Quadro</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <Select value={freqType} onValueChange={(v) => setFreqType(v as any)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="weekday">Dia da semana</SelectItem>
+                      <SelectItem value="weekly">Semanal</SelectItem>
+                      <SelectItem value="monthly">Mensal</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {freqType === "weekday" && (
+                    <Select value={weekday} onValueChange={setWeekday}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {WEEKDAYS.map((d) => (
+                          <SelectItem key={d.value} value={d.value}>
+                            {d.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  <Select value={assignedUser} onValueChange={setAssignedUser}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todos da equipe (sem atribuição)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Todos da equipe</SelectItem>
+                      {teamMembers?.map((m: any) => (
+                        <SelectItem key={m.user_id} value={m.user_id}>
+                          {m.profiles?.name ?? m.user_id}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button onClick={handleSaveSettings} className="w-full">
+                    Salvar Configurações
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" /> Nova Tarefa
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Nova Tarefa</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <Input
+                    placeholder="Título da tarefa"
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                  />
+                  <Textarea
+                    placeholder="Descrição (opcional)"
+                    value={newDesc}
+                    onChange={(e) => setNewDesc(e.target.value)}
+                  />
+                  <Button
+                    onClick={handleCreate}
+                    disabled={!newTitle.trim() || createTask.isPending}
+                    className="w-full"
+                  >
+                    Criar Tarefa
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
         )}
       </div>
 
@@ -203,28 +283,18 @@ export default function RecurringTasks() {
   // Create board dialog
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState("");
-  const [newFreqType, setNewFreqType] = useState<"weekday" | "weekly" | "monthly">("weekday");
-  const [newWeekday, setNewWeekday] = useState("0");
-  const [newAssignedUser, setNewAssignedUser] = useState<string>("");
-
-  // Edit board dialog
-  const [editBoard, setEditBoard] = useState<RecurringTaskBoard | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editFreqType, setEditFreqType] = useState<"weekday" | "weekly" | "monthly">("weekday");
-  const [editWeekday, setEditWeekday] = useState("0");
-  const [editAssignedUser, setEditAssignedUser] = useState<string>("");
 
   const handleCreate = async () => {
     if (!newName.trim() || !teamId) return;
     try {
       await createBoard.mutateAsync({
         name: newName.trim(),
-        frequencyType: newFreqType,
-        weekday: parseInt(newWeekday),
+        frequencyType: "weekly",
+        weekday: 0,
         teamId,
-        assignedUserId: newAssignedUser && newAssignedUser !== "none" ? newAssignedUser : null,
+        assignedUserId: null,
       });
-      setNewName(""); setNewAssignedUser("");
+      setNewName("");
       setCreateOpen(false);
       toast({ title: "Quadro criado com sucesso" });
     } catch {
@@ -232,39 +302,13 @@ export default function RecurringTasks() {
     }
   };
 
-  const handleEdit = async () => {
-    if (!editBoard || !editName.trim()) return;
-    try {
-      await updateBoard.mutateAsync({
-        id: editBoard.id,
-        name: editName.trim(),
-        frequencyType: editFreqType,
-        weekday: parseInt(editWeekday),
-        assignedUserId: editAssignedUser && editAssignedUser !== "none" ? editAssignedUser : null,
-      });
-      setEditBoard(null);
-      toast({ title: "Quadro atualizado" });
-    } catch {
-      toast({ title: "Erro ao atualizar quadro", variant: "destructive" });
-    }
-  };
-
   const handleDelete = async (id: string) => {
     try {
       await deleteBoard.mutateAsync(id);
-      setEditBoard(null);
       toast({ title: "Quadro removido" });
     } catch {
       toast({ title: "Erro ao remover quadro", variant: "destructive" });
     }
-  };
-
-  const openEdit = (board: RecurringTaskBoard) => {
-    setEditName(board.name);
-    setEditFreqType(board.frequency_type);
-    setEditWeekday(String(board.weekday ?? 0));
-    setEditAssignedUser(board.assigned_user_id ?? "");
-    setEditBoard(board);
   };
 
   const getMemberName = (userId: string) => {
@@ -278,6 +322,10 @@ export default function RecurringTasks() {
         board={selectedBoard}
         onBack={() => setSelectedBoard(null)}
         canManage={!!canManage}
+        teamMembers={teamMembers as any[] ?? []}
+        onUpdateBoard={async (params) => {
+          await updateBoard.mutateAsync(params);
+        }}
       />
     );
   }
@@ -321,43 +369,6 @@ export default function RecurringTasks() {
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
                   />
-                  <Select value={newFreqType} onValueChange={(v) => setNewFreqType(v as any)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="weekday">Dia da semana</SelectItem>
-                      <SelectItem value="weekly">Semanal</SelectItem>
-                      <SelectItem value="monthly">Mensal</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {newFreqType === "weekday" && (
-                    <Select value={newWeekday} onValueChange={setNewWeekday}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {WEEKDAYS.map((d) => (
-                          <SelectItem key={d.value} value={d.value}>
-                            {d.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                  <Select value={newAssignedUser} onValueChange={setNewAssignedUser}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Todos da equipe (sem atribuição)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Todos da equipe</SelectItem>
-                      {(teamMembers as any[])?.map((m) => (
-                        <SelectItem key={m.user_id} value={m.user_id}>
-                          {m.profiles?.name ?? m.user_id}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                   <Button
                     onClick={handleCreate}
                     disabled={!newName.trim() || createBoard.isPending}
@@ -392,25 +403,10 @@ export default function RecurringTasks() {
                 onClick={() => setSelectedBoard(board)}
               >
                 <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between">
                     <CardTitle className="flex items-center gap-2 text-base">
                       <Icon className="h-4 w-4 text-primary" />
                       {board.name}
                     </CardTitle>
-                    {canManage && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openEdit(board);
-                        }}
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-                  </div>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground">{frequencyLabel(board)}</p>
@@ -429,88 +425,6 @@ export default function RecurringTasks() {
         </div>
       )}
 
-      {/* Edit board dialog */}
-      <Dialog open={!!editBoard} onOpenChange={(open) => !open && setEditBoard(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Pencil className="h-5 w-5" /> Editar Quadro
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <Input
-              placeholder="Nome do quadro"
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-            />
-            <Select value={editFreqType} onValueChange={(v) => setEditFreqType(v as any)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="weekday">Dia da semana</SelectItem>
-                <SelectItem value="weekly">Semanal</SelectItem>
-                <SelectItem value="monthly">Mensal</SelectItem>
-              </SelectContent>
-            </Select>
-            {editFreqType === "weekday" && (
-              <Select value={editWeekday} onValueChange={setEditWeekday}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {WEEKDAYS.map((d) => (
-                    <SelectItem key={d.value} value={d.value}>
-                      {d.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            <Select value={editAssignedUser} onValueChange={setEditAssignedUser}>
-              <SelectTrigger>
-                <SelectValue placeholder="Todos da equipe (sem atribuição)" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Todos da equipe</SelectItem>
-                {(teamMembers as any[])?.map((m) => (
-                  <SelectItem key={m.user_id} value={m.user_id}>
-                    {m.profiles?.name ?? m.user_id}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button
-              onClick={handleEdit}
-              disabled={!editName.trim() || updateBoard.isPending}
-              className="w-full"
-            >
-              Salvar Alterações
-            </Button>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" className="w-full gap-2">
-                  <Trash2 className="h-4 w-4" /> Excluir Quadro
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Excluir quadro?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Todas as tarefas deste quadro serão excluídas permanentemente.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => editBoard && handleDelete(editBoard.id)}>
-                    Excluir
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
