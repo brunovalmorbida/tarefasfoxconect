@@ -1,1 +1,4 @@
 project_id = "layaexaomcakyyyprnqb"
+
+[functions.notify-recurring-tasks]
+verify_jwt = false
