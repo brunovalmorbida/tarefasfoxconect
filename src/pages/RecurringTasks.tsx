@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Trash2, Plus, CalendarDays, CalendarRange, Calendar, Pencil, ArrowLeft } from "lucide-react";
+import { Trash2, Plus, CalendarDays, CalendarRange, Calendar, Pencil, ArrowLeft, User } from "lucide-react";
 import {
   useRecurringTaskBoards,
   useRecurringTasks,
@@ -15,7 +15,7 @@ import {
   RecurringTaskBoard,
   RecurringTask,
 } from "@/hooks/useRecurringTasks";
-import { useTeams } from "@/hooks/useBoards";
+import { useTeams, useTeamMembers } from "@/hooks/useBoards";
 import { useCanManage } from "@/hooks/useUserRole";
 import { useToast } from "@/hooks/use-toast";
 
@@ -195,6 +195,7 @@ export default function RecurringTasks() {
   const teamId = selectedTeam || teams?.[0]?.id || "";
   const { boards, isLoading, createBoard, updateBoard, deleteBoard, isActiveToday } =
     useRecurringTaskBoards(teamId);
+  const { data: teamMembers } = useTeamMembers(teamId);
   const { toast } = useToast();
 
   const [selectedBoard, setSelectedBoard] = useState<RecurringTaskBoard | null>(null);
@@ -204,12 +205,14 @@ export default function RecurringTasks() {
   const [newName, setNewName] = useState("");
   const [newFreqType, setNewFreqType] = useState<"weekday" | "weekly" | "monthly">("weekday");
   const [newWeekday, setNewWeekday] = useState("0");
+  const [newAssignedUser, setNewAssignedUser] = useState<string>("");
 
   // Edit board dialog
   const [editBoard, setEditBoard] = useState<RecurringTaskBoard | null>(null);
   const [editName, setEditName] = useState("");
   const [editFreqType, setEditFreqType] = useState<"weekday" | "weekly" | "monthly">("weekday");
   const [editWeekday, setEditWeekday] = useState("0");
+  const [editAssignedUser, setEditAssignedUser] = useState<string>("");
 
   const handleCreate = async () => {
     if (!newName.trim() || !teamId) return;
@@ -219,8 +222,9 @@ export default function RecurringTasks() {
         frequencyType: newFreqType,
         weekday: parseInt(newWeekday),
         teamId,
+        assignedUserId: newAssignedUser && newAssignedUser !== "none" ? newAssignedUser : null,
       });
-      setNewName("");
+      setNewName(""); setNewAssignedUser("");
       setCreateOpen(false);
       toast({ title: "Quadro criado com sucesso" });
     } catch {
@@ -236,6 +240,7 @@ export default function RecurringTasks() {
         name: editName.trim(),
         frequencyType: editFreqType,
         weekday: parseInt(editWeekday),
+        assignedUserId: editAssignedUser && editAssignedUser !== "none" ? editAssignedUser : null,
       });
       setEditBoard(null);
       toast({ title: "Quadro atualizado" });
@@ -258,7 +263,13 @@ export default function RecurringTasks() {
     setEditName(board.name);
     setEditFreqType(board.frequency_type);
     setEditWeekday(String(board.weekday ?? 0));
+    setEditAssignedUser(board.assigned_user_id ?? "");
     setEditBoard(board);
+  };
+
+  const getMemberName = (userId: string) => {
+    const member = (teamMembers as any[])?.find((m) => m.user_id === userId);
+    return member?.profiles?.name ?? "Usuário";
   };
 
   if (selectedBoard) {
@@ -334,6 +345,19 @@ export default function RecurringTasks() {
                       </SelectContent>
                     </Select>
                   )}
+                  <Select value={newAssignedUser} onValueChange={setNewAssignedUser}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todos da equipe (sem atribuição)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Todos da equipe</SelectItem>
+                      {(teamMembers as any[])?.map((m) => (
+                        <SelectItem key={m.user_id} value={m.user_id}>
+                          {m.profiles?.name ?? m.user_id}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Button
                     onClick={handleCreate}
                     disabled={!newName.trim() || createBoard.isPending}
@@ -390,6 +414,11 @@ export default function RecurringTasks() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground">{frequencyLabel(board)}</p>
+                  {board.assigned_user_id && (
+                    <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                      <User className="h-3 w-3" /> {getMemberName(board.assigned_user_id)}
+                    </p>
+                  )}
                   {!active && (
                     <p className="text-xs text-muted-foreground mt-1">Não ativo hoje</p>
                   )}
@@ -438,6 +467,19 @@ export default function RecurringTasks() {
                 </SelectContent>
               </Select>
             )}
+            <Select value={editAssignedUser} onValueChange={setEditAssignedUser}>
+              <SelectTrigger>
+                <SelectValue placeholder="Todos da equipe (sem atribuição)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Todos da equipe</SelectItem>
+                {(teamMembers as any[])?.map((m) => (
+                  <SelectItem key={m.user_id} value={m.user_id}>
+                    {m.profiles?.name ?? m.user_id}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button
               onClick={handleEdit}
               disabled={!editName.trim() || updateBoard.isPending}
