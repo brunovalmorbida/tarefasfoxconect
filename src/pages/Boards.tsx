@@ -2,18 +2,18 @@ import { useState } from "react";
 import { useBoards } from "@/hooks/useBoards";
 import { useIsAppAdmin } from "@/hooks/useUserRole";
 import { CreateBoardDialog } from "@/components/kanban/CreateBoardDialog";
-import { BoardAccessDialog } from "@/components/kanban/BoardAccessDialog";
+import { EditBoardDialog } from "@/components/kanban/EditBoardDialog";
 import { KanbanBoard } from "@/components/kanban/KanbanBoard";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { LayoutGrid, Users, User } from "lucide-react";
+import { LayoutGrid, Pencil, User } from "lucide-react";
 
 export default function Boards() {
   const { boards, isLoading } = useBoards();
   const { data: isAdmin } = useIsAppAdmin();
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
-  const [accessBoard, setAccessBoard] = useState<{ id: string; name: string; teamId: string } | null>(null);
+  const [editBoard, setEditBoard] = useState<{ id: string; name: string; description: string | null; team_id: string } | null>(null);
 
   if (selectedBoardId) {
     return <KanbanBoard boardId={selectedBoardId} onBack={() => setSelectedBoardId(null)} />;
@@ -71,11 +71,16 @@ export default function Boards() {
                           className="gap-1.5"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setAccessBoard({ id: board.id, name: board.name, teamId: board.team_id });
+                            setEditBoard({
+                              id: board.id,
+                              name: board.name,
+                              description: board.description,
+                              team_id: board.team_id,
+                            });
                           }}
                         >
-                          <Users className="h-3.5 w-3.5" />
-                          Acessos
+                          <Pencil className="h-3.5 w-3.5" />
+                          Editar
                         </Button>
                       )}
                     </div>
@@ -87,13 +92,11 @@ export default function Boards() {
         </div>
       )}
 
-      {accessBoard && (
-        <BoardAccessDialog
-          open={!!accessBoard}
-          onOpenChange={(open) => !open && setAccessBoard(null)}
-          boardId={accessBoard.id}
-          boardName={accessBoard.name}
-          teamId={accessBoard.teamId}
+      {editBoard && (
+        <EditBoardDialog
+          open={!!editBoard}
+          onOpenChange={(open) => !open && setEditBoard(null)}
+          board={editBoard}
         />
       )}
     </div>
