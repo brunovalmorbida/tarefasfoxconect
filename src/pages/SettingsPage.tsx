@@ -1,7 +1,8 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useIsAppAdmin } from "@/hooks/useUserRole";
 import { UsersTab } from "@/components/settings/UsersTab";
-import { Settings, Users } from "lucide-react";
+import { IntegrationsTab } from "@/components/settings/IntegrationsTab";
+import { Settings, Users, Plug } from "lucide-react";
 
 export default function SettingsPage() {
   const { data: isAdmin } = useIsAppAdmin();
@@ -22,6 +23,12 @@ export default function SettingsPage() {
               Usuários
             </TabsTrigger>
           )}
+          {isAdmin && (
+            <TabsTrigger value="integrations" className="gap-2">
+              <Plug className="h-4 w-4" />
+              Integrações
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="general" className="mt-6">
@@ -31,6 +38,11 @@ export default function SettingsPage() {
         {isAdmin && (
           <TabsContent value="users" className="mt-6">
             <UsersTab />
+          </TabsContent>
+        )}
+        {isAdmin && (
+          <TabsContent value="integrations" className="mt-6">
+            <IntegrationsTab />
           </TabsContent>
         )}
       </Tabs>
