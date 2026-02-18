@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import { useLogActivity } from "./useActivityLog";
 import type { Tables, TablesInsert } from "@/integrations/supabase/types";
 
 export type Board = Tables<"boards">;
@@ -10,6 +11,7 @@ export type Task = Tables<"tasks">;
 export function useBoards(teamId?: string) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const logActivity = useLogActivity();
 
   const boardsQuery = useQuery({
     queryKey: ["boards", teamId],
@@ -32,12 +34,13 @@ export function useBoards(teamId?: string) {
         .single();
       if (error) throw error;
 
-      // Create default columns
       const defaultColumns = ["A Fazer", "Em Andamento", "Em Revisão", "Concluído"];
       const { error: colError } = await supabase.from("board_columns").insert(
         defaultColumns.map((name, i) => ({ board_id: data.id, name, position: i }))
       );
       if (colError) throw colError;
+
+      await logActivity("Criou um quadro", { board_name: name }, teamId);
       return data;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["boards"] }),
@@ -49,6 +52,7 @@ export function useBoards(teamId?: string) {
 export function useBoardDetail(boardId: string) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const logActivity = useLogActivity();
 
   const boardQuery = useQuery({
     queryKey: ["board", boardId],
@@ -59,7 +63,6 @@ export function useBoardDetail(boardId: string) {
         .eq("id", boardId)
         .single();
       if (error) throw error;
-      // Sort columns by position, tasks by position
       if (data.board_columns) {
         data.board_columns.sort((a: any, b: any) => a.position - b.position);
         data.board_columns.forEach((col: any) => {
@@ -71,10 +74,13 @@ export function useBoardDetail(boardId: string) {
     enabled: !!user && !!boardId,
   });
 
+  const getTeamId = () => boardQuery.data?.team_id;
+
   const addColumn = useMutation({
     mutationFn: async ({ name, position }: { name: string; position: number }) => {
       const { error } = await supabase.from("board_columns").insert({ board_id: boardId, name, position });
       if (error) throw error;
+      await logActivity("Adicionou uma coluna", { column_name: name, board_name: boardQuery.data?.name }, getTeamId());
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["board", boardId] }),
   });
@@ -89,8 +95,10 @@ export function useBoardDetail(boardId: string) {
 
   const deleteColumn = useMutation({
     mutationFn: async (columnId: string) => {
+      const col = boardQuery.data?.board_columns?.find((c: any) => c.id === columnId);
       const { error } = await supabase.from("board_columns").delete().eq("id", columnId);
       if (error) throw error;
+      await logActivity("Excluiu uma coluna", { column_name: col?.name, board_name: boardQuery.data?.name }, getTeamId());
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["board", boardId] }),
   });
@@ -108,6 +116,8 @@ export function useBoardDetail(boardId: string) {
         created_by: user!.id,
       });
       if (error) throw error;
+      const col = boardQuery.data?.board_columns?.find((c: any) => c.id === columnId);
+      await logActivity("Criou uma tarefa", { task_title: title, column_name: col?.name, board_name: boardQuery.data?.name }, getTeamId());
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["board", boardId] }),
   });
@@ -116,22 +126,51 @@ export function useBoardDetail(boardId: string) {
     mutationFn: async ({ id, ...updates }: { id: string } & Partial<TablesInsert<"tasks">>) => {
       const { error } = await supabase.from("tasks").update(updates).eq("id", id);
       if (error) throw error;
+      await logActivity("Atualizou uma tarefa", { task_title: updates.title, board_name: boardQuery.data?.name }, getTeamId());
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["board", boardId] }),
   });
 
   const deleteTask = useMutation({
     mutationFn: async (taskId: string) => {
+      // Find task title before deleting
+      let taskTitle = "";
+      boardQuery.data?.board_columns?.forEach((col: any) => {
+        const task = col.tasks?.find((t: any) => t.id === taskId);
+        if (task) taskTitle = task.title;
+      });
       const { error } = await supabase.from("tasks").delete().eq("id", taskId);
       if (error) throw error;
+      await logActivity("Excluiu uma tarefa", { task_title: taskTitle, board_name: boardQuery.data?.name }, getTeamId());
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["board", boardId] }),
   });
 
   const moveTask = useMutation({
     mutationFn: async ({ taskId, newColumnId, newPosition }: { taskId: string; newColumnId: string; newPosition: number }) => {
+      // Find task and columns info before moving
+      let taskTitle = "";
+      let fromCol = "";
+      boardQuery.data?.board_columns?.forEach((col: any) => {
+        const task = col.tasks?.find((t: any) => t.id === taskId);
+        if (task) {
+          taskTitle = task.title;
+          fromCol = col.name;
+        }
+      });
+      const toCol = boardQuery.data?.board_columns?.find((c: any) => c.id === newColumnId)?.name;
+
       const { error } = await supabase.from("tasks").update({ column_id: newColumnId, position: newPosition }).eq("id", taskId);
       if (error) throw error;
+
+      if (fromCol !== toCol) {
+        await logActivity("Moveu uma tarefa", {
+          task_title: taskTitle,
+          from_column: fromCol,
+          to_column: toCol,
+          board_name: boardQuery.data?.name,
+        }, getTeamId());
+      }
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["board", boardId] }),
   });

@@ -20,7 +20,7 @@ export type Database = {
           created_at: string
           details: Json | null
           id: string
-          team_id: string
+          team_id: string | null
           user_id: string
         }
         Insert: {
@@ -28,7 +28,7 @@ export type Database = {
           created_at?: string
           details?: Json | null
           id?: string
-          team_id: string
+          team_id?: string | null
           user_id: string
         }
         Update: {
@@ -36,7 +36,7 @@ export type Database = {
           created_at?: string
           details?: Json | null
           id?: string
-          team_id?: string
+          team_id?: string | null
           user_id?: string
         }
         Relationships: [

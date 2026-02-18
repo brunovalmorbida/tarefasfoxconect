@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTeams } from "@/hooks/useBoards";
 import { useAuth } from "@/hooks/useAuth";
+import { useLogActivity } from "@/hooks/useActivityLog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +36,7 @@ interface Profile {
 export function UsersTab() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const logActivity = useLogActivity();
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Create user state
@@ -156,6 +158,7 @@ export function UsersTab() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       toast.success("Usuário criado com sucesso!");
+      await logActivity("Criou um usuário", { user_name: newName.trim(), email: newEmail.trim() });
       queryClient.invalidateQueries({ queryKey: ["admin-profiles"] });
       queryClient.invalidateQueries({ queryKey: ["admin-team-members"] });
       setNewName("");
@@ -190,6 +193,7 @@ export function UsersTab() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       toast.success("Usuário atualizado com sucesso!");
+      await logActivity("Atualizou um usuário", { user_name: editName.trim() });
       queryClient.invalidateQueries({ queryKey: ["admin-profiles"] });
       queryClient.invalidateQueries({ queryKey: ["admin-team-members"] });
       queryClient.invalidateQueries({ queryKey: ["admin-roles"] });
@@ -209,8 +213,9 @@ export function UsersTab() {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
+      const deletedName = profiles?.find(p => p.user_id === userId)?.name ?? "Desconhecido";
       toast.success("Usuário removido com sucesso!");
-      queryClient.invalidateQueries({ queryKey: ["admin-profiles"] });
+      await logActivity("Removeu um usuário", { user_name: deletedName });
       queryClient.invalidateQueries({ queryKey: ["admin-team-members"] });
     } catch (err: any) {
       toast.error(err.message || "Erro ao remover usuário");

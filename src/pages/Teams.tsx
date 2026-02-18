@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTeams } from "@/hooks/useBoards";
 import { useAuth } from "@/hooks/useAuth";
+import { useLogActivity } from "@/hooks/useActivityLog";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,12 +18,12 @@ export default function Teams() {
   const { user } = useAuth();
   const { data: teams, isLoading } = useTeams();
   const queryClient = useQueryClient();
+  const logActivity = useLogActivity();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [creating, setCreating] = useState(false);
 
-  // Edit state
   const [editOpen, setEditOpen] = useState(false);
   const [editId, setEditId] = useState("");
   const [editName, setEditName] = useState("");
@@ -34,8 +35,9 @@ export default function Teams() {
     if (!name.trim() || !user) return;
     setCreating(true);
     try {
-      const { error } = await supabase.from("teams").insert({ name: name.trim(), description: description.trim() || null, created_by: user.id });
+      const { data, error } = await supabase.from("teams").insert({ name: name.trim(), description: description.trim() || null, created_by: user.id }).select().single();
       if (error) throw error;
+      await logActivity("Criou uma equipe", { team_name: name.trim() }, data.id);
       toast.success("Equipe criada com sucesso!");
       queryClient.invalidateQueries({ queryKey: ["teams"] });
       setName("");
@@ -61,6 +63,7 @@ export default function Teams() {
     try {
       const { error } = await supabase.from("teams").update({ name: editName.trim(), description: editDesc.trim() || null }).eq("id", editId);
       if (error) throw error;
+      await logActivity("Atualizou uma equipe", { team_name: editName.trim() }, editId);
       toast.success("Equipe atualizada!");
       queryClient.invalidateQueries({ queryKey: ["teams"] });
       setEditOpen(false);
@@ -71,10 +74,11 @@ export default function Teams() {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, teamName: string) => {
     try {
       const { error } = await supabase.from("teams").delete().eq("id", id);
       if (error) throw error;
+      await logActivity("Excluiu uma equipe", { team_name: teamName });
       toast.success("Equipe excluída!");
       queryClient.invalidateQueries({ queryKey: ["teams"] });
     } catch (err: any) {
@@ -143,7 +147,7 @@ export default function Teams() {
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDelete(team.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                          <AlertDialogAction onClick={() => handleDelete(team.id, team.name)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                             Excluir
                           </AlertDialogAction>
                         </AlertDialogFooter>
@@ -161,7 +165,6 @@ export default function Teams() {
         </div>
       )}
 
-      {/* Edit dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Editar Equipe</DialogTitle></DialogHeader>

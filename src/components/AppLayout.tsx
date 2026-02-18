@@ -1,11 +1,22 @@
+import { useEffect, useRef } from "react";
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useLogActivity } from "@/hooks/useActivityLog";
 import { AppSidebar } from "@/components/AppSidebar";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { Loader2 } from "lucide-react";
 
 export function AppLayout() {
   const { user, loading } = useAuth();
+  const logActivity = useLogActivity();
+  const hasLoggedAccess = useRef(false);
+
+  useEffect(() => {
+    if (user && !hasLoggedAccess.current) {
+      hasLoggedAccess.current = true;
+      logActivity("Acessou o sistema");
+    }
+  }, [user, logActivity]);
 
   if (loading) {
     return (
