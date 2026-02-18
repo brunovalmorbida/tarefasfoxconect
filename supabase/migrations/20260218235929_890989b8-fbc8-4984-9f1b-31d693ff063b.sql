@@ -1,0 +1,1 @@
+ALTER TABLE public.purchase_lists ADD COLUMN urgency public.purchase_urgency NOT NULL DEFAULT 'medium';

@@ -274,6 +274,7 @@ export type Database = {
           requested_by: string
           title: string
           updated_at: string
+          urgency: Database["public"]["Enums"]["purchase_urgency"]
         }
         Insert: {
           buyer_id?: string | null
@@ -287,6 +288,7 @@ export type Database = {
           requested_by: string
           title?: string
           updated_at?: string
+          urgency?: Database["public"]["Enums"]["purchase_urgency"]
         }
         Update: {
           buyer_id?: string | null
@@ -300,6 +302,7 @@ export type Database = {
           requested_by?: string
           title?: string
           updated_at?: string
+          urgency?: Database["public"]["Enums"]["purchase_urgency"]
         }
         Relationships: []
       }
