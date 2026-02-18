@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import { useLogActivity } from "./useActivityLog";
 import { startOfDay, startOfWeek, startOfMonth, format, getDay } from "date-fns";
 
 export type RecurringTaskBoard = {
@@ -89,6 +90,7 @@ function isActiveToday(board: RecurringTaskBoard): boolean {
 export function useRecurringTaskBoards(teamId?: string) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const logActivity = useLogActivity();
 
   const boardsQuery = useQuery({
     queryKey: ["recurring-task-boards", teamId],
@@ -122,6 +124,7 @@ export function useRecurringTaskBoards(teamId?: string) {
         created_by: user!.id,
       });
       if (error) throw error;
+      await logActivity("Criou um quadro de tarefas fixas", { board_name: params.name }, params.teamId);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["recurring-task-boards"] }),
   });
@@ -147,14 +150,17 @@ export function useRecurringTaskBoards(teamId?: string) {
         .update(updateData)
         .eq("id", params.id);
       if (error) throw error;
+      await logActivity("Atualizou um quadro de tarefas fixas", { board_name: params.name }, params.teamId);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["recurring-task-boards"] }),
   });
 
   const deleteBoard = useMutation({
     mutationFn: async (id: string) => {
+      const board = boardsQuery.data?.find(b => b.id === id);
       const { error } = await supabase.from("recurring_task_boards" as any).delete().eq("id", id);
       if (error) throw error;
+      await logActivity("Excluiu um quadro de tarefas fixas", { board_name: board?.name }, board?.team_id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["recurring-task-boards"] });
@@ -175,6 +181,7 @@ export function useRecurringTaskBoards(teamId?: string) {
 export function useRecurringTasks(boardId?: string) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const logActivity = useLogActivity();
 
   const tasksQuery = useQuery({
     queryKey: ["recurring-tasks", boardId],
@@ -225,6 +232,7 @@ export function useRecurringTasks(boardId?: string) {
           .delete()
           .eq("id", existing.id);
         if (error) throw error;
+        await logActivity("Desmarcou tarefa fixa como concluída", { task_title: task.title }, task.team_id);
       } else {
         const { error } = await supabase
           .from("recurring_task_completions" as any)
@@ -234,6 +242,7 @@ export function useRecurringTasks(boardId?: string) {
             period_start: periodStart,
           });
         if (error) throw error;
+        await logActivity("Marcou tarefa fixa como concluída", { task_title: task.title }, task.team_id);
       }
     },
     onSuccess: () => {
@@ -262,17 +271,20 @@ export function useRecurringTasks(boardId?: string) {
         month_day: params.frequency === "monthly" ? (params.monthDay ?? 1) : null,
       });
       if (error) throw error;
+      await logActivity("Criou uma tarefa fixa", { task_title: params.title }, params.teamId);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["recurring-tasks"] }),
   });
 
   const deleteTask = useMutation({
     mutationFn: async (taskId: string) => {
+      const task = tasksQuery.data?.find(t => t.id === taskId);
       const { error } = await supabase
         .from("recurring_tasks" as any)
         .delete()
         .eq("id", taskId);
       if (error) throw error;
+      await logActivity("Excluiu uma tarefa fixa", { task_title: task?.title }, task?.team_id);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["recurring-tasks"] }),
   });

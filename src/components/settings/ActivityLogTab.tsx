@@ -105,9 +105,12 @@ export function ActivityLogTab() {
                       </span>
                     </div>
                     <p className="text-sm mt-1">{log.action}</p>
-                    {log.details && (
-                      <p className="text-xs text-muted-foreground mt-1 truncate">
-                        {typeof log.details === "string" ? log.details : JSON.stringify(log.details)}
+                    {log.details && typeof log.details === "object" && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {Object.entries(log.details as Record<string, any>)
+                          .filter(([_, v]) => v != null)
+                          .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`)
+                          .join(" • ")}
                       </p>
                     )}
                   </div>
