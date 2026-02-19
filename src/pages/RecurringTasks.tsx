@@ -310,12 +310,13 @@ export default function RecurringTasks() {
   const [editId, setEditId] = useState("");
   const [editName, setEditName] = useState("");
   const [editTeamId, setEditTeamId] = useState("");
+  const [editAssignedUser, setEditAssignedUser] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const handleEdit = async () => {
     if (!editName.trim() || !editId || !editTeamId) return;
     try {
-      await updateBoard.mutateAsync({ id: editId, name: editName.trim(), frequencyType: "weekly", weekday: 0, assignedUserId: null, teamId: editTeamId });
+      await updateBoard.mutateAsync({ id: editId, name: editName.trim(), frequencyType: "weekly", weekday: 0, assignedUserId: editAssignedUser && editAssignedUser !== "none" ? editAssignedUser : null, teamId: editTeamId });
       setEditOpen(false); toast({ title: "Quadro atualizado" });
     } catch { toast({ title: "Erro ao atualizar quadro", variant: "destructive" }); }
   };
@@ -425,7 +426,7 @@ export default function RecurringTasks() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                        <DropdownMenuItem onClick={() => { setEditId(board.id); setEditName(board.name); setEditTeamId(board.team_id); setEditOpen(true); }}>
+                        <DropdownMenuItem onClick={() => { setEditId(board.id); setEditName(board.name); setEditTeamId(board.team_id); setEditAssignedUser(board.assigned_user_id || "none"); setEditOpen(true); }}>
                           <Pencil className="h-4 w-4 mr-2" /> Editar
                         </DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive" onClick={() => setDeleteId(board.id)}>
@@ -456,6 +457,16 @@ export default function RecurringTasks() {
                 </Select>
               </div>
             )}
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">Responsável</label>
+              <Select value={editAssignedUser || "none"} onValueChange={setEditAssignedUser}>
+                <SelectTrigger><SelectValue placeholder="Selecione o responsável" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Todos da equipe</SelectItem>
+                  {(teamMembers as any[])?.map((m: any) => (<SelectItem key={m.user_id} value={m.user_id}>{m.profiles?.name ?? m.user_id}</SelectItem>))}
+                </SelectContent>
+              </Select>
+            </div>
             <Button onClick={handleEdit} disabled={!editName.trim() || updateBoard.isPending} className="w-full">Salvar</Button>
           </div>
         </DialogContent>
