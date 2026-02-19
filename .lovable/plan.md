@@ -1,6 +1,20 @@
 
-
 # TaskFlow - Sistema de Gestão de Tarefas
+
+## 🏁 Marco: Versão V1.0 (19/02/2026)
+> Estado estável do sistema com todas as funcionalidades base implementadas:
+> - Autenticação (login, cadastro, recuperação de senha)
+> - Dashboard com abas (Kanban, Tarefas Recorrentes, Compras)
+> - Quadros Kanban com drag & drop, colunas, tarefas, etiquetas, prioridades
+> - Gestão de Equipes (criar, convidar membros, papéis admin/membro)
+> - Tarefas Recorrentes (diárias, semanais, mensais, por dia da semana)
+> - Compras (listas, itens, catálogo de produtos, categorias, fluxo pendente→comprado→recebido)
+> - Notificações internas e via WhatsApp (Z-API)
+> - Configurações (usuários, permissões, integrações, log de atividades, backup)
+> - Controle de permissões granular por usuário
+> - Sistema de roles (admin/user)
+>
+> **Para restaurar esta versão:** Use o Histórico de edições do Lovable e encontre esta mensagem.
 
 ## Visão Geral
 Sistema completo de gestão de tarefas estilo Trello com Kanban, gestão de equipes, dashboard analítico, autenticação por email/senha e notificações via WhatsApp (Z-API). Design clean e minimalista.
