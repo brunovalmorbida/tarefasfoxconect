@@ -274,7 +274,7 @@ export default function Purchases() {
                 <ShoppingCart className="h-3 w-3 mr-1" /> Tudo Comprado
               </Button>
             )}
-            {list.status === "purchased" && list.requested_by === user?.id && (
+            {list.status === "purchased" && (list.requested_by === user?.id || isAdmin) && (
               <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => setShowReceiveDialog(list)}>
                 <PackageCheck className="h-3 w-3 mr-1" /> Tudo Recebido
               </Button>
