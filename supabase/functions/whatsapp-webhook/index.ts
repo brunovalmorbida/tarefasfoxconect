@@ -1148,7 +1148,7 @@ async function sendWhatsAppImage(supabase: any, phone: string, base64Image: stri
 }
 
 // ─── COMMAND: Print do Quadro ─────────────────────────────
-async function handlePrintQuadro(supabase: any, requesterProfile: any, allProfiles: any[], args: any, isAdmin: boolean, phone: string, lovableApiKey: string) {
+async function handlePrintQuadro(supabase: any, requesterProfile: any, allProfiles: any[], args: any, isAdmin: boolean, phone: string, _lovableApiKey: string) {
   const { nome_usuario, nome_quadro } = args;
 
   let targetProfile = requesterProfile;
@@ -1214,70 +1214,8 @@ async function handlePrintQuadro(supabase: any, requesterProfile: any, allProfil
   const assigneeMap = new Map<string, string>();
   allProfiles.forEach((p: any) => { if (assigneeIds.has(p.user_id)) assigneeMap.set(p.user_id, p.name); });
 
-  const priorityLabels: Record<string, string> = { low: "Baixa", medium: "Média", high: "Alta", urgent: "Urgente" };
-  const priorityColors: Record<string, string> = { low: "green", medium: "yellow", high: "orange", urgent: "red" };
 
-  let boardDesc = `Kanban Board titled "${board.name}"\n\nColumns (left to right):\n`;
-  sortedColumns.forEach((col: any) => {
-    const tasks = col.tasks || [];
-    boardDesc += `\nColumn: "${col.name}" (${tasks.length} tasks)\n`;
-    if (tasks.length === 0) {
-      boardDesc += `  - Empty\n`;
-    } else {
-      tasks.forEach((t: any) => {
-        const assignee = t.assignee_id ? assigneeMap.get(t.assignee_id) || "?" : "";
-        const due = t.due_date ? new Date(t.due_date).toLocaleDateString("pt-BR") : "";
-        const prio = priorityLabels[t.priority] || "Média";
-        const prioColor = priorityColors[t.priority] || "yellow";
-        boardDesc += `  - Card: "${t.title}" | Priority: ${prio} (${prioColor})${assignee ? ` | Assignee: ${assignee}` : ""}${due ? ` | Due: ${due}` : ""}\n`;
-      });
-    }
-  });
-
-  await sendWhatsApp(supabase, phone, `⏳ Gerando imagem do quadro *${board.name}*...`);
-
-  try {
-    const imagePrompt = `Create a clean, professional Kanban board image with the following exact data. Use a modern dark theme with colored column headers. Each task card should show the title, a colored priority indicator (green=low, yellow=medium, orange=high, red=urgent), assignee name, and due date if available. Make it look like a real project management tool screenshot. All text must be clearly readable and exactly as provided.
-
-${boardDesc}
-
-Style: Modern dark UI, rounded card corners, clear typography, column headers in distinct colors. Cards should be white/light with subtle shadows. Include the board title "${board.name}" at the top. 16:9 aspect ratio.`;
-
-    const imageResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${lovableApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image",
-        messages: [{ role: "user", content: imagePrompt }],
-        modalities: ["image", "text"],
-      }),
-    });
-
-    if (!imageResponse.ok) {
-      console.error("Image AI error:", imageResponse.status, await imageResponse.text());
-      await sendWhatsApp(supabase, phone, buildTextBoardPrint(board, sortedColumns, assigneeMap));
-      return;
-    }
-
-    const imageData = await imageResponse.json();
-    const imageUrl = imageData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-
-    if (!imageUrl) {
-      console.error("No image in AI response");
-      await sendWhatsApp(supabase, phone, buildTextBoardPrint(board, sortedColumns, assigneeMap));
-      return;
-    }
-
-    const totalTasks = sortedColumns.reduce((sum: number, col: any) => sum + (col.tasks?.length || 0), 0);
-    const caption = `📋 *${board.name}* | ${sortedColumns.length} colunas | ${totalTasks} tarefas`;
-    await sendWhatsAppImage(supabase, phone, imageUrl, caption);
-  } catch (e: any) {
-    console.error("Error generating board image:", e);
-    await sendWhatsApp(supabase, phone, buildTextBoardPrint(board, sortedColumns, assigneeMap));
-  }
+  await sendWhatsApp(supabase, phone, buildTextBoardPrint(board, sortedColumns, assigneeMap));
 }
 
 function buildTextBoardPrint(board: any, columns: any[], assigneeMap: Map<string, string>): string {
