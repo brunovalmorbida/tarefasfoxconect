@@ -59,9 +59,20 @@ Deno.serve(async (req) => {
     }
 
     const urgencyLabels: Record<string, string> = { low: "Baixa", medium: "Média", high: "Alta", urgent: "Urgente" };
-    const categoryLabels: Record<string, string> = {
+    const fixedCategoryLabels: Record<string, string> = {
       office: "Escritório", cleaning: "Limpeza", technology: "Tecnologia",
       maintenance: "Manutenção", food: "Alimentação", other: "Outros",
+    };
+
+    // Fetch custom categories to resolve UUIDs to names
+    const { data: productCategories } = await supabase
+      .from("product_categories").select("id, name");
+    const customCatMap = new Map((productCategories || []).map((c: any) => [c.id, c.name]));
+
+    const getCategoryName = (cat: string) => {
+      if (fixedCategoryLabels[cat]) return fixedCategoryLabels[cat];
+      if (customCatMap.has(cat)) return customCatMap.get(cat);
+      return cat;
     };
 
     const sendWhatsApp = async (phone: string, message: string) => {
@@ -78,7 +89,7 @@ Deno.serve(async (req) => {
     // Build items list text
     const buildItemsList = (showActual = false) => {
       return (items || []).map((item: any, i: number) => {
-        let line = `  ${i + 1}. ${item.name} (x${item.quantity}) - ${categoryLabels[item.category] || item.category}`;
+        let line = `  ${i + 1}. ${item.name} (x${item.quantity}) - ${getCategoryName(item.category)}`;
         if (item.estimated_value && !showActual) line += ` | Est: R$ ${Number(item.estimated_value).toFixed(2)}`;
         if (item.actual_value && showActual) line += ` | R$ ${Number(item.actual_value).toFixed(2)}`;
         if (item.description) line += ` | ${item.description}`;
