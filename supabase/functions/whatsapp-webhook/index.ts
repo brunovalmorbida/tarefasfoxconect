@@ -144,21 +144,6 @@ const TOOLS = [
   {
     type: "function",
     function: {
-      name: "print_quadro",
-      description: "Gera uma imagem visual do quadro Kanban do usuário (ou de outro usuário se admin/gestor) e envia via WhatsApp. Ex: 'print do quadro', 'foto do meu quadro', 'imagem do quadro do João'",
-      parameters: {
-        type: "object",
-        properties: {
-          nome_usuario: { type: "string", description: "Nome do usuário alvo (opcional, se não informado usa o próprio usuário)" },
-          nome_quadro: { type: "string", description: "Nome específico do quadro (opcional, se não informado usa o primeiro quadro)" },
-        },
-        additionalProperties: false,
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
       name: "ajuda",
       description: "Mostra os comandos disponíveis quando o usuário não sabe o que fazer",
       parameters: {
@@ -185,8 +170,6 @@ Exemplos:
 - "Resumo semanal da Maria" → resumo_completo (periodo: "semana", nome_usuario: "Maria")
 - "Tarefas do João" ou "Quadro do João" → tarefas_usuario (pegar nome "João")
 - "Tarefas diárias da Maria" ou "Rotina da Maria" ou "Tarefas fixas do João" → tarefas_diarias_usuario (pegar nome)
-- "Print do quadro" ou "Foto do meu quadro" ou "Imagem do quadro" → print_quadro
-- "Print do quadro do João" ou "Foto do quadro da Maria" → print_quadro (nome_usuario)
 - "O que posso fazer?" → ajuda
 
 Regras:
@@ -199,8 +182,7 @@ Regras:
 - Se o usuário pedir resumo de OUTRA pessoa, inclua nome_usuario no resumo_completo
 - Quando o usuário pedir tarefas de OUTRA pessoa, use tarefas_usuario ou tarefas_diarias_usuario
 - "tarefas diárias", "rotina", "tarefas fixas" de alguém → tarefas_diarias_usuario
-- "tarefas", "quadro" de alguém → tarefas_usuario
-- "print", "foto", "imagem", "screenshot" do quadro → print_quadro`;
+- "tarefas", "quadro" de alguém → tarefas_usuario`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -382,11 +364,6 @@ Deno.serve(async (req) => {
         } else {
           responseMessage = await handleTarefasDiariasUsuario(supabase, profiles || [], args);
         }
-        break;
-      case "print_quadro":
-        // Special handling: sends image directly, not text
-        await handlePrintQuadro(supabase, userProfile, profiles || [], args, isAdmin, cleanPhone, lovableApiKey);
-        responseMessage = ""; // Already sent
         break;
       case "ajuda":
         responseMessage = handleAjuda(userProfile.name, isAdmin);
@@ -1170,100 +1147,6 @@ async function sendWhatsAppImage(supabase: any, phone: string, base64Image: stri
   }
 }
 
-// ─── COMMAND: Print do Quadro ─────────────────────────────
-async function handlePrintQuadro(supabase: any, requesterProfile: any, allProfiles: any[], args: any, isAdmin: boolean, phone: string, _lovableApiKey: string) {
-  const { nome_usuario, nome_quadro } = args;
-
-  let targetProfile = requesterProfile;
-
-  if (nome_usuario) {
-    const found = findProfileByName(allProfiles, nome_usuario);
-    if (!found) {
-      await sendWhatsApp(supabase, phone, `❌ Nenhum usuário encontrado com o nome "${nome_usuario}".`);
-      return;
-    }
-    if (found.user_id !== requesterProfile.user_id) {
-      if (isAdmin) {
-        targetProfile = found;
-      } else {
-        const { data: requesterAdminTeams } = await supabase
-          .from("team_members")
-          .select("team_id")
-          .eq("user_id", requesterProfile.user_id)
-          .eq("role", "admin");
-        const adminTeamIds = (requesterAdminTeams || []).map((t: any) => t.team_id);
-        if (adminTeamIds.length === 0) {
-          await sendWhatsApp(supabase, phone, "🔒 Você não tem permissão para ver quadros de outros usuários.");
-          return;
-        }
-        const { data: targetMemberships } = await supabase
-          .from("team_members")
-          .select("team_id")
-          .eq("user_id", found.user_id)
-          .in("team_id", adminTeamIds);
-        if (!targetMemberships || targetMemberships.length === 0) {
-          await sendWhatsApp(supabase, phone, "🔒 Você só pode ver quadros de usuários das equipes que você gerencia.");
-          return;
-        }
-        targetProfile = found;
-      }
-    }
-  }
-
-  let boardQuery = supabase
-    .from("boards")
-    .select("id, name, description, board_columns(id, name, position, tasks(id, title, priority, due_date, assignee_id))")
-    .or(`assigned_user_id.eq.${targetProfile.user_id},created_by.eq.${targetProfile.user_id}`);
-  if (nome_quadro) {
-    boardQuery = boardQuery.ilike("name", `%${nome_quadro}%`);
-  }
-  const { data: boards } = await boardQuery.limit(1);
-
-  if (!boards || boards.length === 0) {
-    await sendWhatsApp(supabase, phone, `❌ Nenhum quadro encontrado${nome_quadro ? ` com o nome "${nome_quadro}"` : ""}.`);
-    return;
-  }
-
-  const board = boards[0];
-  const sortedColumns = (board.board_columns || []).sort((a: any, b: any) => a.position - b.position);
-  sortedColumns.forEach((col: any) => {
-    if (col.tasks) col.tasks.sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0));
-  });
-
-  const assigneeIds = new Set<string>();
-  sortedColumns.forEach((col: any) => {
-    (col.tasks || []).forEach((t: any) => { if (t.assignee_id) assigneeIds.add(t.assignee_id); });
-  });
-  const assigneeMap = new Map<string, string>();
-  allProfiles.forEach((p: any) => { if (assigneeIds.has(p.user_id)) assigneeMap.set(p.user_id, p.name); });
-
-
-  await sendWhatsApp(supabase, phone, buildTextBoardPrint(board, sortedColumns, assigneeMap));
-}
-
-function buildTextBoardPrint(board: any, columns: any[], assigneeMap: Map<string, string>): string {
-  const priorityEmoji: Record<string, string> = { low: "🟢", medium: "🟡", high: "🟠", urgent: "🔴" };
-  let msg = `📋 *${board.name}*\n`;
-  if (board.description) msg += `${board.description}\n`;
-  msg += `━━━━━━━━━━━━━━━━\n\n`;
-  columns.forEach((col: any) => {
-    const tasks = col.tasks || [];
-    msg += `📌 *${col.name}* (${tasks.length})\n`;
-    if (tasks.length === 0) {
-      msg += `  _vazio_\n`;
-    } else {
-      tasks.forEach((t: any) => {
-        const emoji = priorityEmoji[t.priority] || "⚪";
-        const assignee = t.assignee_id ? assigneeMap.get(t.assignee_id) : null;
-        const due = t.due_date ? ` 📅${new Date(t.due_date).toLocaleDateString("pt-BR")}` : "";
-        msg += `  ${emoji} ${t.title}${assignee ? ` @${assignee}` : ""}${due}\n`;
-      });
-    }
-    msg += `\n`;
-  });
-  return msg.trim();
-}
-
 // ─── COMMAND: Ajuda ────────────────────────────────────────
 function handleAjuda(userName: string, isAdmin: boolean = false) {
   let msg = `👋 Olá, ${userName}! Sou o *TaskFox Bot*.\n\n` +
@@ -1292,12 +1175,10 @@ function handleAjuda(userName: string, isAdmin: boolean = false) {
       `  • "Quadro da Maria"\n` +
       `  • "Tarefas atrasadas do Pedro"\n` +
       `  • "Tarefas diárias da Ana"\n` +
-      `  • "Resumo da semana do Carlos"\n` +
-      `  • "Print do quadro do João"\n`;
+      `  • "Resumo da semana do Carlos"\n`;
   } else {
     msg += `\n👥 *Gestor de equipe:*\n` +
-      `  • "Resumo do dia do [nome]" (membros da sua equipe)\n` +
-      `  • "Print do quadro do [nome]"\n`;
+      `  • "Resumo do dia do [nome]" (membros da sua equipe)\n`;
   }
 
   msg += `\nBasta digitar normalmente que eu entendo! 🚀`;
