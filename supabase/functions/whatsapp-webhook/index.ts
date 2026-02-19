@@ -144,6 +144,21 @@ const TOOLS = [
   {
     type: "function",
     function: {
+      name: "print_quadro",
+      description: "Gera uma imagem visual do quadro Kanban do usuário (ou de outro usuário se admin/gestor) e envia via WhatsApp. Ex: 'print do quadro', 'foto do meu quadro', 'imagem do quadro do João'",
+      parameters: {
+        type: "object",
+        properties: {
+          nome_usuario: { type: "string", description: "Nome do usuário alvo (opcional, se não informado usa o próprio usuário)" },
+          nome_quadro: { type: "string", description: "Nome específico do quadro (opcional, se não informado usa o primeiro quadro)" },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "ajuda",
       description: "Mostra os comandos disponíveis quando o usuário não sabe o que fazer",
       parameters: {
@@ -170,6 +185,8 @@ Exemplos:
 - "Resumo semanal da Maria" → resumo_completo (periodo: "semana", nome_usuario: "Maria")
 - "Tarefas do João" ou "Quadro do João" → tarefas_usuario (pegar nome "João")
 - "Tarefas diárias da Maria" ou "Rotina da Maria" ou "Tarefas fixas do João" → tarefas_diarias_usuario (pegar nome)
+- "Print do quadro" ou "Foto do meu quadro" ou "Imagem do quadro" → print_quadro
+- "Print do quadro do João" ou "Foto do quadro da Maria" → print_quadro (nome_usuario)
 - "O que posso fazer?" → ajuda
 
 Regras:
@@ -182,7 +199,8 @@ Regras:
 - Se o usuário pedir resumo de OUTRA pessoa, inclua nome_usuario no resumo_completo
 - Quando o usuário pedir tarefas de OUTRA pessoa, use tarefas_usuario ou tarefas_diarias_usuario
 - "tarefas diárias", "rotina", "tarefas fixas" de alguém → tarefas_diarias_usuario
-- "tarefas", "quadro" de alguém → tarefas_usuario`;
+- "tarefas", "quadro" de alguém → tarefas_usuario
+- "print", "foto", "imagem", "screenshot" do quadro → print_quadro`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -342,6 +360,11 @@ Deno.serve(async (req) => {
           responseMessage = await handleTarefasDiariasUsuario(supabase, profiles || [], args);
         }
         break;
+      case "print_quadro":
+        // Special handling: sends image directly, not text
+        await handlePrintQuadro(supabase, userProfile, profiles || [], args, isAdmin, cleanPhone, lovableApiKey);
+        responseMessage = ""; // Already sent
+        break;
       case "ajuda":
         responseMessage = handleAjuda(userProfile.name, isAdmin);
         break;
@@ -349,7 +372,9 @@ Deno.serve(async (req) => {
         responseMessage = "🤔 Comando não reconhecido. Envie *ajuda* para ver os comandos disponíveis.";
     }
 
-    await sendWhatsApp(supabase, cleanPhone, responseMessage);
+    if (responseMessage) {
+      await sendWhatsApp(supabase, cleanPhone, responseMessage);
+    }
 
     // Log activity
     await supabase.from("activity_log").insert({
@@ -1092,6 +1117,192 @@ async function handleResumoCompleto(supabase: any, requesterProfile: any, allPro
   return msg.trim();
 }
 
+// ─── HELPER: Send WhatsApp image ──────────────────────────
+async function sendWhatsAppImage(supabase: any, phone: string, base64Image: string, caption: string) {
+  try {
+    const { data: zapiConfig } = await supabase
+      .from("zapi_config")
+      .select("*")
+      .eq("is_active", true)
+      .limit(1)
+      .maybeSingle();
+
+    if (!zapiConfig) return;
+
+    const url = `https://api.z-api.io/instances/${zapiConfig.instance_id}/token/${zapiConfig.token}/send-image`;
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (zapiConfig.client_token) headers["Client-Token"] = zapiConfig.client_token;
+
+    await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        phone: phone.replace(/\D/g, ""),
+        image: base64Image,
+        caption,
+      }),
+    });
+  } catch (e) {
+    console.error("Error sending WhatsApp image:", e);
+  }
+}
+
+// ─── COMMAND: Print do Quadro ─────────────────────────────
+async function handlePrintQuadro(supabase: any, requesterProfile: any, allProfiles: any[], args: any, isAdmin: boolean, phone: string, lovableApiKey: string) {
+  const { nome_usuario, nome_quadro } = args;
+
+  let targetProfile = requesterProfile;
+
+  if (nome_usuario) {
+    const found = findProfileByName(allProfiles, nome_usuario);
+    if (!found) {
+      await sendWhatsApp(supabase, phone, `❌ Nenhum usuário encontrado com o nome "${nome_usuario}".`);
+      return;
+    }
+    if (found.user_id !== requesterProfile.user_id) {
+      if (isAdmin) {
+        targetProfile = found;
+      } else {
+        const { data: requesterAdminTeams } = await supabase
+          .from("team_members")
+          .select("team_id")
+          .eq("user_id", requesterProfile.user_id)
+          .eq("role", "admin");
+        const adminTeamIds = (requesterAdminTeams || []).map((t: any) => t.team_id);
+        if (adminTeamIds.length === 0) {
+          await sendWhatsApp(supabase, phone, "🔒 Você não tem permissão para ver quadros de outros usuários.");
+          return;
+        }
+        const { data: targetMemberships } = await supabase
+          .from("team_members")
+          .select("team_id")
+          .eq("user_id", found.user_id)
+          .in("team_id", adminTeamIds);
+        if (!targetMemberships || targetMemberships.length === 0) {
+          await sendWhatsApp(supabase, phone, "🔒 Você só pode ver quadros de usuários das equipes que você gerencia.");
+          return;
+        }
+        targetProfile = found;
+      }
+    }
+  }
+
+  let boardQuery = supabase
+    .from("boards")
+    .select("id, name, description, board_columns(id, name, position, tasks(id, title, priority, due_date, assignee_id))")
+    .or(`assigned_user_id.eq.${targetProfile.user_id},created_by.eq.${targetProfile.user_id}`);
+  if (nome_quadro) {
+    boardQuery = boardQuery.ilike("name", `%${nome_quadro}%`);
+  }
+  const { data: boards } = await boardQuery.limit(1);
+
+  if (!boards || boards.length === 0) {
+    await sendWhatsApp(supabase, phone, `❌ Nenhum quadro encontrado${nome_quadro ? ` com o nome "${nome_quadro}"` : ""}.`);
+    return;
+  }
+
+  const board = boards[0];
+  const sortedColumns = (board.board_columns || []).sort((a: any, b: any) => a.position - b.position);
+  sortedColumns.forEach((col: any) => {
+    if (col.tasks) col.tasks.sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0));
+  });
+
+  const assigneeIds = new Set<string>();
+  sortedColumns.forEach((col: any) => {
+    (col.tasks || []).forEach((t: any) => { if (t.assignee_id) assigneeIds.add(t.assignee_id); });
+  });
+  const assigneeMap = new Map<string, string>();
+  allProfiles.forEach((p: any) => { if (assigneeIds.has(p.user_id)) assigneeMap.set(p.user_id, p.name); });
+
+  const priorityLabels: Record<string, string> = { low: "Baixa", medium: "Média", high: "Alta", urgent: "Urgente" };
+  const priorityColors: Record<string, string> = { low: "green", medium: "yellow", high: "orange", urgent: "red" };
+
+  let boardDesc = `Kanban Board titled "${board.name}"\n\nColumns (left to right):\n`;
+  sortedColumns.forEach((col: any) => {
+    const tasks = col.tasks || [];
+    boardDesc += `\nColumn: "${col.name}" (${tasks.length} tasks)\n`;
+    if (tasks.length === 0) {
+      boardDesc += `  - Empty\n`;
+    } else {
+      tasks.forEach((t: any) => {
+        const assignee = t.assignee_id ? assigneeMap.get(t.assignee_id) || "?" : "";
+        const due = t.due_date ? new Date(t.due_date).toLocaleDateString("pt-BR") : "";
+        const prio = priorityLabels[t.priority] || "Média";
+        const prioColor = priorityColors[t.priority] || "yellow";
+        boardDesc += `  - Card: "${t.title}" | Priority: ${prio} (${prioColor})${assignee ? ` | Assignee: ${assignee}` : ""}${due ? ` | Due: ${due}` : ""}\n`;
+      });
+    }
+  });
+
+  await sendWhatsApp(supabase, phone, `⏳ Gerando imagem do quadro *${board.name}*...`);
+
+  try {
+    const imagePrompt = `Create a clean, professional Kanban board image with the following exact data. Use a modern dark theme with colored column headers. Each task card should show the title, a colored priority indicator (green=low, yellow=medium, orange=high, red=urgent), assignee name, and due date if available. Make it look like a real project management tool screenshot. All text must be clearly readable and exactly as provided.
+
+${boardDesc}
+
+Style: Modern dark UI, rounded card corners, clear typography, column headers in distinct colors. Cards should be white/light with subtle shadows. Include the board title "${board.name}" at the top. 16:9 aspect ratio.`;
+
+    const imageResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${lovableApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash-image",
+        messages: [{ role: "user", content: imagePrompt }],
+        modalities: ["image", "text"],
+      }),
+    });
+
+    if (!imageResponse.ok) {
+      console.error("Image AI error:", imageResponse.status, await imageResponse.text());
+      await sendWhatsApp(supabase, phone, buildTextBoardPrint(board, sortedColumns, assigneeMap));
+      return;
+    }
+
+    const imageData = await imageResponse.json();
+    const imageUrl = imageData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+
+    if (!imageUrl) {
+      console.error("No image in AI response");
+      await sendWhatsApp(supabase, phone, buildTextBoardPrint(board, sortedColumns, assigneeMap));
+      return;
+    }
+
+    const totalTasks = sortedColumns.reduce((sum: number, col: any) => sum + (col.tasks?.length || 0), 0);
+    const caption = `📋 *${board.name}* | ${sortedColumns.length} colunas | ${totalTasks} tarefas`;
+    await sendWhatsAppImage(supabase, phone, imageUrl, caption);
+  } catch (e: any) {
+    console.error("Error generating board image:", e);
+    await sendWhatsApp(supabase, phone, buildTextBoardPrint(board, sortedColumns, assigneeMap));
+  }
+}
+
+function buildTextBoardPrint(board: any, columns: any[], assigneeMap: Map<string, string>): string {
+  const priorityEmoji: Record<string, string> = { low: "🟢", medium: "🟡", high: "🟠", urgent: "🔴" };
+  let msg = `📋 *${board.name}*\n`;
+  if (board.description) msg += `${board.description}\n`;
+  msg += `━━━━━━━━━━━━━━━━\n\n`;
+  columns.forEach((col: any) => {
+    const tasks = col.tasks || [];
+    msg += `📌 *${col.name}* (${tasks.length})\n`;
+    if (tasks.length === 0) {
+      msg += `  _vazio_\n`;
+    } else {
+      tasks.forEach((t: any) => {
+        const emoji = priorityEmoji[t.priority] || "⚪";
+        const assignee = t.assignee_id ? assigneeMap.get(t.assignee_id) : null;
+        const due = t.due_date ? ` 📅${new Date(t.due_date).toLocaleDateString("pt-BR")}` : "";
+        msg += `  ${emoji} ${t.title}${assignee ? ` @${assignee}` : ""}${due}\n`;
+      });
+    }
+    msg += `\n`;
+  });
+  return msg.trim();
+}
+
 // ─── COMMAND: Ajuda ────────────────────────────────────────
 function handleAjuda(userName: string, isAdmin: boolean = false) {
   let msg = `👋 Olá, ${userName}! Sou o *TaskFox Bot*.\n\n` +
@@ -1108,18 +1319,24 @@ function handleAjuda(userName: string, isAdmin: boolean = false) {
     `📊 *Resumo:*\n` +
     `  • "Como tá meu dia?"\n` +
     `  • "Meu resumo da semana"\n` +
-    `  • "Resumo do mês"\n`;
+    `  • "Resumo do mês"\n\n` +
+    `🖼️ *Print do Quadro:*\n` +
+    `  • "Print do meu quadro"\n` +
+    `  • "Foto do quadro"\n` +
+    `  • "Imagem do quadro [nome]"\n`;
 
   if (isAdmin) {
-    msg += `\n🔑 *Comandos de Admin:*\n` +
+     msg += `\n🔑 *Comandos de Admin:*\n` +
       `  • "Tarefas do João"\n` +
       `  • "Quadro da Maria"\n` +
       `  • "Tarefas atrasadas do Pedro"\n` +
       `  • "Tarefas diárias da Ana"\n` +
-      `  • "Resumo da semana do Carlos"\n`;
+      `  • "Resumo da semana do Carlos"\n` +
+      `  • "Print do quadro do João"\n`;
   } else {
     msg += `\n👥 *Gestor de equipe:*\n` +
-      `  • "Resumo do dia do [nome]" (membros da sua equipe)\n`;
+      `  • "Resumo do dia do [nome]" (membros da sua equipe)\n` +
+      `  • "Print do quadro do [nome]"\n`;
   }
 
   msg += `\nBasta digitar normalmente que eu entendo! 🚀`;
