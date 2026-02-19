@@ -276,6 +276,32 @@ export function useRecurringTasks(boardId?: string) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["recurring-tasks"] }),
   });
 
+  const updateTask = useMutation({
+    mutationFn: async (params: {
+      id: string;
+      title: string;
+      description?: string | null;
+      frequency: "daily" | "weekly" | "weekday" | "monthly";
+      weekday?: number | null;
+      monthDay?: number | null;
+      teamId: string;
+    }) => {
+      const { error } = await supabase
+        .from("recurring_tasks" as any)
+        .update({
+          title: params.title,
+          description: params.description || null,
+          frequency: params.frequency,
+          weekday: params.frequency === "weekday" ? (params.weekday ?? 0) : null,
+          month_day: params.frequency === "monthly" ? (params.monthDay ?? 1) : null,
+        })
+        .eq("id", params.id);
+      if (error) throw error;
+      await logActivity("Editou uma tarefa fixa", { task_title: params.title }, params.teamId);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["recurring-tasks"] }),
+  });
+
   const deleteTask = useMutation({
     mutationFn: async (taskId: string) => {
       const task = tasksQuery.data?.find(t => t.id === taskId);
@@ -295,6 +321,7 @@ export function useRecurringTasks(boardId?: string) {
     isTaskCompleted,
     toggleCompletion,
     createTask,
+    updateTask,
     deleteTask,
   };
 }
