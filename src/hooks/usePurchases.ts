@@ -122,7 +122,6 @@ export function usePurchases() {
   });
 
   const updateListStatusFromItems = async (listId: string) => {
-    // Fetch all items for this list to determine overall status
     const { data: allItems } = await supabase
       .from("purchase_list_items")
       .select("status")
@@ -132,14 +131,11 @@ export function usePurchases() {
 
     const allReceived = allItems.every((i: any) => i.status === "received");
     const allPurchasedOrReceived = allItems.every((i: any) => i.status === "purchased" || i.status === "received");
-    const somePurchased = allItems.some((i: any) => i.status === "purchased" || i.status === "received");
 
     let newStatus = "pending";
     if (allReceived) {
       newStatus = "received";
     } else if (allPurchasedOrReceived) {
-      newStatus = "purchased";
-    } else if (somePurchased) {
       newStatus = "purchased";
     }
 
@@ -148,7 +144,7 @@ export function usePurchases() {
       .update({
         status: newStatus,
         ...(newStatus === "received" ? { received_at: new Date().toISOString(), received_by: user!.id } : {}),
-        ...(newStatus === "purchased" && !somePurchased ? { purchased_at: new Date().toISOString(), buyer_id: user!.id } : {}),
+        ...(newStatus === "purchased" ? { purchased_at: new Date().toISOString(), buyer_id: user!.id } : {}),
       } as any)
       .eq("id", listId);
   };
