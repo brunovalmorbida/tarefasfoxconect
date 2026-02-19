@@ -21,10 +21,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+
+      // Log auth events directly (can't use useLogActivity here due to circular dependency)
+      if (event === "SIGNED_IN" && session?.user) {
+        supabase.from("activity_log").insert({
+          action: "Fez login no sistema",
+          user_id: session.user.id,
+        }).then(() => {});
+      }
+      if (event === "SIGNED_OUT") {
+        // user is already null, we logged below in signOut
+      }
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -54,6 +65,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    if (user) {
+      await supabase.from("activity_log").insert({
+        action: "Fez logout do sistema",
+        user_id: user.id,
+      });
+    }
     await supabase.auth.signOut();
   };
 

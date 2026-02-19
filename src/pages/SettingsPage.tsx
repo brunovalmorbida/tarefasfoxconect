@@ -10,10 +10,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { supabase } from "@/integrations/supabase/client";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useLogActivity } from "@/hooks/useActivityLog";
 
 export default function SettingsPage() {
   const { data: isAdmin } = useIsAppAdmin();
   const [exporting, setExporting] = useState(false);
+  const logActivity = useLogActivity();
 
   const handleExportBackup = async () => {
     setExporting(true);
@@ -31,6 +33,7 @@ export default function SettingsPage() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       toast.success("Backup exportado com sucesso!");
+      await logActivity("Exportou backup do sistema");
     } catch (err: any) {
       toast.error("Erro ao exportar backup: " + err.message);
     } finally {

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLogActivity } from "@/hooks/useActivityLog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +14,7 @@ import { toast } from "sonner";
 
 export function PurchasesConfigTab() {
   const queryClient = useQueryClient();
+  const logActivity = useLogActivity();
 
   // ---- Categories ----
   const [catDialog, setCatDialog] = useState(false);
@@ -43,6 +45,7 @@ export function PurchasesConfigTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["product-categories"] });
       toast.success(editingCat ? "Categoria atualizada" : "Categoria criada");
+      logActivity(editingCat ? "Atualizou categoria de produto" : "Criou categoria de produto", { name: catName.trim() });
       setCatDialog(false);
       setCatName("");
       setEditingCat(null);
@@ -55,10 +58,11 @@ export function PurchasesConfigTab() {
       const { error } = await supabase.from("product_categories").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, id) => {
       queryClient.invalidateQueries({ queryKey: ["product-categories"] });
       queryClient.invalidateQueries({ queryKey: ["product-catalog"] });
       toast.success("Categoria removida");
+      logActivity("Removeu categoria de produto", { category_id: id });
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -102,6 +106,7 @@ export function PurchasesConfigTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["product-catalog"] });
       toast.success(editingProd ? "Produto atualizado" : "Produto cadastrado");
+      logActivity(editingProd ? "Atualizou produto no catálogo" : "Cadastrou produto no catálogo", { name: prodName.trim() });
       closeProdDialog();
     },
     onError: (e: any) => toast.error(e.message),
@@ -112,9 +117,10 @@ export function PurchasesConfigTab() {
       const { error } = await supabase.from("product_catalog").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, id) => {
       queryClient.invalidateQueries({ queryKey: ["product-catalog"] });
       toast.success("Produto removido");
+      logActivity("Removeu produto do catálogo", { product_id: id });
     },
     onError: (e: any) => toast.error(e.message),
   });

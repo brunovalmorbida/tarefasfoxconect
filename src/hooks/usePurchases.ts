@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useLogActivity } from "@/hooks/useActivityLog";
 
 export type PurchaseListItem = {
   id: string;
@@ -38,6 +39,7 @@ export function usePurchases() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const logActivity = useLogActivity();
 
   const purchasesQuery = useQuery({
     queryKey: ["purchase-lists"],
@@ -112,9 +114,10 @@ export function usePurchases() {
 
       return list;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["purchase-lists"] });
       toast({ title: "Lista de compras criada!" });
+      logActivity("Criou uma lista de compras", { title: variables.title, items: variables.items.length });
     },
     onError: (e: any) => {
       toast({ title: "Erro ao criar lista", description: e.message, variant: "destructive" });
@@ -162,9 +165,10 @@ export function usePurchases() {
 
       await updateListStatusFromItems(data.listId);
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["purchase-lists"] });
       toast({ title: "Item marcado como comprado!" });
+      logActivity("Marcou item como comprado", { item_id: variables.itemId });
     },
     onError: (e: any) => {
       toast({ title: "Erro", description: e.message, variant: "destructive" });
@@ -181,9 +185,10 @@ export function usePurchases() {
 
       await updateListStatusFromItems(data.listId);
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["purchase-lists"] });
       toast({ title: "Item marcado como recebido!" });
+      logActivity("Marcou item como recebido", { item_id: variables.itemId });
     },
     onError: (e: any) => {
       toast({ title: "Erro", description: e.message, variant: "destructive" });
@@ -218,9 +223,10 @@ export function usePurchases() {
         body: { listId: data.id, action: "purchased" },
       });
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["purchase-lists"] });
       toast({ title: "Compra registrada!" });
+      logActivity("Registrou compra da lista", { list_id: variables.id });
     },
     onError: (e: any) => {
       toast({ title: "Erro", description: e.message, variant: "destructive" });
@@ -247,9 +253,10 @@ export function usePurchases() {
         body: { listId: data.id, action: "received" },
       });
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["purchase-lists"] });
       toast({ title: "Recebimento confirmado!" });
+      logActivity("Confirmou recebimento da lista", { list_id: variables.id });
     },
     onError: (e: any) => {
       toast({ title: "Erro", description: e.message, variant: "destructive" });
@@ -261,9 +268,10 @@ export function usePurchases() {
       const { error } = await supabase.from("purchase_lists").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["purchase-lists"] });
       toast({ title: "Lista removida!" });
+      logActivity("Removeu uma lista de compras", { list_id: variables });
     },
     onError: (e: any) => {
       toast({ title: "Erro", description: e.message, variant: "destructive" });
