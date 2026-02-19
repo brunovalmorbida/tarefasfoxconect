@@ -97,6 +97,22 @@ const TOOLS = [
   {
     type: "function",
     function: {
+      name: "resumo_completo",
+      description: "Mostra um resumo completo das tarefas do usuário (kanban + fixas) para um período. Pode pedir de si mesmo ou de outro usuário (se for gestor da equipe ou admin). Ex: 'meu resumo da semana', 'resumo do mês do João', 'resumo semanal da Maria'",
+      parameters: {
+        type: "object",
+        properties: {
+          periodo: { type: "string", enum: ["dia", "semana", "mes"], description: "Período do resumo" },
+          nome_usuario: { type: "string", description: "Nome do usuário alvo (opcional, se não informado usa o próprio usuário)" },
+        },
+        required: ["periodo"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "tarefas_usuario",
       description: "ADMIN ONLY: Lista as tarefas do quadro Kanban de outro usuário pelo nome. Ex: 'tarefas do João', 'quadro da Maria'",
       parameters: {
@@ -148,6 +164,10 @@ Exemplos:
 - "Quais minhas tarefas?" ou "Minhas tarefas" → listar_tarefas
 - "Concluir tarefa relatório" → concluir_tarefa
 - "Como tá meu dia?" → resumo_dia
+- "Meu resumo da semana" ou "Resumo semanal" → resumo_completo (periodo: "semana", sem nome_usuario)
+- "Resumo do mês" → resumo_completo (periodo: "mes", sem nome_usuario)
+- "Resumo do dia do João" → resumo_completo (periodo: "dia", nome_usuario: "João")
+- "Resumo semanal da Maria" → resumo_completo (periodo: "semana", nome_usuario: "Maria")
 - "Tarefas do João" ou "Quadro do João" → tarefas_usuario (pegar nome "João")
 - "Tarefas diárias da Maria" ou "Rotina da Maria" ou "Tarefas fixas do João" → tarefas_diarias_usuario (pegar nome)
 - "O que posso fazer?" → ajuda
@@ -158,6 +178,8 @@ Regras:
 - Para prioridade, infira do contexto (urgente, importante = high; normal = medium; pode esperar = low)
 - Para lista de compras, extraia os itens e quantidades da mensagem
 - Quantidade padrão é 1 se não especificada
+- Quando o usuário pedir um resumo completo (com período dia/semana/mês), use resumo_completo
+- Se o usuário pedir resumo de OUTRA pessoa, inclua nome_usuario no resumo_completo
 - Quando o usuário pedir tarefas de OUTRA pessoa, use tarefas_usuario ou tarefas_diarias_usuario
 - "tarefas diárias", "rotina", "tarefas fixas" de alguém → tarefas_diarias_usuario
 - "tarefas", "quadro" de alguém → tarefas_usuario`;
@@ -302,6 +324,9 @@ Deno.serve(async (req) => {
         break;
       case "resumo_dia":
         responseMessage = await handleResumoDia(supabase, userProfile);
+        break;
+      case "resumo_completo":
+        responseMessage = await handleResumoCompleto(supabase, userProfile, profiles || [], args, isAdmin);
         break;
       case "tarefas_usuario":
         if (!isAdmin) {
@@ -848,6 +873,225 @@ async function handleTarefasDiariasUsuario(supabase: any, profiles: any[], args:
   return msg.trim();
 }
 
+// ─── COMMAND: Resumo Completo (dia/semana/mês) ────────────
+async function handleResumoCompleto(supabase: any, requesterProfile: any, allProfiles: any[], args: any, isAdmin: boolean) {
+  const { periodo, nome_usuario } = args;
+  
+  let targetProfile = requesterProfile;
+  
+  // If requesting for another user, check permissions
+  if (nome_usuario) {
+    const found = findProfileByName(allProfiles, nome_usuario);
+    if (!found) return `❌ Nenhum usuário encontrado com o nome "${nome_usuario}".`;
+    
+    if (found.user_id !== requesterProfile.user_id) {
+      if (isAdmin) {
+        targetProfile = found;
+      } else {
+        // Check if requester is team admin of a team the target belongs to
+        const { data: requesterAdminTeams } = await supabase
+          .from("team_members")
+          .select("team_id")
+          .eq("user_id", requesterProfile.user_id)
+          .eq("role", "admin");
+        
+        const adminTeamIds = (requesterAdminTeams || []).map((t: any) => t.team_id);
+        
+        if (adminTeamIds.length === 0) {
+          return "🔒 Você não tem permissão para ver o resumo de outros usuários.";
+        }
+        
+        const { data: targetMemberships } = await supabase
+          .from("team_members")
+          .select("team_id")
+          .eq("user_id", found.user_id)
+          .in("team_id", adminTeamIds);
+        
+        if (!targetMemberships || targetMemberships.length === 0) {
+          return "🔒 Você só pode ver o resumo de usuários das equipes que você gerencia.";
+        }
+        
+        targetProfile = found;
+      }
+    }
+  }
+  
+  // Calculate date range
+  const now = new Date();
+  let startDate: Date;
+  let periodoLabel: string;
+  
+  switch (periodo) {
+    case "semana": {
+      const day = now.getDay();
+      const diff = day === 0 ? 6 : day - 1;
+      startDate = new Date(now);
+      startDate.setDate(now.getDate() - diff);
+      startDate.setHours(0, 0, 0, 0);
+      periodoLabel = "da Semana";
+      break;
+    }
+    case "mes": {
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      periodoLabel = "do Mês";
+      break;
+    }
+    default: {
+      startDate = new Date(now);
+      startDate.setHours(0, 0, 0, 0);
+      periodoLabel = "do Dia";
+      break;
+    }
+  }
+  
+  const isSelf = targetProfile.user_id === requesterProfile.user_id;
+  const nameLabel = isSelf ? "Seu" : `de ${targetProfile.name}`;
+  
+  // ── KANBAN TASKS ──
+  const { data: allTasks } = await supabase
+    .from("tasks")
+    .select("id, title, priority, due_date, column_id, created_at, updated_at")
+    .eq("assignee_id", targetProfile.user_id);
+  
+  const tasks = allTasks || [];
+  const columnIds = [...new Set(tasks.map((t: any) => t.column_id))];
+  
+  let columns: any[] = [];
+  if (columnIds.length > 0) {
+    const { data } = await supabase.from("board_columns").select("id, name, board_id, position").in("id", columnIds);
+    columns = data || [];
+  }
+  
+  const boardMaxPos = new Map<string, number>();
+  columns.forEach((c: any) => {
+    const curr = boardMaxPos.get(c.board_id) || 0;
+    if (c.position > curr) boardMaxPos.set(c.board_id, c.position);
+  });
+  const doneColumnIds = new Set(
+    columns.filter((c: any) => c.position === boardMaxPos.get(c.board_id)).map((c: any) => c.id)
+  );
+  
+  const overdue = tasks.filter((t: any) => t.due_date && new Date(t.due_date) < now && !doneColumnIds.has(t.column_id));
+  const doneTasks = tasks.filter((t: any) => doneColumnIds.has(t.column_id));
+  const pendingTasks = tasks.filter((t: any) => !doneColumnIds.has(t.column_id));
+  
+  // ── RECURRING TASKS ──
+  const { data: recurringBoards } = await supabase
+    .from("recurring_task_boards")
+    .select("id, name, assigned_user_id, team_id");
+  
+  const userRecBoards = (recurringBoards || []).filter((b: any) => 
+    b.assigned_user_id === targetProfile.user_id || b.assigned_user_id === null
+  );
+  const recBoardIds = userRecBoards.map((b: any) => b.id);
+  
+  let recurringTasks: any[] = [];
+  if (recBoardIds.length > 0) {
+    const { data } = await supabase
+      .from("recurring_tasks")
+      .select("id, title, frequency, weekday, month_day, board_id")
+      .in("board_id", recBoardIds);
+    recurringTasks = data || [];
+  }
+  
+  // Filter tasks active today
+  const jsDay = now.getDay();
+  const todayRecTasks = recurringTasks.filter((t: any) => {
+    if (t.frequency === "daily") return true;
+    if (t.frequency === "weekday") {
+      const ourDay = jsDay === 0 ? 6 : jsDay - 1;
+      return t.weekday === ourDay;
+    }
+    if (t.frequency === "weekly") return true;
+    if (t.frequency === "monthly") return t.month_day === now.getDate();
+    return false;
+  });
+  
+  // Get completions for the period
+  const recTaskIds = recurringTasks.map((t: any) => t.id);
+  let completions: any[] = [];
+  if (recTaskIds.length > 0) {
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const startStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, "0")}-${String(startDate.getDate()).padStart(2, "0")}`;
+    
+    const { data } = await supabase
+      .from("recurring_task_completions")
+      .select("recurring_task_id, period_start, completed_by")
+      .in("recurring_task_id", recTaskIds)
+      .gte("period_start", startStr)
+      .lte("period_start", todayStr)
+      .eq("completed_by", targetProfile.user_id);
+    completions = data || [];
+  }
+  
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const completedTodaySet = new Set(
+    completions.filter((c: any) => c.period_start === todayStr).map((c: any) => c.recurring_task_id)
+  );
+  
+  const recDoneToday = todayRecTasks.filter((t: any) => completedTodaySet.has(t.id)).length;
+  const recPendingToday = todayRecTasks.length - recDoneToday;
+  const recTotalCompletions = completions.length;
+  
+  // ── BUILD MESSAGE ──
+  const overallScore = (tasks.length + todayRecTasks.length) > 0
+    ? Math.round(((doneTasks.length + recDoneToday) / (tasks.length + todayRecTasks.length)) * 100)
+    : 0;
+  
+  let scoreEmoji = "🔴";
+  if (overallScore >= 80) scoreEmoji = "🟢";
+  else if (overallScore >= 50) scoreEmoji = "🟡";
+  
+  let msg = `📊 *Resumo ${periodoLabel} ${nameLabel}*\n`;
+  msg += `${scoreEmoji} *Score Geral:* ${overallScore}%\n\n`;
+  
+  msg += `📋 *Kanban:*\n`;
+  msg += `  ✅ Concluídas: ${doneTasks.length}\n`;
+  msg += `  ⏳ Pendentes: ${pendingTasks.length}\n`;
+  msg += `  ⚠️ Atrasadas: ${overdue.length}\n`;
+  msg += `  📊 Total: ${tasks.length}\n\n`;
+  
+  msg += `🔄 *Tarefas Fixas (Hoje):*\n`;
+  msg += `  ✅ Concluídas: ${recDoneToday}\n`;
+  msg += `  ⏳ Pendentes: ${recPendingToday}\n`;
+  msg += `  📊 Total: ${todayRecTasks.length}\n`;
+  
+  if (periodo !== "dia") {
+    msg += `  📈 Conclusões no período: ${recTotalCompletions}\n`;
+  }
+  
+  if (overdue.length > 0) {
+    msg += `\n🔴 *Tarefas Atrasadas:*\n`;
+    overdue.slice(0, 5).forEach((t: any, i: number) => {
+      const dueStr = t.due_date ? new Date(t.due_date).toLocaleDateString("pt-BR") : "";
+      msg += `  ${i + 1}. ${t.title} (📅 ${dueStr})\n`;
+    });
+    if (overdue.length > 5) msg += `  ... e mais ${overdue.length - 5}\n`;
+  }
+  
+  if (recPendingToday > 0) {
+    msg += `\n⏳ *Tarefas Fixas Pendentes Hoje:*\n`;
+    const pendingRec = todayRecTasks.filter((t: any) => !completedTodaySet.has(t.id));
+    pendingRec.slice(0, 5).forEach((t: any, i: number) => {
+      msg += `  ${i + 1}. ${t.title}\n`;
+    });
+    if (pendingRec.length > 5) msg += `  ... e mais ${pendingRec.length - 5}\n`;
+  }
+  
+  const { data: purchaseLists } = await supabase
+    .from("purchase_lists")
+    .select("id, status")
+    .eq("requested_by", targetProfile.user_id)
+    .eq("status", "pending");
+  
+  if (purchaseLists && purchaseLists.length > 0) {
+    msg += `\n🛒 *Compras pendentes:* ${purchaseLists.length}\n`;
+  }
+  
+  msg += `\n💬 Envie *ajuda* para ver todos os comandos.`;
+  return msg.trim();
+}
+
 // ─── COMMAND: Ajuda ────────────────────────────────────────
 function handleAjuda(userName: string, isAdmin: boolean = false) {
   let msg = `👋 Olá, ${userName}! Sou o *TaskFox Bot*.\n\n` +
@@ -863,7 +1107,8 @@ function handleAjuda(userName: string, isAdmin: boolean = false) {
     `  • "Preciso de material de limpeza"\n\n` +
     `📊 *Resumo:*\n` +
     `  • "Como tá meu dia?"\n` +
-    `  • "Resumo"\n`;
+    `  • "Meu resumo da semana"\n` +
+    `  • "Resumo do mês"\n`;
 
   if (isAdmin) {
     msg += `\n🔑 *Comandos de Admin:*\n` +
@@ -871,7 +1116,10 @@ function handleAjuda(userName: string, isAdmin: boolean = false) {
       `  • "Quadro da Maria"\n` +
       `  • "Tarefas atrasadas do Pedro"\n` +
       `  • "Tarefas diárias da Ana"\n` +
-      `  • "Rotina do Carlos"\n`;
+      `  • "Resumo da semana do Carlos"\n`;
+  } else {
+    msg += `\n👥 *Gestor de equipe:*\n` +
+      `  • "Resumo do dia do [nome]" (membros da sua equipe)\n`;
   }
 
   msg += `\nBasta digitar normalmente que eu entendo! 🚀`;
