@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Trash2, Plus, Pencil, ArrowLeft, User, CalendarDays, CalendarRange, Calendar, Clock, MoreVertical, Target } from "lucide-react";
+import { Trash2, Plus, Pencil, ArrowLeft, User, CalendarDays, CalendarRange, Calendar, Clock, MoreVertical, Target, ChevronUp, ChevronDown } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Progress } from "@/components/ui/progress";
@@ -57,7 +57,7 @@ function BoardDetail({
   teamMembers: any[];
   onUpdateBoard: (params: { id: string; name: string; frequencyType: "weekday" | "weekly" | "monthly"; weekday: number; assignedUserId: string | null }) => Promise<void>;
 }) {
-  const { tasks, isLoading, isTaskCompleted, toggleCompletion, createTask, updateTask, deleteTask } =
+  const { tasks, isLoading, isTaskCompleted, toggleCompletion, createTask, updateTask, deleteTask, reorderTasks } =
     useRecurringTasks(board.id);
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -134,14 +134,20 @@ function BoardDetail({
     } catch { toast({ title: "Erro ao atualizar tarefa", variant: "destructive" }); }
   };
 
-  // Sort: active first, completed last
+  // Sort by position within each frequency group
   const sortedByFreq = (freq: string) => {
-    const freqTasks = tasks.filter((t) => t.frequency === freq);
-    return freqTasks.sort((a, b) => {
-      const aCompleted = isTaskCompleted(a) ? 1 : 0;
-      const bCompleted = isTaskCompleted(b) ? 1 : 0;
-      return aCompleted - bCompleted;
-    });
+    return tasks.filter((t) => t.frequency === freq).sort((a, b) => a.position - b.position);
+  };
+
+  const handleMoveTask = async (freq: string, index: number, direction: "up" | "down") => {
+    const freqTasks = sortedByFreq(freq);
+    const newIndex = direction === "up" ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= freqTasks.length) return;
+    const reordered = [...freqTasks];
+    [reordered[index], reordered[newIndex]] = [reordered[newIndex], reordered[index]];
+    try {
+      await reorderTasks.mutateAsync(reordered.map(t => t.id));
+    } catch { toast({ title: "Erro ao reordenar", variant: "destructive" }); }
   };
 
   return (
@@ -273,7 +279,7 @@ function BoardDetail({
 
                 {/* Tasks */}
                 <div className="space-y-2">
-                  {freqTasks.map((task) => {
+                  {freqTasks.map((task, taskIndex) => {
                     const completed = isTaskCompleted(task);
                     const active = isTaskActiveToday(task);
                     return (
@@ -306,6 +312,16 @@ function BoardDetail({
                               <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{task.description}</p>
                             )}
                           </div>
+                          {canManage && (
+                            <div className="flex flex-col items-center gap-0.5 flex-shrink-0 mr-1">
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-accent" disabled={taskIndex === 0} onClick={() => handleMoveTask(freq, taskIndex, "up")}>
+                                <ChevronUp className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-accent" disabled={taskIndex === freqTasks.length - 1} onClick={() => handleMoveTask(freq, taskIndex, "down")}>
+                                <ChevronDown className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          )}
                           {canManage && (
                             <div className="flex items-center gap-0.5 flex-shrink-0">
                               <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-accent" onClick={() => openEditDialog(task)}>

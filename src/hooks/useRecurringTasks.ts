@@ -25,6 +25,7 @@ export type RecurringTask = {
   frequency: "daily" | "weekly" | "weekday" | "monthly";
   weekday: number | null;
   month_day: number | null;
+  position: number;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -196,6 +197,7 @@ export function useRecurringTasks(boardId?: string) {
       let query = supabase
         .from("recurring_tasks" as any)
         .select("*")
+        .order("position")
         .order("title");
       if (boardId) query = query.eq("board_id", boardId);
       const { data, error } = await query;
@@ -322,6 +324,18 @@ export function useRecurringTasks(boardId?: string) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["recurring-tasks"] }),
   });
 
+  const reorderTasks = useMutation({
+    mutationFn: async (orderedIds: string[]) => {
+      const updates = orderedIds.map((id, index) =>
+        supabase.from("recurring_tasks" as any).update({ position: index }).eq("id", id)
+      );
+      const results = await Promise.all(updates);
+      const err = results.find(r => r.error);
+      if (err?.error) throw err.error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["recurring-tasks"] }),
+  });
+
   return {
     tasks: tasksQuery.data ?? [],
     isLoading: tasksQuery.isLoading,
@@ -330,5 +344,6 @@ export function useRecurringTasks(boardId?: string) {
     createTask,
     updateTask,
     deleteTask,
+    reorderTasks,
   };
 }

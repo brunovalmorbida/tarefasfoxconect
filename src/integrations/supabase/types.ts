@@ -453,6 +453,7 @@ export type Database = {
           frequency: string
           id: string
           month_day: number | null
+          position: number
           team_id: string
           title: string
           updated_at: string
@@ -466,6 +467,7 @@ export type Database = {
           frequency: string
           id?: string
           month_day?: number | null
+          position?: number
           team_id: string
           title: string
           updated_at?: string
@@ -479,6 +481,7 @@ export type Database = {
           frequency?: string
           id?: string
           month_day?: number | null
+          position?: number
           team_id?: string
           title?: string
           updated_at?: string
