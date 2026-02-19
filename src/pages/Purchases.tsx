@@ -11,11 +11,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, ShoppingCart, PackageCheck, Trash2, Clock, X, ChevronDown, ChevronUp, Check } from "lucide-react";
+import { Plus, ShoppingCart, PackageCheck, Trash2, Clock, X, ChevronDown, ChevronUp, Check, Search } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 const urgencyColors: Record<string, string> = {
   low: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
@@ -69,6 +71,35 @@ export default function Purchases() {
     },
     enabled: !!user,
   });
+
+  const { data: productCatalog = [] } = useQuery({
+    queryKey: ["product-catalog"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("product_catalog")
+        .select("*, product_categories(name)")
+        .order("name");
+      return data || [];
+    },
+    enabled: !!user,
+  });
+
+  const { data: productCategories = [] } = useQuery({
+    queryKey: ["product-categories"],
+    queryFn: async () => {
+      const { data } = await supabase.from("product_categories").select("*").order("name");
+      return data || [];
+    },
+    enabled: !!user,
+  });
+
+  // Map custom categories to the select - merge with fixed ones
+  const allCategoryLabels: Record<string, string> = { ...categoryLabels };
+  productCategories.forEach((c: any) => {
+    allCategoryLabels[c.id] = c.name;
+  });
+
+  const [openProductPopover, setOpenProductPopover] = useState<number | null>(null);
 
   const updateItem = (i: number, field: keyof ListItem, value: string) => {
     setListItems((prev) => prev.map((item, idx) => idx === i ? { ...item, [field]: value } : item));
@@ -190,7 +221,7 @@ export default function Purchases() {
                     {itemStatusIcon(item.status)}
                     <div className="min-w-0">
                       <span className="font-medium">{i + 1}. {item.name}</span>
-                      <span className="text-muted-foreground ml-2">x{item.quantity} · {categoryLabels[item.category] || item.category}</span>
+                      <span className="text-muted-foreground ml-2">x{item.quantity} · {allCategoryLabels[item.category] || categoryLabels[item.category] || item.category}</span>
                       {item.description && <span className="text-muted-foreground ml-1">· {item.description}</span>}
                     </div>
                   </div>
@@ -328,13 +359,63 @@ export default function Purchases() {
                 <div key={i} className="flex gap-2 items-start">
                   <div className="flex-1 grid grid-cols-5 gap-2">
                     <div className="col-span-2">
-                      <Input value={item.name} onChange={(e) => updateItem(i, "name", e.target.value)} placeholder={`Item ${i + 1}`} className="h-8 text-sm" />
+                      <Popover open={openProductPopover === i} onOpenChange={(open) => setOpenProductPopover(open ? i : null)}>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className="h-8 text-sm w-full justify-start font-normal truncate">
+                            {item.name || <span className="text-muted-foreground">Buscar produto...</span>}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="p-0 w-[280px]" align="start">
+                          <Command>
+                            <CommandInput placeholder="Buscar produto..." />
+                            <CommandList>
+                              <CommandEmpty>Nenhum produto encontrado.</CommandEmpty>
+                              <CommandGroup heading="Catálogo">
+                                {productCatalog.map((p: any) => (
+                                  <CommandItem
+                                    key={p.id}
+                                    value={p.name}
+                                    onSelect={() => {
+                                      const catId = p.category_id || "other";
+                                      updateItem(i, "name", p.name);
+                                      updateItem(i, "category", catId);
+                                      if (p.default_estimated_value) {
+                                        updateItem(i, "estimated_value", String(p.default_estimated_value));
+                                      }
+                                      setOpenProductPopover(null);
+                                    }}
+                                  >
+                                    <div className="flex flex-col">
+                                      <span>{p.name}</span>
+                                      <span className="text-xs text-muted-foreground">
+                                        {p.product_categories?.name || "Sem categoria"}
+                                        {p.default_estimated_value ? ` · R$ ${Number(p.default_estimated_value).toFixed(2)}` : ""}
+                                      </span>
+                                    </div>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                              <CommandGroup heading="Digitar manualmente">
+                                <CommandItem onSelect={() => setOpenProductPopover(null)}>
+                                  <span className="text-muted-foreground">Fechar e digitar abaixo</span>
+                                </CommandItem>
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                      <Input
+                        value={item.name}
+                        onChange={(e) => updateItem(i, "name", e.target.value)}
+                        placeholder={`Item ${i + 1}`}
+                        className="h-8 text-sm mt-1"
+                      />
                     </div>
                     <Input type="number" min="1" value={item.quantity} onChange={(e) => updateItem(i, "quantity", e.target.value)} placeholder="Qtd" className="h-8 text-sm" />
                     <Select value={item.category} onValueChange={(v) => updateItem(i, "category", v)}>
                       <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {Object.entries(categoryLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                        {Object.entries(allCategoryLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
                       </SelectContent>
                     </Select>
                     <Input type="number" step="0.01" value={item.estimated_value} onChange={(e) => updateItem(i, "estimated_value", e.target.value)} placeholder="R$" className="h-8 text-sm" />
