@@ -1,0 +1,1 @@
+ALTER TABLE public.purchase_lists ADD COLUMN status public.purchase_status NOT NULL DEFAULT 'pending';

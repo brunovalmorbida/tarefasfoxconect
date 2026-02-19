@@ -275,6 +275,7 @@ export type Database = {
           received_at: string | null
           received_by: string | null
           requested_by: string
+          status: Database["public"]["Enums"]["purchase_status"]
           title: string
           updated_at: string
           urgency: Database["public"]["Enums"]["purchase_urgency"]
@@ -289,6 +290,7 @@ export type Database = {
           received_at?: string | null
           received_by?: string | null
           requested_by: string
+          status?: Database["public"]["Enums"]["purchase_status"]
           title?: string
           updated_at?: string
           urgency?: Database["public"]["Enums"]["purchase_urgency"]
@@ -303,6 +305,7 @@ export type Database = {
           received_at?: string | null
           received_by?: string | null
           requested_by?: string
+          status?: Database["public"]["Enums"]["purchase_status"]
           title?: string
           updated_at?: string
           urgency?: Database["public"]["Enums"]["purchase_urgency"]
