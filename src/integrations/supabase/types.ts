@@ -187,6 +187,59 @@ export type Database = {
         }
         Relationships: []
       }
+      product_catalog: {
+        Row: {
+          category_id: string | null
+          created_at: string
+          default_estimated_value: number | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          category_id?: string | null
+          created_at?: string
+          default_estimated_value?: number | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          category_id?: string | null
+          created_at?: string
+          default_estimated_value?: number | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_catalog_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "product_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_categories: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
