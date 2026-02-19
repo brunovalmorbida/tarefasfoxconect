@@ -8,11 +8,13 @@ import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { useLogActivity } from "@/hooks/useActivityLog";
 import { MessageSquare, Loader2, Send } from "lucide-react";
 
 export function IntegrationsTab() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const logActivity = useLogActivity();
   const [instanceId, setInstanceId] = useState("");
   const [token, setToken] = useState("");
   const [clientToken, setClientToken] = useState("");
@@ -64,6 +66,7 @@ export function IntegrationsTab() {
       }
       queryClient.invalidateQueries({ queryKey: ["zapi-config"] });
       toast({ title: "Configuração salva com sucesso!" });
+      await logActivity("Atualizou configuração da Z-API", { is_active: isActive });
     } catch (e: any) {
       toast({ title: "Erro ao salvar", description: e.message, variant: "destructive" });
     } finally {
