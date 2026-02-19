@@ -1,6 +1,14 @@
 
 # TaskFlow - Sistema de Gestão de Tarefas
 
+## 🏁 Marco: Versão V1.2 (19/02/2026)
+> Melhorias de UX e interação sobre a base V1.1:
+> - **Dashboard Premium**: refatoração completa das 3 dashboards (Kanban, Tarefas Fixas, Compras) com hierarquia visual aprimorada, cards expressivos, barras de progresso com gradiente, feed de atividades, skeleton loading e microinterações
+> - **Kanban Cards**: arrasto pelo card inteiro (sem grip handle), cursor grab/grabbing, elevação ao arrastar
+> - Todas funcionalidades anteriores mantidas sem alteração de backend
+>
+> **Para restaurar esta versão:** Use o Histórico de edições do Lovable e encontre esta mensagem.
+
 ## 🏁 Marco: Versão V1.1 (19/02/2026)
 > Refatoração completa de UI/UX para experiência SaaS premium sobre a base V1.0:
 > - **Design System**: bordas 12px, sombras suaves, tokens semânticos de prioridade, animações (fade-in, scale-in, slide-up, check-strike, progress-fill)
