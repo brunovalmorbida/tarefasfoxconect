@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Plus, MoreHorizontal, Trash2, GripVertical, CalendarIcon, User, AlertTriangle, Pencil, Copy, ArrowRightLeft } from "lucide-react";
+import { Plus, MoreHorizontal, Trash2, CalendarIcon, User, AlertTriangle, Pencil, Copy, ArrowRightLeft } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -179,9 +179,10 @@ export function KanbanBoard({ boardId, onBack }: Props) {
                               <div
                                 ref={provided.innerRef}
                                 {...provided.draggableProps}
+                                {...provided.dragHandleProps}
                                 className={cn(
-                                  `bg-card rounded-xl border shadow-sm p-3.5 cursor-pointer transition-all duration-200 ${priorityBorderClass[task.priority] || ""}`,
-                                  snapshot.isDragging && "shadow-lg ring-2 ring-primary/20 rotate-1",
+                                  `bg-card rounded-xl border shadow-sm p-3.5 cursor-grab transition-all duration-200 ${priorityBorderClass[task.priority] || ""}`,
+                                  snapshot.isDragging && "shadow-lg ring-2 ring-primary/20 rotate-1 cursor-grabbing",
                                   isOverdue && "bg-destructive/5",
                                   !snapshot.isDragging && "hover:shadow-md hover:-translate-y-0.5"
                                 )}
@@ -189,36 +190,31 @@ export function KanbanBoard({ boardId, onBack }: Props) {
                                 onMouseEnter={() => setHoveredTask(task.id)}
                                 onMouseLeave={() => setHoveredTask(null)}
                               >
-                                <div className="flex items-start gap-2.5">
-                                  <div {...provided.dragHandleProps} className="mt-0.5 opacity-30 hover:opacity-100 transition-opacity">
-                                    <GripVertical className="h-4 w-4 text-muted-foreground" />
-                                  </div>
-                                  <div className="flex-1 space-y-2 min-w-0">
-                                    <p className="text-sm font-medium leading-tight">{task.title}</p>
-                                    {task.description && (
-                                      <p className="text-xs text-muted-foreground line-clamp-2">{task.description}</p>
+                                <div className="space-y-2 min-w-0">
+                                  <p className="text-sm font-medium leading-tight">{task.title}</p>
+                                  {task.description && (
+                                    <p className="text-xs text-muted-foreground line-clamp-2">{task.description}</p>
+                                  )}
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    {task.due_date && (
+                                      <span className={cn(
+                                        "text-[11px] px-2 py-0.5 rounded-md font-medium inline-flex items-center gap-1",
+                                        isOverdue
+                                          ? "bg-destructive/15 text-destructive"
+                                          : "bg-muted text-muted-foreground"
+                                      )}>
+                                        {isOverdue && <AlertTriangle className="h-3 w-3" />}
+                                        <CalendarIcon className="h-3 w-3" />
+                                        {format(new Date(task.due_date), "dd/MM", { locale: ptBR })}
+                                      </span>
                                     )}
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      {task.due_date && (
-                                        <span className={cn(
-                                          "text-[11px] px-2 py-0.5 rounded-md font-medium inline-flex items-center gap-1",
-                                          isOverdue
-                                            ? "bg-destructive/15 text-destructive"
-                                            : "bg-muted text-muted-foreground"
-                                        )}>
-                                          {isOverdue && <AlertTriangle className="h-3 w-3" />}
-                                          <CalendarIcon className="h-3 w-3" />
-                                          {format(new Date(task.due_date), "dd/MM", { locale: ptBR })}
-                                        </span>
-                                      )}
-                                      {assigneeName && (
-                                        <Avatar className="h-5 w-5">
-                                          <AvatarFallback className="text-[9px] bg-primary/10 text-primary font-semibold">
-                                            {getInitials(assigneeName)}
-                                          </AvatarFallback>
-                                        </Avatar>
-                                      )}
-                                    </div>
+                                    {assigneeName && (
+                                      <Avatar className="h-5 w-5">
+                                        <AvatarFallback className="text-[9px] bg-primary/10 text-primary font-semibold">
+                                          {getInitials(assigneeName)}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                    )}
                                   </div>
                                 </div>
 
