@@ -1,6 +1,7 @@
-import { LayoutDashboard, Columns3, Users, Bell, Settings, LogOut, ListChecks, ShoppingCart } from "lucide-react";
+import { LayoutDashboard, Columns3, Users, Bell, Settings, LogOut, ListChecks, ShoppingCart, Sun, Moon } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
+import { useState, useEffect } from "react";
 import logoFox from "@/assets/logo-fox.png";
 import {
   Sidebar,
@@ -28,6 +29,25 @@ const mainNav = [
 
 export function AppSidebar() {
   const { signOut } = useAuth();
+  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains("dark"));
+
+  const toggleTheme = () => {
+    const next = !isDark;
+    setIsDark(next);
+    document.documentElement.classList.toggle("dark", next);
+    localStorage.setItem("theme", next ? "dark" : "light");
+  };
+
+  useEffect(() => {
+    const saved = localStorage.getItem("theme");
+    if (saved === "dark") {
+      document.documentElement.classList.add("dark");
+      setIsDark(true);
+    } else if (saved === "light") {
+      document.documentElement.classList.remove("dark");
+      setIsDark(false);
+    }
+  }, []);
 
   return (
     <Sidebar>
@@ -62,6 +82,12 @@ export function AppSidebar() {
 
       <SidebarFooter className="p-2">
         <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton onClick={toggleTheme} className="text-muted-foreground hover:text-foreground">
+              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              <span>{isDark ? "Tema Claro" : "Tema Escuro"}</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton onClick={signOut} className="text-muted-foreground hover:text-destructive">
               <LogOut className="h-4 w-4" />
