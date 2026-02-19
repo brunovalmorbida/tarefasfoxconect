@@ -248,7 +248,7 @@ function BoardDetail({
                       <div
                         key={task.id}
                         className={cn(
-                          "card-premium p-3.5 transition-all duration-300",
+                          "card-premium p-3.5 transition-all duration-300 group",
                           !active && "opacity-40",
                           completed && "opacity-60"
                         )}
@@ -275,8 +275,8 @@ function BoardDetail({
                             )}
                           </div>
                           {canManage && (
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive opacity-0 group-hover:opacity-100 hover:opacity-100 flex-shrink-0" onClick={() => handleDelete(task.id)}>
-                              <Trash2 className="h-3.5 w-3.5" />
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/70 hover:text-destructive hover:bg-destructive/10 flex-shrink-0" onClick={() => handleDelete(task.id)}>
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           )}
                         </div>
