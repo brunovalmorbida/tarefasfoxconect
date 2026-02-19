@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, ShoppingCart, PackageCheck, Trash2, Clock, X, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, ShoppingCart, PackageCheck, Trash2, Clock, X, ChevronDown, ChevronUp, Check } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
@@ -41,7 +41,7 @@ const emptyItem = (): ListItem => ({ name: "", quantity: "1", category: "other",
 export default function Purchases() {
   const { user } = useAuth();
   const { data: isAdmin } = useIsAppAdmin();
-  const { purchases, isLoading, createList, markAsPurchased, markAsReceived, deleteList } = usePurchases();
+  const { purchases, isLoading, createList, markAsPurchased, markAsReceived, markItemPurchased, markItemReceived, deleteList } = usePurchases();
 
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showPurchaseDialog, setShowPurchaseDialog] = useState<PurchaseList | null>(null);
@@ -131,8 +131,18 @@ export default function Purchases() {
   const totalActual = (list: PurchaseList) =>
     list.items.reduce((s, i) => s + (Number(i.actual_value) || 0), 0);
 
+  const itemStatusIcon = (status: string) => {
+    if (status === "received") return <Check className="h-3 w-3 text-green-600" />;
+    if (status === "purchased") return <ShoppingCart className="h-3 w-3 text-amber-600" />;
+    return <Clock className="h-3 w-3 text-muted-foreground" />;
+  };
+
   const renderCard = (list: PurchaseList) => {
     const isExpanded = expandedId === list.id;
+    const pendingItems = list.items.filter(i => i.status === "pending").length;
+    const purchasedItems = list.items.filter(i => i.status === "purchased").length;
+    const receivedItems = list.items.filter(i => i.status === "received").length;
+
     return (
       <Card key={list.id} className="relative">
         <CardContent className="pt-4 pb-3 px-4 space-y-2">
@@ -155,6 +165,13 @@ export default function Purchases() {
             {list.buyer_name && <span>🛍️ {list.buyer_name}</span>}
           </div>
 
+          {/* Item progress */}
+          <div className="flex gap-3 text-[10px] text-muted-foreground">
+            {pendingItems > 0 && <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {pendingItems} pendente(s)</span>}
+            {purchasedItems > 0 && <span className="flex items-center gap-1"><ShoppingCart className="h-3 w-3 text-amber-600" /> {purchasedItems} comprado(s)</span>}
+            {receivedItems > 0 && <span className="flex items-center gap-1"><Check className="h-3 w-3 text-green-600" /> {receivedItems} recebido(s)</span>}
+          </div>
+
           {/* Expand/collapse items */}
           <Button
             variant="ghost" size="sm"
@@ -168,14 +185,42 @@ export default function Purchases() {
           {isExpanded && (
             <div className="border rounded-md divide-y text-xs">
               {list.items.map((item, i) => (
-                <div key={item.id} className="px-3 py-1.5 flex justify-between gap-2">
-                  <div className="min-w-0">
-                    <span className="font-medium">{i + 1}. {item.name}</span>
-                    <span className="text-muted-foreground ml-2">x{item.quantity} · {categoryLabels[item.category] || item.category}</span>
-                    {item.description && <span className="text-muted-foreground ml-1">· {item.description}</span>}
+                <div key={item.id} className="px-3 py-2 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {itemStatusIcon(item.status)}
+                    <div className="min-w-0">
+                      <span className="font-medium">{i + 1}. {item.name}</span>
+                      <span className="text-muted-foreground ml-2">x{item.quantity} · {categoryLabels[item.category] || item.category}</span>
+                      {item.description && <span className="text-muted-foreground ml-1">· {item.description}</span>}
+                    </div>
                   </div>
-                  <div className="shrink-0 text-muted-foreground">
-                    {item.actual_value ? `R$ ${Number(item.actual_value).toFixed(2)}` : item.estimated_value ? `Est: R$ ${Number(item.estimated_value).toFixed(2)}` : ""}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-muted-foreground">
+                      {item.actual_value ? `R$ ${Number(item.actual_value).toFixed(2)}` : item.estimated_value ? `Est: R$ ${Number(item.estimated_value).toFixed(2)}` : ""}
+                    </span>
+                    {item.status === "pending" && (
+                      <Button
+                        size="sm" variant="outline"
+                        className="text-[10px] h-6 px-2"
+                        onClick={() => markItemPurchased.mutate({ itemId: item.id, listId: list.id })}
+                        disabled={markItemPurchased.isPending}
+                      >
+                        <ShoppingCart className="h-3 w-3 mr-1" /> Comprado
+                      </Button>
+                    )}
+                    {item.status === "purchased" && (
+                      <Button
+                        size="sm" variant="outline"
+                        className="text-[10px] h-6 px-2"
+                        onClick={() => markItemReceived.mutate({ itemId: item.id, listId: list.id })}
+                        disabled={markItemReceived.isPending}
+                      >
+                        <PackageCheck className="h-3 w-3 mr-1" /> Recebido
+                      </Button>
+                    )}
+                    {item.status === "received" && (
+                      <Badge className="text-[10px] px-1.5 py-0 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">✓</Badge>
+                    )}
                   </div>
                 </div>
               ))}
@@ -195,12 +240,12 @@ export default function Purchases() {
                 setItemValues(vals);
                 setShowPurchaseDialog(list);
               }}>
-                <ShoppingCart className="h-3 w-3 mr-1" /> Comprado
+                <ShoppingCart className="h-3 w-3 mr-1" /> Tudo Comprado
               </Button>
             )}
             {list.status === "purchased" && list.requested_by === user?.id && (
               <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => setShowReceiveDialog(list)}>
-                <PackageCheck className="h-3 w-3 mr-1" /> Recebido
+                <PackageCheck className="h-3 w-3 mr-1" /> Tudo Recebido
               </Button>
             )}
             {isAdmin && (
@@ -313,10 +358,10 @@ export default function Purchases() {
         </DialogContent>
       </Dialog>
 
-      {/* Purchase Dialog */}
+      {/* Purchase All Dialog */}
       <Dialog open={!!showPurchaseDialog} onOpenChange={() => setShowPurchaseDialog(null)}>
         <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Registrar Compra</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Registrar Compra (Todos)</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">Lista: <strong>{showPurchaseDialog?.title}</strong></p>
             <div className="space-y-2">
@@ -347,10 +392,10 @@ export default function Purchases() {
         </DialogContent>
       </Dialog>
 
-      {/* Receive Dialog */}
+      {/* Receive All Dialog */}
       <Dialog open={!!showReceiveDialog} onOpenChange={() => setShowReceiveDialog(null)}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>Confirmar Recebimento</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Confirmar Recebimento (Todos)</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">Lista: <strong>{showReceiveDialog?.title}</strong></p>
             <div className="border rounded-md divide-y text-xs">

@@ -12,6 +12,7 @@ export type PurchaseListItem = {
   estimated_value: number | null;
   actual_value: number | null;
   description: string | null;
+  status: string;
 };
 
 export type PurchaseList = {
@@ -120,6 +121,79 @@ export function usePurchases() {
     },
   });
 
+  const updateListStatusFromItems = async (listId: string) => {
+    // Fetch all items for this list to determine overall status
+    const { data: allItems } = await supabase
+      .from("purchase_list_items")
+      .select("status")
+      .eq("list_id", listId);
+
+    if (!allItems || allItems.length === 0) return;
+
+    const allReceived = allItems.every((i: any) => i.status === "received");
+    const allPurchasedOrReceived = allItems.every((i: any) => i.status === "purchased" || i.status === "received");
+    const somePurchased = allItems.some((i: any) => i.status === "purchased" || i.status === "received");
+
+    let newStatus = "pending";
+    if (allReceived) {
+      newStatus = "received";
+    } else if (allPurchasedOrReceived) {
+      newStatus = "purchased";
+    } else if (somePurchased) {
+      newStatus = "purchased";
+    }
+
+    await supabase
+      .from("purchase_lists")
+      .update({
+        status: newStatus,
+        ...(newStatus === "received" ? { received_at: new Date().toISOString(), received_by: user!.id } : {}),
+        ...(newStatus === "purchased" && !somePurchased ? { purchased_at: new Date().toISOString(), buyer_id: user!.id } : {}),
+      } as any)
+      .eq("id", listId);
+  };
+
+  const markItemPurchased = useMutation({
+    mutationFn: async (data: { itemId: string; listId: string; actual_value?: number }) => {
+      const { error } = await supabase
+        .from("purchase_list_items")
+        .update({
+          status: "purchased",
+          ...(data.actual_value ? { actual_value: data.actual_value } : {}),
+        } as any)
+        .eq("id", data.itemId);
+      if (error) throw error;
+
+      await updateListStatusFromItems(data.listId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["purchase-lists"] });
+      toast({ title: "Item marcado como comprado!" });
+    },
+    onError: (e: any) => {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    },
+  });
+
+  const markItemReceived = useMutation({
+    mutationFn: async (data: { itemId: string; listId: string }) => {
+      const { error } = await supabase
+        .from("purchase_list_items")
+        .update({ status: "received" } as any)
+        .eq("id", data.itemId);
+      if (error) throw error;
+
+      await updateListStatusFromItems(data.listId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["purchase-lists"] });
+      toast({ title: "Item marcado como recebido!" });
+    },
+    onError: (e: any) => {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    },
+  });
+
   const markAsPurchased = useMutation({
     mutationFn: async (data: { id: string; purchase_notes?: string; item_values?: Record<string, number> }) => {
       const { error } = await supabase
@@ -133,7 +207,9 @@ export function usePurchases() {
         .eq("id", data.id);
       if (error) throw error;
 
-      // Update individual item actual_values
+      // Update all items to purchased + individual values
+      await supabase.from("purchase_list_items").update({ status: "purchased" } as any).eq("list_id", data.id);
+
       if (data.item_values) {
         for (const [itemId, value] of Object.entries(data.item_values)) {
           if (value) {
@@ -168,6 +244,9 @@ export function usePurchases() {
         .eq("id", data.id);
       if (error) throw error;
 
+      // Mark all items as received
+      await supabase.from("purchase_list_items").update({ status: "received" } as any).eq("list_id", data.id);
+
       supabase.functions.invoke("notify-purchase", {
         body: { listId: data.id, action: "received" },
       });
@@ -201,6 +280,8 @@ export function usePurchases() {
     createList,
     markAsPurchased,
     markAsReceived,
+    markItemPurchased,
+    markItemReceived,
     deleteList,
   };
 }

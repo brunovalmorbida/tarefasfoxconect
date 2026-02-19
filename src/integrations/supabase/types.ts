@@ -231,6 +231,7 @@ export type Database = {
           list_id: string
           name: string
           quantity: number
+          status: Database["public"]["Enums"]["purchase_status"]
         }
         Insert: {
           actual_value?: number | null
@@ -242,6 +243,7 @@ export type Database = {
           list_id: string
           name: string
           quantity?: number
+          status?: Database["public"]["Enums"]["purchase_status"]
         }
         Update: {
           actual_value?: number | null
@@ -253,6 +255,7 @@ export type Database = {
           list_id?: string
           name?: string
           quantity?: number
+          status?: Database["public"]["Enums"]["purchase_status"]
         }
         Relationships: [
           {
