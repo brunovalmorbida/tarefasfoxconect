@@ -36,7 +36,16 @@ Deno.serve(async (req) => {
     const brtOffset = -3 * 60;
     const brtNow = new Date(now.getTime() + (brtOffset + now.getTimezoneOffset()) * 60000);
     const jsDay = brtNow.getDay(); // 0=Sun, 1=Mon...
-    const ourDay = jsDay === 0 ? 6 : jsDay - 1; // 0=Mon, 1=Tue... 6=Sun
+
+    // Skip Sundays — recurring tasks only apply Mon-Sat
+    if (jsDay === 0) {
+      console.log("Today is Sunday, skipping recurring task notifications.");
+      return new Response(JSON.stringify({ message: "Domingo — notificações de tarefas fixas ignoradas", sent: 0 }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const ourDay = jsDay - 1; // 0=Mon, 1=Tue... 5=Sat
     const dayOfMonth = brtNow.getDate();
 
     // Get Z-API config
