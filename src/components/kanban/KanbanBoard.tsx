@@ -5,10 +5,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Plus, MoreHorizontal, Trash2, GripVertical, CalendarIcon, User } from "lucide-react";
+import { Plus, MoreHorizontal, Trash2, GripVertical, CalendarIcon, User, AlertTriangle, Pencil, Copy, ArrowRightLeft } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -17,37 +15,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { differenceInDays, format, isPast } from "date-fns";
+import { format, isPast } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
-function getDueDateColor(dueDate: string | null, createdAt: string): string {
-  if (!dueDate) return "";
-  const now = new Date();
-  const due = new Date(dueDate);
-  const created = new Date(createdAt);
-  if (isPast(due)) return "bg-destructive/15 text-destructive border-destructive/30";
-  const total = due.getTime() - created.getTime();
-  const elapsed = now.getTime() - created.getTime();
-  if (total <= 0) return "";
-  const pct = elapsed / total;
-  if (pct >= 0.9) return "bg-destructive/15 text-destructive border-destructive/30";
-  if (pct >= 0.7) return "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30";
-  if (pct >= 0.5) return "bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30";
-  return "bg-muted text-muted-foreground border-border";
-}
-
-const priorityColors: Record<string, string> = {
-  low: "bg-muted text-muted-foreground",
-  medium: "bg-primary/10 text-primary",
-  high: "bg-warning/10 text-warning-foreground",
-  urgent: "bg-destructive/10 text-destructive",
-};
-
-const priorityLabels: Record<string, string> = {
-  low: "Baixa",
-  medium: "Média",
-  high: "Alta",
-  urgent: "Urgente",
+const priorityBorderClass: Record<string, string> = {
+  low: "priority-border-low",
+  medium: "priority-border-medium",
+  high: "priority-border-high",
+  urgent: "priority-border-urgent",
 };
 
 interface Props {
@@ -64,22 +39,18 @@ export function KanbanBoard({ boardId, onBack }: Props) {
   const [newTaskAssignee, setNewTaskAssignee] = useState<string>("");
   const [newTaskDueDate, setNewTaskDueDate] = useState<Date | undefined>(undefined);
   const [editingTask, setEditingTask] = useState<any>(null);
+  const [hoveredTask, setHoveredTask] = useState<string | null>(null);
 
-  // Fetch team members for assignee selection
   const { data: teamMembers } = useQuery({
     queryKey: ["team-members-profiles", board?.team_id],
     queryFn: async () => {
       const { data: members, error: mErr } = await supabase
-        .from("team_members")
-        .select("user_id")
-        .eq("team_id", board!.team_id);
+        .from("team_members").select("user_id").eq("team_id", board!.team_id);
       if (mErr) throw mErr;
       const userIds = members.map((m) => m.user_id);
       if (userIds.length === 0) return [];
       const { data: profiles, error: pErr } = await supabase
-        .from("profiles")
-        .select("user_id, name")
-        .in("user_id", userIds);
+        .from("profiles").select("user_id, name").in("user_id", userIds);
       if (pErr) throw pErr;
       return profiles ?? [];
     },
@@ -91,9 +62,7 @@ export function KanbanBoard({ boardId, onBack }: Props) {
     return teamMembers.find((m) => m.user_id === assigneeId)?.name ?? null;
   };
 
-  const getInitials = (name: string) => {
-    return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
-  };
+  const getInitials = (name: string) => name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
 
   const handleAddColumn = async () => {
     if (!newColumnName.trim()) return;
@@ -107,21 +76,14 @@ export function KanbanBoard({ boardId, onBack }: Props) {
 
   const handleAddTask = async (columnId: string) => {
     if (!newTaskTitle.trim()) return;
-    if (!newTaskDueDate) {
-      toast.error("O prazo é obrigatório");
-      return;
-    }
+    if (!newTaskDueDate) { toast.error("O prazo é obrigatório"); return; }
     try {
       await addTask.mutateAsync({
-        columnId,
-        title: newTaskTitle.trim(),
+        columnId, title: newTaskTitle.trim(),
         assigneeId: newTaskAssignee && newTaskAssignee !== "none" ? newTaskAssignee : undefined,
         dueDate: newTaskDueDate.toISOString(),
       });
-      setNewTaskTitle("");
-      setNewTaskAssignee("");
-      setNewTaskDueDate(undefined);
-      setAddingTaskCol(null);
+      setNewTaskTitle(""); setNewTaskAssignee(""); setNewTaskDueDate(undefined); setAddingTaskCol(null);
     } catch { toast.error("Erro ao criar tarefa"); }
   };
 
@@ -129,196 +91,202 @@ export function KanbanBoard({ boardId, onBack }: Props) {
     if (!result.destination || !board?.board_columns) return;
     const { draggableId, destination } = result;
     try {
-      await moveTask.mutateAsync({
-        taskId: draggableId,
-        newColumnId: destination.droppableId,
-        newPosition: destination.index,
-      });
+      await moveTask.mutateAsync({ taskId: draggableId, newColumnId: destination.droppableId, newPosition: destination.index });
     } catch { toast.error("Erro ao mover tarefa"); }
   };
 
   const handleUpdateTask = async () => {
     if (!editingTask) return;
-    if (!editingTask.due_date) {
-      toast.error("O prazo é obrigatório");
-      return;
-    }
+    if (!editingTask.due_date) { toast.error("O prazo é obrigatório"); return; }
     try {
       await updateTask.mutateAsync({
-        id: editingTask.id,
-        title: editingTask.title,
-        description: editingTask.description || null,
-        priority: editingTask.priority,
-        due_date: editingTask.due_date || null,
-        assignee_id: editingTask.assignee_id || null,
+        id: editingTask.id, title: editingTask.title, description: editingTask.description || null,
+        priority: editingTask.priority, due_date: editingTask.due_date || null, assignee_id: editingTask.assignee_id || null,
       });
       setEditingTask(null);
       toast.success("Tarefa atualizada!");
     } catch { toast.error("Erro ao atualizar"); }
   };
 
-  if (isLoading) return <div className="flex items-center justify-center h-64 text-muted-foreground">Carregando...</div>;
+  if (isLoading) return (
+    <div className="flex items-center justify-center h-64">
+      <div className="flex flex-col items-center gap-3">
+        <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm text-muted-foreground">Carregando quadro...</p>
+      </div>
+    </div>
+  );
   if (!board) return <div className="text-muted-foreground">Quadro não encontrado.</div>;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={onBack}>← Voltar</Button>
-        <h1 className="text-2xl font-bold tracking-tight">{board.name}</h1>
-        {board.description && <span className="text-muted-foreground text-sm">— {board.description}</span>}
+        <Button variant="ghost" size="sm" onClick={onBack} className="gap-1.5">
+          ← Voltar
+        </Button>
+        <div>
+          <h1 className="text-xl font-bold tracking-tight">{board.name}</h1>
+          {board.description && <p className="text-xs text-muted-foreground">{board.description}</p>}
+        </div>
       </div>
 
       <DragDropContext onDragEnd={handleDragEnd}>
         <div className="flex gap-4 overflow-x-auto pb-4" style={{ minHeight: 400 }}>
-          {board.board_columns?.map((col: any) => (
-            <div key={col.id} className="flex-shrink-0 w-72 bg-secondary/50 rounded-lg p-3 space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-sm text-foreground">{col.name}</h3>
-                <div className="flex items-center gap-1">
-                  <Badge variant="secondary" className="text-xs">{col.tasks?.length ?? 0}</Badge>
+          {board.board_columns?.map((col: any) => {
+            const taskCount = col.tasks?.length ?? 0;
+            return (
+              <div key={col.id} className="flex-shrink-0 w-[300px] bg-muted/40 rounded-xl p-3.5 space-y-3">
+                {/* Column header */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-sm text-foreground">{col.name}</h3>
+                    <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-foreground/10 text-[11px] font-semibold text-foreground">
+                      {taskCount}
+                    </span>
+                  </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-6 w-6"><MoreHorizontal className="h-3 w-3" /></Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 opacity-50 hover:opacity-100">
+                        <MoreHorizontal className="h-3.5 w-3.5" />
+                      </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent>
                       <DropdownMenuItem className="text-destructive" onClick={() => deleteColumn.mutateAsync(col.id)}>
-                        <Trash2 className="mr-2 h-3 w-3" /> Excluir coluna
+                        <Trash2 className="mr-2 h-3.5 w-3.5" /> Excluir coluna
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
-              </div>
 
-              <Droppable droppableId={col.id}>
-                {(provided) => (
-                  <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-2 min-h-[40px]">
-                    {col.tasks?.map((task: any, index: number) => {
-                      const assigneeName = getAssigneeName(task.assignee_id);
-                      return (
-                        <Draggable key={task.id} draggableId={task.id} index={index}>
-                          {(provided, snapshot) => (
-                            <Card
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              className={`p-3 cursor-pointer hover:shadow-md transition-shadow ${snapshot.isDragging ? "shadow-lg ring-2 ring-primary/20" : ""}`}
-                              onClick={() => setEditingTask({ ...task })}
-                            >
-                              <div className="flex items-start gap-2">
-                                <div {...provided.dragHandleProps} className="mt-0.5">
-                                  <GripVertical className="h-4 w-4 text-muted-foreground" />
-                                </div>
-                                <div className="flex-1 space-y-1.5">
-                                  <p className="text-sm font-medium leading-tight">{task.title}</p>
-                                  {task.description && <p className="text-xs text-muted-foreground line-clamp-2">{task.description}</p>}
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${priorityColors[task.priority]}`}>
-                                      {priorityLabels[task.priority]}
-                                    </span>
-                                    {task.due_date && (
-                                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium border flex items-center gap-0.5 ${getDueDateColor(task.due_date, task.created_at)}`}>
-                                        <CalendarIcon className="h-2.5 w-2.5" />
-                                        {format(new Date(task.due_date), "dd/MM", { locale: ptBR })}
-                                      </span>
+                <Droppable droppableId={col.id}>
+                  {(provided, snapshot) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      className={cn(
+                        "space-y-2.5 min-h-[50px] rounded-lg transition-colors",
+                        snapshot.isDraggingOver && "bg-primary/5"
+                      )}
+                    >
+                      {col.tasks?.map((task: any, index: number) => {
+                        const assigneeName = getAssigneeName(task.assignee_id);
+                        const isOverdue = task.due_date && isPast(new Date(task.due_date));
+                        const isHovered = hoveredTask === task.id;
+
+                        return (
+                          <Draggable key={task.id} draggableId={task.id} index={index}>
+                            {(provided, snapshot) => (
+                              <div
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                className={cn(
+                                  `bg-card rounded-xl border shadow-sm p-3.5 cursor-pointer transition-all duration-200 ${priorityBorderClass[task.priority] || ""}`,
+                                  snapshot.isDragging && "shadow-lg ring-2 ring-primary/20 rotate-1",
+                                  isOverdue && "bg-destructive/5",
+                                  !snapshot.isDragging && "hover:shadow-md hover:-translate-y-0.5"
+                                )}
+                                onClick={() => setEditingTask({ ...task })}
+                                onMouseEnter={() => setHoveredTask(task.id)}
+                                onMouseLeave={() => setHoveredTask(null)}
+                              >
+                                <div className="flex items-start gap-2.5">
+                                  <div {...provided.dragHandleProps} className="mt-0.5 opacity-30 hover:opacity-100 transition-opacity">
+                                    <GripVertical className="h-4 w-4 text-muted-foreground" />
+                                  </div>
+                                  <div className="flex-1 space-y-2 min-w-0">
+                                    <p className="text-sm font-medium leading-tight">{task.title}</p>
+                                    {task.description && (
+                                      <p className="text-xs text-muted-foreground line-clamp-2">{task.description}</p>
                                     )}
-                                    {assigneeName && (
-                                      <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-accent text-accent-foreground flex items-center gap-0.5">
-                                        <User className="h-2.5 w-2.5" />
-                                        {assigneeName.split(" ")[0]}
-                                      </span>
-                                    )}
-                                    {task.labels?.map((l: string) => (
-                                      <Badge key={l} variant="outline" className="text-[10px] px-1.5 py-0">{l}</Badge>
-                                    ))}
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      {task.due_date && (
+                                        <span className={cn(
+                                          "text-[11px] px-2 py-0.5 rounded-md font-medium inline-flex items-center gap-1",
+                                          isOverdue
+                                            ? "bg-destructive/15 text-destructive"
+                                            : "bg-muted text-muted-foreground"
+                                        )}>
+                                          {isOverdue && <AlertTriangle className="h-3 w-3" />}
+                                          <CalendarIcon className="h-3 w-3" />
+                                          {format(new Date(task.due_date), "dd/MM", { locale: ptBR })}
+                                        </span>
+                                      )}
+                                      {assigneeName && (
+                                        <Avatar className="h-5 w-5">
+                                          <AvatarFallback className="text-[9px] bg-primary/10 text-primary font-semibold">
+                                            {getInitials(assigneeName)}
+                                          </AvatarFallback>
+                                        </Avatar>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            </Card>
-                          )}
-                        </Draggable>
-                      );
-                    })}
-                    {provided.placeholder}
-                  </div>
-                )}
-              </Droppable>
 
-              {addingTaskCol === col.id ? (
-                <div className="space-y-2">
-                  <Input
-                    value={newTaskTitle}
-                    onChange={(e) => setNewTaskTitle(e.target.value)}
-                    placeholder="Título da tarefa"
-                    autoFocus
-                    onKeyDown={(e) => e.key === "Enter" && handleAddTask(col.id)}
-                  />
-                  <Select value={newTaskAssignee} onValueChange={setNewTaskAssignee}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue placeholder="Responsável (opcional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Sem responsável</SelectItem>
-                      {teamMembers?.map((m) => (
-                        <SelectItem key={m.user_id} value={m.user_id}>{m.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "h-8 text-xs w-full justify-start text-left font-normal",
-                          !newTaskDueDate && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-3 w-3" />
-                        {newTaskDueDate
-                          ? format(newTaskDueDate, "dd/MM/yyyy", { locale: ptBR })
-                          : "Prazo *"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={newTaskDueDate}
-                        onSelect={setNewTaskDueDate}
-                        disabled={(date) => date <= new Date(new Date().setHours(23, 59, 59, 999))}
-                        initialFocus
-                        className={cn("p-3 pointer-events-auto")}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <div className="flex gap-2">
-                    <Button size="sm" onClick={() => handleAddTask(col.id)} disabled={!newTaskTitle.trim() || !newTaskDueDate}>Adicionar</Button>
-                    <Button size="sm" variant="ghost" onClick={() => { setAddingTaskCol(null); setNewTaskTitle(""); setNewTaskAssignee(""); setNewTaskDueDate(undefined); }}>Cancelar</Button>
+                                {/* Hover quick actions */}
+                                {isHovered && !snapshot.isDragging && (
+                                  <div className="flex items-center gap-1 mt-2 pt-2 border-t border-border/50 animate-fade-in">
+                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); setEditingTask({ ...task }); }}>
+                                      <Pencil className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </Draggable>
+                        );
+                      })}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+
+                {addingTaskCol === col.id ? (
+                  <div className="space-y-2 bg-card rounded-xl border p-3 animate-scale-in">
+                    <Input value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} placeholder="Título da tarefa" autoFocus onKeyDown={(e) => e.key === "Enter" && handleAddTask(col.id)} />
+                    <Select value={newTaskAssignee} onValueChange={setNewTaskAssignee}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Responsável (opcional)" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sem responsável</SelectItem>
+                        {teamMembers?.map((m) => (<SelectItem key={m.user_id} value={m.user_id}>{m.name}</SelectItem>))}
+                      </SelectContent>
+                    </Select>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className={cn("h-8 text-xs w-full justify-start text-left font-normal", !newTaskDueDate && "text-muted-foreground")}>
+                          <CalendarIcon className="mr-2 h-3 w-3" />
+                          {newTaskDueDate ? format(newTaskDueDate, "dd/MM/yyyy", { locale: ptBR }) : "Prazo *"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar mode="single" selected={newTaskDueDate} onSelect={setNewTaskDueDate} disabled={(date) => date <= new Date(new Date().setHours(23, 59, 59, 999))} initialFocus className={cn("p-3 pointer-events-auto")} />
+                      </PopoverContent>
+                    </Popover>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => handleAddTask(col.id)} disabled={!newTaskTitle.trim() || !newTaskDueDate}>Adicionar</Button>
+                      <Button size="sm" variant="ghost" onClick={() => { setAddingTaskCol(null); setNewTaskTitle(""); setNewTaskAssignee(""); setNewTaskDueDate(undefined); }}>Cancelar</Button>
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <Button variant="ghost" size="sm" className="w-full justify-start text-muted-foreground" onClick={() => setAddingTaskCol(col.id)}>
-                  <Plus className="mr-1 h-3 w-3" /> Adicionar tarefa
-                </Button>
-              )}
-            </div>
-          ))}
+                ) : (
+                  <Button variant="ghost" size="sm" className="w-full justify-start text-muted-foreground hover:text-foreground" onClick={() => setAddingTaskCol(col.id)}>
+                    <Plus className="mr-1.5 h-3.5 w-3.5" /> Adicionar tarefa
+                  </Button>
+                )}
+              </div>
+            );
+          })}
 
           {/* Add column */}
-          <div className="flex-shrink-0 w-72">
+          <div className="flex-shrink-0 w-[300px]">
             {addingColumn ? (
-              <div className="bg-secondary/50 rounded-lg p-3 space-y-2">
-                <Input
-                  value={newColumnName}
-                  onChange={(e) => setNewColumnName(e.target.value)}
-                  placeholder="Nome da coluna"
-                  autoFocus
-                  onKeyDown={(e) => e.key === "Enter" && handleAddColumn()}
-                />
+              <div className="bg-muted/40 rounded-xl p-3.5 space-y-2 animate-scale-in">
+                <Input value={newColumnName} onChange={(e) => setNewColumnName(e.target.value)} placeholder="Nome da coluna" autoFocus onKeyDown={(e) => e.key === "Enter" && handleAddColumn()} />
                 <div className="flex gap-2">
                   <Button size="sm" onClick={handleAddColumn} disabled={!newColumnName.trim()}>Adicionar</Button>
                   <Button size="sm" variant="ghost" onClick={() => { setAddingColumn(false); setNewColumnName(""); }}>Cancelar</Button>
                 </div>
               </div>
             ) : (
-              <Button variant="outline" className="w-full border-dashed h-12" onClick={() => setAddingColumn(true)}>
+              <Button variant="outline" className="w-full border-dashed h-12 rounded-xl" onClick={() => setAddingColumn(true)}>
                 <Plus className="mr-2 h-4 w-4" /> Nova Coluna
               </Button>
             )}
@@ -342,16 +310,11 @@ export function KanbanBoard({ boardId, onBack }: Props) {
               </div>
               <div>
                 <label className="text-sm font-medium">Responsável</label>
-                <Select
-                  value={editingTask.assignee_id || "none"}
-                  onValueChange={(v) => setEditingTask({ ...editingTask, assignee_id: v === "none" ? null : v })}
-                >
+                <Select value={editingTask.assignee_id || "none"} onValueChange={(v) => setEditingTask({ ...editingTask, assignee_id: v === "none" ? null : v })}>
                   <SelectTrigger><SelectValue placeholder="Selecionar responsável" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Sem responsável</SelectItem>
-                    {teamMembers?.map((m) => (
-                      <SelectItem key={m.user_id} value={m.user_id}>{m.name}</SelectItem>
-                    ))}
+                    {teamMembers?.map((m) => (<SelectItem key={m.user_id} value={m.user_id}>{m.name}</SelectItem>))}
                   </SelectContent>
                 </Select>
               </div>
@@ -371,28 +334,13 @@ export function KanbanBoard({ boardId, onBack }: Props) {
                 <label className="text-sm font-medium">Prazo</label>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !editingTask.due_date && "text-muted-foreground"
-                      )}
-                    >
+                    <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !editingTask.due_date && "text-muted-foreground")}>
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {editingTask.due_date
-                        ? format(new Date(editingTask.due_date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
-                        : "Selecionar prazo"}
+                      {editingTask.due_date ? format(new Date(editingTask.due_date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR }) : "Selecionar prazo"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={editingTask.due_date ? new Date(editingTask.due_date) : undefined}
-                      onSelect={(date) => setEditingTask({ ...editingTask, due_date: date ? date.toISOString() : null })}
-                      disabled={(date) => date <= new Date(new Date().setHours(23, 59, 59, 999))}
-                      initialFocus
-                      className={cn("p-3 pointer-events-auto")}
-                    />
+                    <Calendar mode="single" selected={editingTask.due_date ? new Date(editingTask.due_date) : undefined} onSelect={(date) => setEditingTask({ ...editingTask, due_date: date ? date.toISOString() : null })} disabled={(date) => date <= new Date(new Date().setHours(23, 59, 59, 999))} initialFocus className={cn("p-3 pointer-events-auto")} />
                   </PopoverContent>
                 </Popover>
               </div>

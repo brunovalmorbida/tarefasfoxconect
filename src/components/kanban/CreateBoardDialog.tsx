@@ -42,7 +42,7 @@ export function CreateBoardDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button><Plus className="mr-2 h-4 w-4" /> Novo Quadro</Button>
+        <Button><Plus className="mr-2 h-4 w-4" /> Criar Novo Quadro</Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>

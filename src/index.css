@@ -2,13 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
-
 @layer base {
   :root {
-    --background: 0 0% 99%;
+    --background: 0 0% 98%;
     --foreground: 220 15% 15%;
 
     --card: 0 0% 100%;
@@ -26,7 +22,7 @@ All colors MUST be HSL.
     --muted: 220 14% 96%;
     --muted-foreground: 220 10% 46%;
 
-    --accent: 220 14% 96%;
+    --accent: 220 14% 93%;
     --accent-foreground: 220 15% 15%;
 
     --destructive: 0 72% 51%;
@@ -36,13 +32,13 @@ All colors MUST be HSL.
     --success-foreground: 0 0% 100%;
 
     --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
+    --warning-foreground: 38 92% 20%;
 
     --border: 220 13% 91%;
     --input: 220 13% 91%;
     --ring: 220 70% 50%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 220 10% 30%;
@@ -52,13 +48,19 @@ All colors MUST be HSL.
     --sidebar-accent-foreground: 220 15% 15%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 220 70% 50%;
+
+    /* Priority colors */
+    --priority-low: 210 70% 55%;
+    --priority-medium: 38 92% 50%;
+    --priority-high: 0 72% 55%;
+    --priority-urgent: 0 72% 45%;
   }
 
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
 
-    --card: 222.2 84% 4.9%;
+    --card: 222.2 84% 6.5%;
     --card-foreground: 210 40% 98%;
 
     --popover: 222.2 84% 4.9%;
@@ -90,6 +92,11 @@ All colors MUST be HSL.
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    --priority-low: 210 70% 55%;
+    --priority-medium: 38 80% 55%;
+    --priority-high: 0 72% 55%;
+    --priority-urgent: 0 72% 45%;
   }
 }
 
@@ -99,6 +106,43 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+@layer components {
+  .card-premium {
+    @apply bg-card rounded-xl border shadow-sm transition-all duration-200;
+  }
+
+  .card-premium:hover {
+    @apply shadow-md border-primary/20 -translate-y-0.5;
+  }
+
+  .progress-bar {
+    @apply h-2 rounded-full bg-muted overflow-hidden;
+  }
+
+  .progress-bar-fill {
+    @apply h-full rounded-full transition-all duration-500 ease-out;
+  }
+
+  .skeleton-loading {
+    @apply animate-pulse bg-muted rounded-lg;
+  }
+}
+
+@layer utilities {
+  .priority-border-low {
+    border-left: 3px solid hsl(var(--priority-low));
+  }
+  .priority-border-medium {
+    border-left: 3px solid hsl(var(--priority-medium));
+  }
+  .priority-border-high {
+    border-left: 3px solid hsl(var(--priority-high));
+  }
+  .priority-border-urgent {
+    border-left: 3px solid hsl(var(--priority-urgent));
   }
 }
