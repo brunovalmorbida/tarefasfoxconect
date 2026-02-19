@@ -97,6 +97,37 @@ const TOOLS = [
   {
     type: "function",
     function: {
+      name: "tarefas_usuario",
+      description: "ADMIN ONLY: Lista as tarefas do quadro Kanban de outro usuário pelo nome. Ex: 'tarefas do João', 'quadro da Maria'",
+      parameters: {
+        type: "object",
+        properties: {
+          nome_usuario: { type: "string", description: "Nome (ou parte do nome) do usuário cujas tarefas se quer ver" },
+          filtro: { type: "string", enum: ["todas", "atrasadas", "pendentes", "concluidas"], description: "Filtro das tarefas" },
+        },
+        required: ["nome_usuario"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "tarefas_diarias_usuario",
+      description: "ADMIN ONLY: Lista as tarefas fixas/recorrentes (diárias) de outro usuário. Ex: 'tarefas diárias do João', 'rotina da Maria'",
+      parameters: {
+        type: "object",
+        properties: {
+          nome_usuario: { type: "string", description: "Nome (ou parte do nome) do usuário cujas tarefas diárias se quer ver" },
+        },
+        required: ["nome_usuario"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "ajuda",
       description: "Mostra os comandos disponíveis quando o usuário não sabe o que fazer",
       parameters: {
@@ -117,6 +148,8 @@ Exemplos:
 - "Quais minhas tarefas?" ou "Minhas tarefas" → listar_tarefas
 - "Concluir tarefa relatório" → concluir_tarefa
 - "Como tá meu dia?" → resumo_dia
+- "Tarefas do João" ou "Quadro do João" → tarefas_usuario (pegar nome "João")
+- "Tarefas diárias da Maria" ou "Rotina da Maria" ou "Tarefas fixas do João" → tarefas_diarias_usuario (pegar nome)
 - "O que posso fazer?" → ajuda
 
 Regras:
@@ -124,7 +157,10 @@ Regras:
 - Se não entender, use ajuda
 - Para prioridade, infira do contexto (urgente, importante = high; normal = medium; pode esperar = low)
 - Para lista de compras, extraia os itens e quantidades da mensagem
-- Quantidade padrão é 1 se não especificada`;
+- Quantidade padrão é 1 se não especificada
+- Quando o usuário pedir tarefas de OUTRA pessoa, use tarefas_usuario ou tarefas_diarias_usuario
+- "tarefas diárias", "rotina", "tarefas fixas" de alguém → tarefas_diarias_usuario
+- "tarefas", "quadro" de alguém → tarefas_usuario`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -169,11 +205,8 @@ Deno.serve(async (req) => {
     const userProfile = (profiles || []).find((p: any) => {
       if (!p.whatsapp_number) return false;
       const storedClean = p.whatsapp_number.replace(/\D/g, "");
-      // Exact match
       if (storedClean === cleanPhone) return true;
-      // Match ignoring country code differences (e.g. stored has +55, incoming might not)
       if (cleanPhone.endsWith(storedClean) || storedClean.endsWith(cleanPhone)) return true;
-      // Match last 8-9 digits (handles 9th digit variations in Brazil)
       const last9stored = storedClean.slice(-9);
       const last9incoming = cleanPhone.slice(-9);
       if (last9stored === last9incoming && storedClean.length >= 10 && cleanPhone.length >= 10) return true;
@@ -186,6 +219,15 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Check if user is admin
+    const { data: adminRole } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userProfile.user_id)
+      .eq("role", "admin")
+      .maybeSingle();
+    const isAdmin = !!adminRole;
 
     if (!lovableApiKey) {
       await sendWhatsApp(supabase, cleanPhone, "⚠️ O sistema de comandos por IA está temporariamente indisponível.");
@@ -261,8 +303,22 @@ Deno.serve(async (req) => {
       case "resumo_dia":
         responseMessage = await handleResumoDia(supabase, userProfile);
         break;
+      case "tarefas_usuario":
+        if (!isAdmin) {
+          responseMessage = "🔒 Apenas administradores podem consultar tarefas de outros usuários.";
+        } else {
+          responseMessage = await handleTarefasUsuario(supabase, profiles || [], args);
+        }
+        break;
+      case "tarefas_diarias_usuario":
+        if (!isAdmin) {
+          responseMessage = "🔒 Apenas administradores podem consultar tarefas diárias de outros usuários.";
+        } else {
+          responseMessage = await handleTarefasDiariasUsuario(supabase, profiles || [], args);
+        }
+        break;
       case "ajuda":
-        responseMessage = handleAjuda(userProfile.name);
+        responseMessage = handleAjuda(userProfile.name, isAdmin);
         break;
       default:
         responseMessage = "🤔 Comando não reconhecido. Envie *ajuda* para ver os comandos disponíveis.";
@@ -314,11 +370,20 @@ async function sendWhatsApp(supabase: any, phone: string, message: string) {
   }
 }
 
+// ─── HELPER: Find profile by name ──────────────────────────
+function findProfileByName(profiles: any[], nome: string) {
+  const lower = nome.toLowerCase().trim();
+  // Exact match first
+  const exact = profiles.find((p: any) => p.name?.toLowerCase() === lower);
+  if (exact) return exact;
+  // Partial match
+  return profiles.find((p: any) => p.name?.toLowerCase().includes(lower));
+}
+
 // ─── COMMAND: Criar Tarefa ─────────────────────────────────
 async function handleCriarTarefa(supabase: any, profile: any, args: any) {
   const { titulo, descricao, prioridade } = args;
 
-  // Find user's first board (assigned or team member)
   const { data: boards } = await supabase
     .from("boards")
     .select("id, name")
@@ -331,7 +396,6 @@ async function handleCriarTarefa(supabase: any, profile: any, args: any) {
 
   const board = boards[0];
 
-  // Get first column of the board
   const { data: columns } = await supabase
     .from("board_columns")
     .select("id, name")
@@ -343,7 +407,6 @@ async function handleCriarTarefa(supabase: any, profile: any, args: any) {
     return "❌ O quadro não tem colunas. Peça ao administrador para configurá-lo.";
   }
 
-  // Get max position
   const { data: existingTasks } = await supabase
     .from("tasks")
     .select("position")
@@ -418,7 +481,6 @@ async function handleListarTarefas(supabase: any, profile: any, args: any) {
     return `📋 Você não tem ${filtroLabels[filtro] || "tarefas"} no momento. Bom trabalho! 🎉`;
   }
 
-  // Get column names
   const columnIds = [...new Set(tasks.map((t: any) => t.column_id))];
   const { data: columns } = await supabase
     .from("board_columns")
@@ -451,7 +513,6 @@ async function handleListarTarefas(supabase: any, profile: any, args: any) {
 async function handleConcluirTarefa(supabase: any, profile: any, args: any) {
   const { titulo_parcial } = args;
 
-  // Find matching task
   const { data: tasks } = await supabase
     .from("tasks")
     .select("id, title, column_id")
@@ -465,7 +526,6 @@ async function handleConcluirTarefa(supabase: any, profile: any, args: any) {
 
   const task = tasks[0];
 
-  // Get the board from column
   const { data: col } = await supabase
     .from("board_columns")
     .select("board_id")
@@ -474,7 +534,6 @@ async function handleConcluirTarefa(supabase: any, profile: any, args: any) {
 
   if (!col) return "❌ Erro ao encontrar o quadro da tarefa.";
 
-  // Get last column (Concluído)
   const { data: lastCol } = await supabase
     .from("board_columns")
     .select("id, name")
@@ -484,7 +543,6 @@ async function handleConcluirTarefa(supabase: any, profile: any, args: any) {
 
   if (!lastCol || lastCol.length === 0) return "❌ Erro ao encontrar coluna de conclusão.";
 
-  // Move task to last column
   const { error } = await supabase
     .from("tasks")
     .update({ column_id: lastCol[0].id })
@@ -536,7 +594,6 @@ async function handleCriarListaCompras(supabase: any, profile: any, args: any) {
     msg += `  ${i + 1}. ${item.name} (x${item.quantity})\n`;
   });
 
-  // Notify admin
   try {
     await supabase.functions.invoke("notify-purchase", {
       body: { listId: list.id, action: "created" },
@@ -548,7 +605,6 @@ async function handleCriarListaCompras(supabase: any, profile: any, args: any) {
 
 // ─── COMMAND: Resumo do Dia ────────────────────────────────
 async function handleResumoDia(supabase: any, profile: any) {
-  // Get all user's tasks
   const { data: allTasks } = await supabase
     .from("tasks")
     .select("id, title, priority, due_date, column_id")
@@ -557,13 +613,11 @@ async function handleResumoDia(supabase: any, profile: any) {
   const now = new Date();
   const tasks = allTasks || [];
 
-  // Get all columns to identify "done" (last column per board)
   const columnIds = [...new Set(tasks.map((t: any) => t.column_id))];
   const { data: columns } = columnIds.length > 0
     ? await supabase.from("board_columns").select("id, name, board_id, position").in("id", columnIds)
     : { data: [] };
 
-  // Find last columns per board
   const boardMaxPos = new Map<string, number>();
   (columns || []).forEach((c: any) => {
     const curr = boardMaxPos.get(c.board_id) || 0;
@@ -578,7 +632,6 @@ async function handleResumoDia(supabase: any, profile: any) {
   const done = tasks.filter((t: any) => doneColumnIds.has(t.column_id));
   const pending = tasks.filter((t: any) => !doneColumnIds.has(t.column_id));
 
-  // Purchases
   const { data: purchaseLists } = await supabase
     .from("purchase_lists")
     .select("id, status")
@@ -617,9 +670,187 @@ async function handleResumoDia(supabase: any, profile: any) {
   return msg;
 }
 
+// ─── COMMAND: Tarefas de outro usuário (ADMIN) ─────────────
+async function handleTarefasUsuario(supabase: any, profiles: any[], args: any) {
+  const { nome_usuario, filtro } = args;
+
+  const targetProfile = findProfileByName(profiles, nome_usuario);
+  if (!targetProfile) {
+    return `❌ Nenhum usuário encontrado com o nome "${nome_usuario}".`;
+  }
+
+  // Get all boards where user is assigned or has tasks
+  const { data: boards } = await supabase
+    .from("boards")
+    .select("id, name, board_columns(id, name, position)")
+    .or(`assigned_user_id.eq.${targetProfile.user_id}`);
+
+  // Also get tasks assigned to this user across all boards
+  let taskQuery = supabase
+    .from("tasks")
+    .select("id, title, priority, due_date, column_id, created_at")
+    .eq("assignee_id", targetProfile.user_id)
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  const now = new Date().toISOString();
+  if (filtro === "atrasadas") {
+    taskQuery = taskQuery.lt("due_date", now).not("due_date", "is", null);
+  }
+
+  const { data: tasks } = await taskQuery;
+
+  if (!tasks || tasks.length === 0) {
+    return `📋 *${targetProfile.name}* não tem tarefas ${filtro === "atrasadas" ? "atrasadas" : ""} no momento.`;
+  }
+
+  // Get column info
+  const columnIds = [...new Set(tasks.map((t: any) => t.column_id))];
+  const { data: columns } = await supabase
+    .from("board_columns")
+    .select("id, name, board_id, position")
+    .in("id", columnIds);
+
+  const colMap = new Map((columns || []).map((c: any) => [c.id, c.name]));
+
+  // Identify done columns
+  const boardMaxPos = new Map<string, number>();
+  (columns || []).forEach((c: any) => {
+    const curr = boardMaxPos.get(c.board_id) || 0;
+    if (c.position > curr) boardMaxPos.set(c.board_id, c.position);
+  });
+  const doneColumnIds = new Set(
+    (columns || []).filter((c: any) => c.position === boardMaxPos.get(c.board_id)).map((c: any) => c.id)
+  );
+
+  // Filter based on filtro
+  let filteredTasks = tasks;
+  if (filtro === "pendentes") {
+    filteredTasks = tasks.filter((t: any) => !doneColumnIds.has(t.column_id));
+  } else if (filtro === "concluidas") {
+    filteredTasks = tasks.filter((t: any) => doneColumnIds.has(t.column_id));
+  }
+
+  const pending = tasks.filter((t: any) => !doneColumnIds.has(t.column_id));
+  const done = tasks.filter((t: any) => doneColumnIds.has(t.column_id));
+  const overdue = tasks.filter((t: any) => t.due_date && new Date(t.due_date) < new Date() && !doneColumnIds.has(t.column_id));
+
+  const priorityEmoji: Record<string, string> = { low: "🟢", medium: "🟡", high: "🟠", urgent: "🔴" };
+
+  const filtroLabel = filtro === "atrasadas" ? " (Atrasadas)" : filtro === "pendentes" ? " (Pendentes)" : filtro === "concluidas" ? " (Concluídas)" : "";
+
+  let msg = `👤 *Tarefas de ${targetProfile.name}${filtroLabel}*\n\n`;
+  msg += `📊 Resumo: ✅ ${done.length} | ⏳ ${pending.length} | ⚠️ ${overdue.length}\n\n`;
+
+  filteredTasks.slice(0, 15).forEach((t: any, i: number) => {
+    const emoji = priorityEmoji[t.priority] || "⚪";
+    const colName = colMap.get(t.column_id) || "";
+    const dueStr = t.due_date ? ` | 📅 ${new Date(t.due_date).toLocaleDateString("pt-BR")}` : "";
+    const isDone = doneColumnIds.has(t.column_id) ? " ✅" : "";
+    msg += `${i + 1}. ${emoji} ${t.title}${isDone}\n   📂 ${colName}${dueStr}\n\n`;
+  });
+
+  return msg.trim();
+}
+
+// ─── COMMAND: Tarefas diárias de outro usuário (ADMIN) ─────
+async function handleTarefasDiariasUsuario(supabase: any, profiles: any[], args: any) {
+  const { nome_usuario } = args;
+
+  const targetProfile = findProfileByName(profiles, nome_usuario);
+  if (!targetProfile) {
+    return `❌ Nenhum usuário encontrado com o nome "${nome_usuario}".`;
+  }
+
+  // Get recurring task boards assigned to this user
+  const { data: boards } = await supabase
+    .from("recurring_task_boards")
+    .select("id, name, frequency_type, weekday")
+    .eq("assigned_user_id", targetProfile.user_id);
+
+  if (!boards || boards.length === 0) {
+    return `📋 *${targetProfile.name}* não tem quadros de tarefas fixas atribuídos.`;
+  }
+
+  const boardIds = boards.map((b: any) => b.id);
+
+  // Get recurring tasks for these boards
+  const { data: tasks } = await supabase
+    .from("recurring_tasks")
+    .select("id, title, frequency, weekday, month_day, board_id")
+    .in("board_id", boardIds);
+
+  if (!tasks || tasks.length === 0) {
+    return `📋 *${targetProfile.name}* não tem tarefas fixas cadastradas.`;
+  }
+
+  // Get today's completions
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+  const taskIds = tasks.map((t: any) => t.id);
+  const { data: completions } = await supabase
+    .from("recurring_task_completions")
+    .select("recurring_task_id, period_start")
+    .in("recurring_task_id", taskIds)
+    .eq("period_start", todayStr);
+
+  const completedTaskIds = new Set((completions || []).map((c: any) => c.recurring_task_id));
+
+  const WEEKDAYS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+  const currentWeekday = now.getDay();
+
+  // Filter tasks active today
+  const todayTasks = tasks.filter((t: any) => {
+    if (t.frequency === "daily") return true;
+    if (t.frequency === "weekday") return currentWeekday >= 1 && currentWeekday <= 5;
+    if (t.frequency === "weekly") return t.weekday === currentWeekday;
+    if (t.frequency === "monthly") return t.month_day === now.getDate();
+    return false;
+  });
+
+  const totalToday = todayTasks.length;
+  const doneToday = todayTasks.filter((t: any) => completedTaskIds.has(t.id)).length;
+  const pendingToday = totalToday - doneToday;
+  const progressPct = totalToday > 0 ? Math.round((doneToday / totalToday) * 100) : 0;
+
+  let progressEmoji = "🔴";
+  if (progressPct >= 80) progressEmoji = "🟢";
+  else if (progressPct >= 50) progressEmoji = "🟡";
+
+  let msg = `📋 *Tarefas Diárias de ${targetProfile.name}*\n\n`;
+  msg += `${progressEmoji} *Progresso Hoje:* ${progressPct}% (${doneToday}/${totalToday})\n\n`;
+
+  if (todayTasks.length === 0) {
+    msg += `Sem tarefas fixas para hoje.\n`;
+  } else {
+    msg += `*Tarefas de Hoje:*\n`;
+    todayTasks.forEach((t: any, i: number) => {
+      const isDone = completedTaskIds.has(t.id);
+      const status = isDone ? "✅" : "⏳";
+      msg += `  ${i + 1}. ${status} ${t.title}\n`;
+    });
+  }
+
+  if (pendingToday > 0) {
+    msg += `\n⚠️ *${pendingToday} tarefa(s) pendente(s) hoje*`;
+  } else if (totalToday > 0) {
+    msg += `\n🎉 Todas as tarefas de hoje concluídas!`;
+  }
+
+  // Show all tasks grouped by board
+  msg += `\n\n📊 *Todos os Quadros:*\n`;
+  boards.forEach((board: any) => {
+    const boardTasks = tasks.filter((t: any) => t.board_id === board.id);
+    msg += `\n📌 *${board.name}* (${boardTasks.length} tarefas)\n`;
+  });
+
+  return msg.trim();
+}
+
 // ─── COMMAND: Ajuda ────────────────────────────────────────
-function handleAjuda(userName: string) {
-  return `👋 Olá, ${userName}! Sou o *TaskFox Bot*.\n\n` +
+function handleAjuda(userName: string, isAdmin: boolean = false) {
+  let msg = `👋 Olá, ${userName}! Sou o *TaskFox Bot*.\n\n` +
     `Você pode me enviar comandos em linguagem natural. Aqui estão alguns exemplos:\n\n` +
     `📋 *Tarefas:*\n` +
     `  • "Criar tarefa revisar relatório"\n` +
@@ -632,6 +863,17 @@ function handleAjuda(userName: string) {
     `  • "Preciso de material de limpeza"\n\n` +
     `📊 *Resumo:*\n` +
     `  • "Como tá meu dia?"\n` +
-    `  • "Resumo"\n\n` +
-    `Basta digitar normalmente que eu entendo! 🚀`;
+    `  • "Resumo"\n`;
+
+  if (isAdmin) {
+    msg += `\n🔑 *Comandos de Admin:*\n` +
+      `  • "Tarefas do João"\n` +
+      `  • "Quadro da Maria"\n` +
+      `  • "Tarefas atrasadas do Pedro"\n` +
+      `  • "Tarefas diárias da Ana"\n` +
+      `  • "Rotina do Carlos"\n`;
+  }
+
+  msg += `\nBasta digitar normalmente que eu entendo! 🚀`;
+  return msg;
 }
