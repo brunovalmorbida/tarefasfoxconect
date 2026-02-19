@@ -70,7 +70,15 @@ function getTaskPeriodStart(task: RecurringTask): string {
   }
 }
 
+// Sunday (JS getDay()===0) is not a business day (Mon-Sat only)
+function isSunday(): boolean {
+  return new Date().getDay() === 0;
+}
+
 export function isTaskActiveToday(task: RecurringTask): boolean {
+  // Sundays are never active for any recurring task
+  if (isSunday()) return false;
+
   if (task.frequency === "weekday" && task.weekday !== null) {
     const jsDay = getDay(new Date());
     const ourDay = jsDay === 0 ? 6 : jsDay - 1;
@@ -79,12 +87,11 @@ export function isTaskActiveToday(task: RecurringTask): boolean {
   if (task.frequency === "monthly" && task.month_day !== null) {
     return new Date().getDate() === task.month_day;
   }
-  return true; // daily and weekly are always "active"
+  return true; // daily and weekly are always "active" (except Sunday, handled above)
 }
 
 function isActiveToday(board: RecurringTaskBoard): boolean {
-  // Boards no longer control frequency, always active
-  return true;
+  return !isSunday();
 }
 
 export function useRecurringTaskBoards(teamId?: string) {
