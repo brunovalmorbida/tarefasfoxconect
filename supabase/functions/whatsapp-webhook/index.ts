@@ -157,15 +157,28 @@ Deno.serve(async (req) => {
     }
 
     const cleanPhone = phone.replace(/\D/g, "");
+    console.log("Received phone raw:", phone, "| cleaned:", cleanPhone);
 
-    // Find user by WhatsApp number
+    // Find user by WhatsApp number - try multiple matching strategies
     const { data: profiles } = await supabase
       .from("profiles")
       .select("user_id, name, whatsapp_number");
 
-    const userProfile = (profiles || []).find(
-      (p: any) => p.whatsapp_number && p.whatsapp_number.replace(/\D/g, "") === cleanPhone
-    );
+    console.log("Profiles found:", (profiles || []).map((p: any) => ({ name: p.name, wn: p.whatsapp_number })));
+
+    const userProfile = (profiles || []).find((p: any) => {
+      if (!p.whatsapp_number) return false;
+      const storedClean = p.whatsapp_number.replace(/\D/g, "");
+      // Exact match
+      if (storedClean === cleanPhone) return true;
+      // Match ignoring country code differences (e.g. stored has +55, incoming might not)
+      if (cleanPhone.endsWith(storedClean) || storedClean.endsWith(cleanPhone)) return true;
+      // Match last 8-9 digits (handles 9th digit variations in Brazil)
+      const last9stored = storedClean.slice(-9);
+      const last9incoming = cleanPhone.slice(-9);
+      if (last9stored === last9incoming && storedClean.length >= 10 && cleanPhone.length >= 10) return true;
+      return false;
+    });
 
     if (!userProfile) {
       await sendWhatsApp(supabase, cleanPhone, "❌ Seu número não está cadastrado no sistema TaskFox. Peça ao administrador para cadastrar seu WhatsApp no perfil.");
