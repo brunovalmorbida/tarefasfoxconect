@@ -57,7 +57,7 @@ function BoardDetail({
   teamMembers: any[];
   onUpdateBoard: (params: { id: string; name: string; frequencyType: "weekday" | "weekly" | "monthly"; weekday: number; assignedUserId: string | null }) => Promise<void>;
 }) {
-  const { tasks, isLoading, isTaskCompleted, toggleCompletion, createTask, deleteTask } =
+  const { tasks, isLoading, isTaskCompleted, toggleCompletion, createTask, updateTask, deleteTask } =
     useRecurringTasks(board.id);
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -68,6 +68,12 @@ function BoardDetail({
   const [newMonthDay, setNewMonthDay] = useState("1");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [assignedUser, setAssignedUser] = useState(board.assigned_user_id ?? "");
+  const [editingTask, setEditingTask] = useState<RecurringTask | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDesc, setEditDesc] = useState("");
+  const [editFrequency, setEditFrequency] = useState<"daily" | "weekly" | "weekday" | "monthly">("daily");
+  const [editWeekday, setEditWeekday] = useState("0");
+  const [editMonthDay, setEditMonthDay] = useState("1");
 
   // Progress stats
   const progressStats = useMemo(() => {
@@ -100,6 +106,32 @@ function BoardDetail({
   const handleDelete = async (id: string) => {
     try { await deleteTask.mutateAsync(id); toast({ title: "Tarefa removida" }); }
     catch { toast({ title: "Erro ao remover tarefa", variant: "destructive" }); }
+  };
+
+  const openEditDialog = (task: RecurringTask) => {
+    setEditingTask(task);
+    setEditTitle(task.title);
+    setEditDesc(task.description ?? "");
+    setEditFrequency(task.frequency as any);
+    setEditWeekday(String(task.weekday ?? 0));
+    setEditMonthDay(String(task.month_day ?? 1));
+  };
+
+  const handleEditSave = async () => {
+    if (!editingTask || !editTitle.trim()) return;
+    try {
+      await updateTask.mutateAsync({
+        id: editingTask.id,
+        title: editTitle.trim(),
+        description: editDesc.trim() || null,
+        frequency: editFrequency,
+        weekday: editFrequency === "weekday" ? parseInt(editWeekday) : null,
+        monthDay: editFrequency === "monthly" ? parseInt(editMonthDay) : null,
+        teamId: editingTask.team_id,
+      });
+      setEditingTask(null);
+      toast({ title: "Tarefa atualizada" });
+    } catch { toast({ title: "Erro ao atualizar tarefa", variant: "destructive" }); }
   };
 
   // Sort: active first, completed last
@@ -275,9 +307,14 @@ function BoardDetail({
                             )}
                           </div>
                           {canManage && (
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/70 hover:text-destructive hover:bg-destructive/10 flex-shrink-0" onClick={() => handleDelete(task.id)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <div className="flex items-center gap-0.5 flex-shrink-0">
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-accent" onClick={() => openEditDialog(task)}>
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/70 hover:text-destructive hover:bg-destructive/10" onClick={() => handleDelete(task.id)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -289,6 +326,48 @@ function BoardDetail({
           })}
         </div>
       )}
+
+      {/* Edit Task Dialog */}
+      <Dialog open={!!editingTask} onOpenChange={(open) => !open && setEditingTask(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Editar Tarefa</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <Input placeholder="Título da tarefa" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+            <Textarea placeholder="Descrição (opcional)" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} />
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">Frequência</label>
+              <Select value={editFrequency} onValueChange={(v) => setEditFrequency(v as any)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="daily">Diária</SelectItem>
+                  <SelectItem value="weekly">Semanal</SelectItem>
+                  <SelectItem value="weekday">Dia da semana específico</SelectItem>
+                  <SelectItem value="monthly">Dia do mês específico</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {editFrequency === "weekday" && (
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Dia da semana</label>
+                <Select value={editWeekday} onValueChange={setEditWeekday}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{WEEKDAYS.map((d) => (<SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>))}</SelectContent>
+                </Select>
+              </div>
+            )}
+            {editFrequency === "monthly" && (
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Dia do mês</label>
+                <Select value={editMonthDay} onValueChange={setEditMonthDay}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{MONTH_DAYS.map((d) => (<SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>))}</SelectContent>
+                </Select>
+              </div>
+            )}
+            <Button onClick={handleEditSave} disabled={!editTitle.trim() || updateTask.isPending} className="w-full">Salvar Alterações</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
