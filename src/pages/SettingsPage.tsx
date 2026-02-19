@@ -4,7 +4,8 @@ import { UsersTab } from "@/components/settings/UsersTab";
 import { IntegrationsTab } from "@/components/settings/IntegrationsTab";
 import { ActivityLogTab } from "@/components/settings/ActivityLogTab";
 import { PurchasesConfigTab } from "@/components/settings/PurchasesConfigTab";
-import { Settings, Users, Plug, ScrollText, Download, ShoppingCart } from "lucide-react";
+import { NotificationsConfigTab } from "@/components/settings/NotificationsConfigTab";
+import { Settings, Users, Plug, ScrollText, Download, ShoppingCart, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
@@ -75,6 +76,12 @@ export default function SettingsPage() {
               Compras
             </TabsTrigger>
           )}
+          {isAdmin && (
+            <TabsTrigger value="notifications" className="gap-2">
+              <Bell className="h-4 w-4" />
+              Notificações
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="general" className="mt-6 space-y-4">
@@ -119,6 +126,11 @@ export default function SettingsPage() {
         {isAdmin && (
           <TabsContent value="purchases" className="mt-6">
             <PurchasesConfigTab />
+          </TabsContent>
+        )}
+        {isAdmin && (
+          <TabsContent value="notifications" className="mt-6">
+            <NotificationsConfigTab />
           </TabsContent>
         )}
       </Tabs>
