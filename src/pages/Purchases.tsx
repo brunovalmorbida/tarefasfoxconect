@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, ShoppingCart, PackageCheck, Trash2, Clock, X, ChevronDown, ChevronUp, Check, Search } from "lucide-react";
+import { Plus, ShoppingCart, PackageCheck, Trash2, Clock, X, ChevronDown, ChevronUp, Check } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
@@ -362,14 +362,14 @@ export default function Purchases() {
                       <Popover open={openProductPopover === i} onOpenChange={(open) => setOpenProductPopover(open ? i : null)}>
                         <PopoverTrigger asChild>
                           <Button variant="outline" className="h-8 text-sm w-full justify-start font-normal truncate">
-                            {item.name || <span className="text-muted-foreground">Buscar produto...</span>}
+                            {item.name || <span className="text-muted-foreground">Selecionar produto...</span>}
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="p-0 w-[280px]" align="start">
                           <Command>
                             <CommandInput placeholder="Buscar produto..." />
                             <CommandList>
-                              <CommandEmpty>Nenhum produto encontrado.</CommandEmpty>
+                              <CommandEmpty>Nenhum produto encontrado. Cadastre no catálogo.</CommandEmpty>
                               <CommandGroup heading="Catálogo">
                                 {productCatalog.map((p: any) => (
                                   <CommandItem
@@ -395,21 +395,10 @@ export default function Purchases() {
                                   </CommandItem>
                                 ))}
                               </CommandGroup>
-                              <CommandGroup heading="Digitar manualmente">
-                                <CommandItem onSelect={() => setOpenProductPopover(null)}>
-                                  <span className="text-muted-foreground">Fechar e digitar abaixo</span>
-                                </CommandItem>
-                              </CommandGroup>
                             </CommandList>
                           </Command>
                         </PopoverContent>
                       </Popover>
-                      <Input
-                        value={item.name}
-                        onChange={(e) => updateItem(i, "name", e.target.value)}
-                        placeholder={`Item ${i + 1}`}
-                        className="h-8 text-sm mt-1"
-                      />
                     </div>
                     <Input type="number" min="1" value={item.quantity} onChange={(e) => updateItem(i, "quantity", e.target.value)} placeholder="Qtd" className="h-8 text-sm" />
                     <Select value={item.category} onValueChange={(v) => updateItem(i, "category", v)}>

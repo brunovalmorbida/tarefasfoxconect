@@ -276,7 +276,7 @@ export type Database = {
       purchase_list_items: {
         Row: {
           actual_value: number | null
-          category: Database["public"]["Enums"]["purchase_category"]
+          category: string
           created_at: string
           description: string | null
           estimated_value: number | null
@@ -288,7 +288,7 @@ export type Database = {
         }
         Insert: {
           actual_value?: number | null
-          category?: Database["public"]["Enums"]["purchase_category"]
+          category?: string
           created_at?: string
           description?: string | null
           estimated_value?: number | null
@@ -300,7 +300,7 @@ export type Database = {
         }
         Update: {
           actual_value?: number | null
-          category?: Database["public"]["Enums"]["purchase_category"]
+          category?: string
           created_at?: string
           description?: string | null
           estimated_value?: number | null
