@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Trash2, Plus, Pencil, ArrowLeft, User, CalendarDays, CalendarRange, Calendar, Clock, MoreVertical, Target, ChevronUp, ChevronDown } from "lucide-react";
+import { Trash2, Plus, Pencil, ArrowLeft, User, CalendarDays, CalendarRange, Calendar, Clock, MoreVertical, Target, GripVertical } from "lucide-react";
+import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Progress } from "@/components/ui/progress";
@@ -139,16 +140,17 @@ function BoardDetail({
     return tasks.filter((t) => t.frequency === freq).sort((a, b) => a.position - b.position);
   };
 
-  const handleMoveTask = async (freq: string, index: number, direction: "up" | "down") => {
+  const handleDragEnd = useCallback(async (result: DropResult) => {
+    if (!result.destination) return;
+    const freq = result.source.droppableId;
     const freqTasks = sortedByFreq(freq);
-    const newIndex = direction === "up" ? index - 1 : index + 1;
-    if (newIndex < 0 || newIndex >= freqTasks.length) return;
     const reordered = [...freqTasks];
-    [reordered[index], reordered[newIndex]] = [reordered[newIndex], reordered[index]];
+    const [moved] = reordered.splice(result.source.index, 1);
+    reordered.splice(result.destination.index, 0, moved);
     try {
       await reorderTasks.mutateAsync(reordered.map(t => t.id));
     } catch { toast({ title: "Erro ao reordenar", variant: "destructive" }); }
-  };
+  }, [tasks, reorderTasks, toast]);
 
   return (
     <div className="space-y-6">
@@ -259,12 +261,12 @@ function BoardDetail({
           <p className="text-muted-foreground">Nenhuma tarefa cadastrada neste quadro.</p>
         </div>
       ) : (
+        <DragDropContext onDragEnd={handleDragEnd}>
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
           {(["daily", "weekly", "weekday", "monthly"] as const).map((freq) => {
             const freqTasks = sortedByFreq(freq);
             if (freqTasks.length === 0) return null;
             const config = freqConfig[freq];
-            const FreqIcon = config.icon;
 
             return (
               <div key={freq} className="space-y-3 animate-fade-in">
@@ -277,70 +279,77 @@ function BoardDetail({
                   </span>
                 </div>
 
-                {/* Tasks */}
-                <div className="space-y-2">
-                  {freqTasks.map((task, taskIndex) => {
-                    const completed = isTaskCompleted(task);
-                    const active = isTaskActiveToday(task);
-                    return (
-                      <div
-                        key={task.id}
-                        className={cn(
-                          "card-premium p-3.5 transition-all duration-300 group",
-                          !active && "opacity-40",
-                          completed && "opacity-60"
-                        )}
-                      >
-                        <div className="flex items-start gap-3">
-                          <Checkbox
-                            checked={completed}
-                            onCheckedChange={() => toggleCompletion.mutate({ task })}
-                            className="mt-0.5"
-                            disabled={!active}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <span className={cn(
-                              "text-sm transition-all duration-300",
-                              completed && "line-through text-muted-foreground"
-                            )}>
-                              {task.title}
-                            </span>
-                            {(task.frequency === "weekday" || task.frequency === "monthly") && (
-                              <p className="text-xs text-muted-foreground mt-0.5">{getTaskFrequencyLabel(task)}</p>
+                {/* Tasks with drag-and-drop */}
+                <Droppable droppableId={freq}>
+                  {(provided) => (
+                    <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-2">
+                      {freqTasks.map((task, taskIndex) => {
+                        const completed = isTaskCompleted(task);
+                        const active = isTaskActiveToday(task);
+                        return (
+                          <Draggable key={task.id} draggableId={task.id} index={taskIndex} isDragDisabled={!canManage}>
+                            {(provided, snapshot) => (
+                              <div
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                className={cn(
+                                  "card-premium p-3.5 transition-all duration-300 group",
+                                  !active && "opacity-40",
+                                  completed && "opacity-60",
+                                  snapshot.isDragging && "shadow-lg ring-2 ring-primary/30"
+                                )}
+                              >
+                                <div className="flex items-start gap-3">
+                                  {canManage && (
+                                    <div {...provided.dragHandleProps} className="mt-0.5 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground">
+                                      <GripVertical className="h-4 w-4" />
+                                    </div>
+                                  )}
+                                  <Checkbox
+                                    checked={completed}
+                                    onCheckedChange={() => toggleCompletion.mutate({ task })}
+                                    className="mt-0.5"
+                                    disabled={!active}
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <span className={cn(
+                                      "text-sm transition-all duration-300",
+                                      completed && "line-through text-muted-foreground"
+                                    )}>
+                                      {task.title}
+                                    </span>
+                                    {(task.frequency === "weekday" || task.frequency === "monthly") && (
+                                      <p className="text-xs text-muted-foreground mt-0.5">{getTaskFrequencyLabel(task)}</p>
+                                    )}
+                                    {task.description && (
+                                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{task.description}</p>
+                                    )}
+                                  </div>
+                                  {canManage && (
+                                    <div className="flex items-center gap-0.5 flex-shrink-0">
+                                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-accent" onClick={() => openEditDialog(task)}>
+                                        <Pencil className="h-3.5 w-3.5" />
+                                      </Button>
+                                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/70 hover:text-destructive hover:bg-destructive/10" onClick={() => handleDelete(task.id)}>
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
                             )}
-                            {task.description && (
-                              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{task.description}</p>
-                            )}
-                          </div>
-                          {canManage && (
-                            <div className="flex flex-col items-center gap-0.5 flex-shrink-0 mr-1">
-                              <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-accent" disabled={taskIndex === 0} onClick={() => handleMoveTask(freq, taskIndex, "up")}>
-                                <ChevronUp className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-accent" disabled={taskIndex === freqTasks.length - 1} onClick={() => handleMoveTask(freq, taskIndex, "down")}>
-                                <ChevronDown className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          )}
-                          {canManage && (
-                            <div className="flex items-center gap-0.5 flex-shrink-0">
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-accent" onClick={() => openEditDialog(task)}>
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/70 hover:text-destructive hover:bg-destructive/10" onClick={() => handleDelete(task.id)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                          </Draggable>
+                        );
+                      })}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
               </div>
             );
           })}
         </div>
+        </DragDropContext>
       )}
 
       {/* Edit Task Dialog */}
