@@ -1,0 +1,1 @@
+ALTER TABLE public.purchase_list_items ADD COLUMN category public.purchase_category NOT NULL DEFAULT 'other';
