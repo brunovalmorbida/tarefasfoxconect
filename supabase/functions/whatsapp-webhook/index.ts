@@ -242,14 +242,37 @@ Deno.serve(async (req) => {
 
     console.log("Profiles found:", (profiles || []).map((p: any) => ({ name: p.name, wn: p.whatsapp_number })));
 
+    // Helper: extract DDD + subscriber from a Brazilian number (handles country code and nono dígito)
+    const extractBrNumber = (num: string) => {
+      let n = num;
+      // Remove country code 55 if present
+      if (n.length >= 12 && n.startsWith("55")) n = n.slice(2);
+      // Now n should be DDD (2 digits) + subscriber (8 or 9 digits)
+      if (n.length === 11) {
+        // Has nono dígito: DDD(2) + 9 + 8 digits
+        return { ddd: n.slice(0, 2), subscriber: n.slice(3) }; // 8-digit core
+      } else if (n.length === 10) {
+        // No nono dígito: DDD(2) + 8 digits
+        return { ddd: n.slice(0, 2), subscriber: n.slice(2) }; // 8-digit core
+      }
+      return { ddd: "", subscriber: n.slice(-8) }; // fallback: last 8
+    };
+
     const userProfile = (profiles || []).find((p: any) => {
       if (!p.whatsapp_number) return false;
       const storedClean = p.whatsapp_number.replace(/\D/g, "");
+      // Exact match
       if (storedClean === cleanPhone) return true;
+      // Suffix match
       if (cleanPhone.endsWith(storedClean) || storedClean.endsWith(cleanPhone)) return true;
-      const last9stored = storedClean.slice(-9);
-      const last9incoming = cleanPhone.slice(-9);
-      if (last9stored === last9incoming && storedClean.length >= 10 && cleanPhone.length >= 10) return true;
+      // Brazilian DDD + 8-digit core match (handles nono dígito difference)
+      const stored = extractBrNumber(storedClean);
+      const incoming = extractBrNumber(cleanPhone);
+      if (stored.ddd === incoming.ddd && stored.subscriber === incoming.subscriber && stored.subscriber.length === 8) return true;
+      // Last 8 fallback
+      const last8stored = storedClean.slice(-8);
+      const last8incoming = cleanPhone.slice(-8);
+      if (last8stored === last8incoming && storedClean.length >= 10 && cleanPhone.length >= 10) return true;
       return false;
     });
 
