@@ -620,6 +620,7 @@ export type Database = {
         Row: {
           can_manage_boards: boolean
           can_manage_columns: boolean
+          can_manage_purchases: boolean
           can_manage_recurring_tasks: boolean
           can_manage_tasks: boolean
           created_at: string
@@ -630,6 +631,7 @@ export type Database = {
         Insert: {
           can_manage_boards?: boolean
           can_manage_columns?: boolean
+          can_manage_purchases?: boolean
           can_manage_recurring_tasks?: boolean
           can_manage_tasks?: boolean
           created_at?: string
@@ -640,6 +642,7 @@ export type Database = {
         Update: {
           can_manage_boards?: boolean
           can_manage_columns?: boolean
+          can_manage_purchases?: boolean
           can_manage_recurring_tasks?: boolean
           can_manage_tasks?: boolean
           created_at?: string
