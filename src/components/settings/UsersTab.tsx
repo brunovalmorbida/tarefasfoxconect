@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTeams } from "@/hooks/useBoards";
@@ -138,6 +138,13 @@ export function UsersTab() {
   };
 
   const isMasterAdmin = user?.email === "brunovalmorbida@live.com";
+
+  // Sync editEmail when userEmails loads after dialog is already open
+  useEffect(() => {
+    if (editOpen && editUserId && userEmails && !editEmail) {
+      setEditEmail(userEmails[editUserId] || "");
+    }
+  }, [userEmails, editOpen, editUserId, editEmail]);
 
   const openEditDialog = (profile: Profile) => {
     setEditUserId(profile.user_id);
