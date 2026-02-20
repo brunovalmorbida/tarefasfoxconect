@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useRef, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -19,25 +19,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const hasLoggedSignIn = useRef(false);
-
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
-
-      // Only log the first SIGNED_IN per session to avoid duplicates on page navigation
-      if (event === "SIGNED_IN" && session?.user && !hasLoggedSignIn.current) {
-        hasLoggedSignIn.current = true;
-        supabase.from("activity_log").insert({
-          action: "Fez login no sistema",
-          user_id: session.user.id,
-        }).then(() => {});
-      }
-      if (event === "SIGNED_OUT") {
-        hasLoggedSignIn.current = false;
-      }
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -62,7 +48,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (!error && data.user) {
+      supabase.from("activity_log").insert({
+        action: "Fez login no sistema",
+        user_id: data.user.id,
+      }).then(() => {});
+    }
     return { error };
   };
 
