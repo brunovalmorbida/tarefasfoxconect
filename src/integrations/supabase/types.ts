@@ -549,6 +549,7 @@ export type Database = {
           labels: string[] | null
           position: number
           priority: Database["public"]["Enums"]["task_priority"]
+          scheduled_time: string | null
           title: string
           updated_at: string
         }
@@ -563,6 +564,7 @@ export type Database = {
           labels?: string[] | null
           position?: number
           priority?: Database["public"]["Enums"]["task_priority"]
+          scheduled_time?: string | null
           title: string
           updated_at?: string
         }
@@ -577,6 +579,7 @@ export type Database = {
           labels?: string[] | null
           position?: number
           priority?: Database["public"]["Enums"]["task_priority"]
+          scheduled_time?: string | null
           title?: string
           updated_at?: string
         }

@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Plus, MoreHorizontal, Trash2, CalendarIcon, User, AlertTriangle, Pencil, Copy, ArrowRightLeft } from "lucide-react";
+import { Plus, MoreHorizontal, Trash2, CalendarIcon, User, AlertTriangle, Pencil, Copy, ArrowRightLeft, Clock } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -40,6 +40,7 @@ export function KanbanBoard({ boardId, onBack }: Props) {
   const [newTaskDueDate, setNewTaskDueDate] = useState<Date | undefined>(undefined);
   const [newTaskDescription, setNewTaskDescription] = useState("");
   const [newTaskPriority, setNewTaskPriority] = useState<string>("medium");
+  const [newTaskScheduledTime, setNewTaskScheduledTime] = useState<string>("");
   const [editingTask, setEditingTask] = useState<any>(null);
   const [hoveredTask, setHoveredTask] = useState<string | null>(null);
 
@@ -87,8 +88,9 @@ export function KanbanBoard({ boardId, onBack }: Props) {
         dueDate: newTaskDueDate.toISOString(),
         description: newTaskDescription.trim() || undefined,
         priority: newTaskPriority || "medium",
+        scheduledTime: newTaskScheduledTime || undefined,
       });
-      setNewTaskTitle(""); setNewTaskAssignee(""); setNewTaskDueDate(undefined); setNewTaskDescription(""); setNewTaskPriority("medium"); setAddingTaskCol(null);
+      setNewTaskTitle(""); setNewTaskAssignee(""); setNewTaskDueDate(undefined); setNewTaskDescription(""); setNewTaskPriority("medium"); setNewTaskScheduledTime(""); setAddingTaskCol(null);
     } catch { toast.error("Erro ao criar tarefa"); }
   };
 
@@ -107,6 +109,7 @@ export function KanbanBoard({ boardId, onBack }: Props) {
       await updateTask.mutateAsync({
         id: editingTask.id, title: editingTask.title, description: editingTask.description || null,
         priority: editingTask.priority, due_date: editingTask.due_date || null, assignee_id: editingTask.assignee_id || null,
+        scheduled_time: editingTask.scheduled_time || null,
       });
       setEditingTask(null);
       toast.success("Tarefa atualizada!");
@@ -213,6 +216,12 @@ export function KanbanBoard({ boardId, onBack }: Props) {
                                         {format(new Date(task.due_date), "dd/MM", { locale: ptBR })}
                                       </span>
                                     )}
+                                    {task.scheduled_time && (
+                                      <span className="text-[11px] px-2 py-0.5 rounded-md font-medium inline-flex items-center gap-1 bg-muted text-muted-foreground">
+                                        <Clock className="h-3 w-3" />
+                                        {task.scheduled_time.slice(0, 5)}
+                                      </span>
+                                    )}
                                     {assigneeName && (
                                       <Avatar className="h-5 w-5">
                                         <AvatarFallback className="text-[9px] bg-primary/10 text-primary font-semibold">
@@ -241,7 +250,7 @@ export function KanbanBoard({ boardId, onBack }: Props) {
                   )}
                 </Droppable>
 
-                <Button variant="ghost" size="sm" className="w-full justify-start text-muted-foreground hover:text-foreground" onClick={() => { setAddingTaskCol(col.id); setNewTaskTitle(""); setNewTaskAssignee(""); setNewTaskDueDate(undefined); setNewTaskDescription(""); setNewTaskPriority("medium"); }}>
+                <Button variant="ghost" size="sm" className="w-full justify-start text-muted-foreground hover:text-foreground" onClick={() => { setAddingTaskCol(col.id); setNewTaskTitle(""); setNewTaskAssignee(""); setNewTaskDueDate(undefined); setNewTaskDescription(""); setNewTaskPriority("medium"); setNewTaskScheduledTime(""); }}>
                     <Plus className="mr-1.5 h-3.5 w-3.5" /> Adicionar tarefa
                   </Button>
               </div>
@@ -319,6 +328,11 @@ export function KanbanBoard({ boardId, onBack }: Props) {
                   </PopoverContent>
                 </Popover>
               </div>
+              <div>
+                <label className="text-sm font-medium">Horário Agendado</label>
+                <Input type="time" value={editingTask.scheduled_time?.slice(0, 5) || ""} onChange={(e) => setEditingTask({ ...editingTask, scheduled_time: e.target.value || null })} />
+                <p className="text-xs text-muted-foreground mt-1">Notificações 1h e 10min antes</p>
+              </div>
               <div className="flex gap-2 justify-end">
                 <Button variant="destructive" size="sm" onClick={async () => { await deleteTask.mutateAsync(editingTask.id); setEditingTask(null); toast.success("Tarefa excluída"); }}>
                   <Trash2 className="mr-1 h-3 w-3" /> Excluir
@@ -380,8 +394,13 @@ export function KanbanBoard({ boardId, onBack }: Props) {
                 </PopoverContent>
               </Popover>
             </div>
+            <div>
+              <label className="text-sm font-medium">Horário Agendado</label>
+              <Input type="time" value={newTaskScheduledTime} onChange={(e) => setNewTaskScheduledTime(e.target.value)} />
+              <p className="text-xs text-muted-foreground mt-1">Notificações 1h e 10min antes</p>
+            </div>
             <div className="flex gap-2 justify-end">
-              <Button variant="ghost" onClick={() => { setAddingTaskCol(null); setNewTaskTitle(""); setNewTaskAssignee(""); setNewTaskDueDate(undefined); setNewTaskDescription(""); setNewTaskPriority("medium"); }}>Cancelar</Button>
+              <Button variant="ghost" onClick={() => { setAddingTaskCol(null); setNewTaskTitle(""); setNewTaskAssignee(""); setNewTaskDueDate(undefined); setNewTaskDescription(""); setNewTaskPriority("medium"); setNewTaskScheduledTime(""); }}>Cancelar</Button>
               <Button onClick={() => addingTaskCol && handleAddTask(addingTaskCol)} disabled={!newTaskTitle.trim() || !newTaskDueDate || !newTaskAssignee || newTaskAssignee === "none"}>Criar Tarefa</Button>
             </div>
           </div>
