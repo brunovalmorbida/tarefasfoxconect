@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 Deno.serve(async (req) => {
@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Fetch list with items
+    // Fetch list
     const { data: list, error: listError } = await supabase
       .from("purchase_lists").select("*").eq("id", listId).single();
     if (listError || !list) {
@@ -35,28 +35,30 @@ Deno.serve(async (req) => {
     const { data: items } = await supabase
       .from("purchase_list_items").select("*").eq("list_id", listId);
 
+    // Fetch notification settings for this stage
+    const { data: notifSetting } = await supabase
+      .from("purchase_notification_settings")
+      .select("*")
+      .eq("stage", action)
+      .eq("is_active", true)
+      .maybeSingle();
+
     // Fetch Z-API config
     const { data: zapiConfig } = await supabase
       .from("zapi_config").select("*").eq("is_active", true).limit(1).single();
+
+    // Get all relevant profiles
+    const { data: allProfiles } = await supabase
+      .from("profiles").select("user_id, name, whatsapp_number");
+    const profileMap = new Map((allProfiles || []).map((p: any) => [p.user_id, p]));
 
     // Get master admin
     const { data: masterProfile } = await supabase
       .from("profiles").select("user_id, name, whatsapp_number")
       .ilike("name", "%bruno%").limit(1).single();
 
-    // Get requester
-    const { data: requesterProfile } = await supabase
-      .from("profiles").select("user_id, name, whatsapp_number")
-      .eq("user_id", list.requested_by).single();
-
-    // Get buyer
-    let buyerProfile = null;
-    if (list.buyer_id) {
-      const { data } = await supabase
-        .from("profiles").select("user_id, name, whatsapp_number")
-        .eq("user_id", list.buyer_id).single();
-      buyerProfile = data;
-    }
+    const requesterProfile = profileMap.get(list.requested_by);
+    const buyerProfile = list.buyer_id ? profileMap.get(list.buyer_id) : null;
 
     const urgencyLabels: Record<string, string> = { low: "Baixa", medium: "Média", high: "Alta", urgent: "Urgente" };
     const fixedCategoryLabels: Record<string, string> = {
@@ -64,7 +66,6 @@ Deno.serve(async (req) => {
       maintenance: "Manutenção", food: "Alimentação", other: "Outros",
     };
 
-    // Fetch custom categories to resolve UUIDs to names
     const { data: productCategories } = await supabase
       .from("product_categories").select("id, name");
     const customCatMap = new Map((productCategories || []).map((c: any) => [c.id, c.name]));
@@ -86,7 +87,6 @@ Deno.serve(async (req) => {
       });
     };
 
-    // Build items list text
     const buildItemsList = (showActual = false) => {
       return (items || []).map((item: any, i: number) => {
         let line = `  ${i + 1}. ${item.name} (x${item.quantity}) - ${getCategoryName(item.category)}`;
@@ -100,68 +100,87 @@ Deno.serve(async (req) => {
     const notifications: Array<{ user_id: string; title: string; message: string }> = [];
     const results: string[] = [];
 
+    // Determine who should be notified
+    const configuredUserIds: string[] = notifSetting?.notify_user_ids || [];
+
+    // Build the message based on action
+    let msg = "";
+    let notifTitle = "";
+    let notifMessage = "";
+    const itemNames = (items || []).map((i: any) => i.name).join(", ");
+
     if (action === "created") {
-      const msg = `🛒 *Nova Lista de Compras*\n\n` +
+      msg = `🛒 *Nova Lista de Compras*\n\n` +
         `📋 *${list.title}*\n` +
         `⚡ *Urgência:* ${urgencyLabels[list.urgency] || list.urgency}\n` +
         `👤 *Solicitado por:* ${requesterProfile?.name || "Desconhecido"}\n\n` +
         `📦 *Itens (${(items || []).length}):*\n${buildItemsList()}`;
-
-      if (masterProfile?.whatsapp_number) {
-        await sendWhatsApp(masterProfile.whatsapp_number, msg);
-        results.push("WhatsApp sent to admin");
-      }
-      if (masterProfile) {
-        const itemNames = (items || []).map((i: any) => i.name).join(", ");
-        notifications.push({
-          user_id: masterProfile.user_id,
-          title: "Nova lista de compras",
-          message: `${requesterProfile?.name || "Alguém"} solicitou: ${itemNames}`,
-        });
-      }
+      notifTitle = "Nova lista de compras";
+      notifMessage = `${requesterProfile?.name || "Alguém"} solicitou: ${itemNames}`;
     } else if (action === "purchased") {
       const totalValue = (items || []).reduce((sum: number, i: any) => sum + (Number(i.actual_value) || 0), 0);
-      const msg = `✅ *Compra Realizada*\n\n` +
+      msg = `✅ *Compra Realizada*\n\n` +
         `📋 *${list.title}*\n` +
         `🛍️ *Comprado por:* ${buyerProfile?.name || "Desconhecido"}\n` +
         (totalValue > 0 ? `💰 *Total:* R$ ${totalValue.toFixed(2)}\n` : "") +
         (list.purchase_notes ? `📝 *Obs:* ${list.purchase_notes}\n` : "") +
         `\n📦 *Itens:*\n${buildItemsList(true)}`;
-
-      if (requesterProfile?.whatsapp_number) {
-        await sendWhatsApp(requesterProfile.whatsapp_number, msg);
-        results.push("WhatsApp sent to requester");
-      }
-      const itemNames = (items || []).map((i: any) => i.name).join(", ");
-      notifications.push({
-        user_id: list.requested_by,
-        title: "Compra realizada",
-        message: `${buyerProfile?.name || "Alguém"} comprou: ${itemNames}`,
-      });
-      if (masterProfile && masterProfile.user_id !== list.requested_by) {
-        notifications.push({
-          user_id: masterProfile.user_id,
-          title: "Compra realizada",
-          message: `${buyerProfile?.name || "Alguém"} comprou a lista "${list.title}"`,
-        });
-      }
+      notifTitle = "Compra realizada";
+      notifMessage = `${buyerProfile?.name || "Alguém"} comprou: ${itemNames}`;
     } else if (action === "received") {
-      const msg = `📬 *Material Recebido*\n\n` +
+      msg = `📬 *Material Recebido*\n\n` +
         `📋 *${list.title}*\n` +
         `👤 *Recebido por:* ${requesterProfile?.name || "Desconhecido"}\n` +
         (list.receive_notes ? `📝 *Obs:* ${list.receive_notes}\n` : "") +
         `\n📦 *Itens:*\n${buildItemsList(true)}`;
+      notifTitle = "Material recebido";
+      notifMessage = `${requesterProfile?.name || "Alguém"} recebeu a lista "${list.title}"`;
+    }
 
-      if (masterProfile?.whatsapp_number) {
-        await sendWhatsApp(masterProfile.whatsapp_number, msg);
-        results.push("WhatsApp sent to admin");
-      }
-      if (masterProfile) {
+    // If configured users exist, notify them
+    if (configuredUserIds.length > 0) {
+      for (const userId of configuredUserIds) {
+        const profile = profileMap.get(userId);
+        if (!profile) continue;
+
+        if (profile.whatsapp_number && zapiConfig) {
+          await sendWhatsApp(profile.whatsapp_number, msg);
+          results.push(`WhatsApp sent to ${profile.name}`);
+        }
+
         notifications.push({
-          user_id: masterProfile.user_id,
-          title: "Material recebido",
-          message: `${requesterProfile?.name || "Alguém"} recebeu a lista "${list.title}"`,
+          user_id: userId,
+          title: notifTitle,
+          message: notifMessage,
         });
+      }
+    } else {
+      // Fallback: original behavior (admin + requester/buyer based on action)
+      if (action === "created") {
+        if (masterProfile?.whatsapp_number) {
+          await sendWhatsApp(masterProfile.whatsapp_number, msg);
+          results.push("WhatsApp sent to admin");
+        }
+        if (masterProfile) {
+          notifications.push({ user_id: masterProfile.user_id, title: notifTitle, message: notifMessage });
+        }
+      } else if (action === "purchased") {
+        if (requesterProfile?.whatsapp_number) {
+          await sendWhatsApp(requesterProfile.whatsapp_number, msg);
+          results.push("WhatsApp sent to requester");
+        }
+        notifications.push({ user_id: list.requested_by, title: notifTitle, message: notifMessage });
+        if (masterProfile && masterProfile.user_id !== list.requested_by) {
+          notifications.push({ user_id: masterProfile.user_id, title: notifTitle, message: `${buyerProfile?.name || "Alguém"} comprou a lista "${list.title}"` });
+        }
+      } else if (action === "received") {
+        if (masterProfile?.whatsapp_number) {
+          await sendWhatsApp(masterProfile.whatsapp_number, msg);
+          results.push("WhatsApp sent to admin");
+        }
+        if (masterProfile) {
+          notifications.push({ user_id: masterProfile.user_id, title: notifTitle, message: notifMessage });
+        }
       }
     }
 
@@ -173,7 +192,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ success: true, results }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (error) {
+  } catch (error: any) {
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

@@ -6,16 +6,19 @@ import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { Bell, Loader2, Send, Clock, AlertTriangle, CalendarClock, CheckCircle2 } from "lucide-react";
+import { Bell, Loader2, Send, Clock, AlertTriangle, CalendarClock, CheckCircle2, ShoppingCart } from "lucide-react";
+import { PurchaseNotificationsConfig } from "./PurchaseNotificationsConfig";
 
 export function NotificationsConfigTab() {
   const { toast } = useToast();
   const [sendingOverdue, setSendingOverdue] = useState(false);
   const [sendingDue, setSendingDue] = useState(false);
   const [sendingRecurring, setSendingRecurring] = useState(false);
+  const [sendingPurchaseReminders, setSendingPurchaseReminders] = useState(false);
   const [overdueResult, setOverdueResult] = useState<any>(null);
   const [dueResult, setDueResult] = useState<any>(null);
   const [recurringResult, setRecurringResult] = useState<any>(null);
+  const [purchaseReminderResult, setPurchaseReminderResult] = useState<any>(null);
 
   const { data: zapiConfig, isLoading } = useQuery({
     queryKey: ["zapi-config"],
@@ -89,6 +92,26 @@ export function NotificationsConfigTab() {
       toast({ title: "Erro ao enviar", description: e.message, variant: "destructive" });
     } finally {
       setSendingRecurring(false);
+    }
+  };
+
+  const handleSendPurchaseReminders = async () => {
+    setSendingPurchaseReminders(true);
+    setPurchaseReminderResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("notify-purchase-reminders", { body: {} });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setPurchaseReminderResult(data);
+      toast({
+        title: data.sent > 0
+          ? `${data.sent} notificação(ões) enviada(s)!`
+          : "Nenhum lembrete de compra pendente.",
+      });
+    } catch (e: any) {
+      toast({ title: "Erro ao enviar", description: e.message, variant: "destructive" });
+    } finally {
+      setSendingPurchaseReminders(false);
     }
   };
 
@@ -194,6 +217,15 @@ export function NotificationsConfigTab() {
                 </p>
               </div>
             </div>
+            <div className="flex items-center gap-3 rounded-lg border p-3">
+              <ShoppingCart className="h-4 w-4 text-blue-500 shrink-0" />
+              <div>
+                <p className="text-sm font-medium">Lista de Compras (Criada / Comprada / Recebida)</p>
+                <p className="text-xs text-muted-foreground">
+                  Notifica os usuários configurados quando uma lista é criada, comprada ou recebida.
+                </p>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -285,13 +317,41 @@ export function NotificationsConfigTab() {
                 </div>
               )}
             </div>
+            <Separator />
+
+            {/* Lembretes de Compras */}
+            <div className="space-y-2">
+              <Button
+                variant="outline"
+                onClick={handleSendPurchaseReminders}
+                disabled={sendingPurchaseReminders}
+                className="w-full justify-start"
+              >
+                {sendingPurchaseReminders ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <ShoppingCart className="h-4 w-4 mr-2 text-amber-500" />
+                )}
+                {sendingPurchaseReminders ? "Enviando..." : "Notificar Lembretes de Compras Pendentes"}
+              </Button>
+              {purchaseReminderResult && (
+                <div className="text-xs text-muted-foreground rounded-md border p-3 space-y-1">
+                  <p>✅ WhatsApp enviados: <strong>{purchaseReminderResult.sent}</strong></p>
+                  <p>🔔 Notificações in-app: <strong>{purchaseReminderResult.in_app}</strong></p>
+                  {purchaseReminderResult.errors > 0 && <p>❌ Erros: <strong>{purchaseReminderResult.errors}</strong></p>}
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}
 
+      {/* Configurações de Notificações de Compras */}
+      <PurchaseNotificationsConfig />
+
       <div className="rounded-lg bg-muted/50 p-3">
         <p className="text-xs text-muted-foreground">
-          💡 As notificações são enviadas via WhatsApp (Z-API) e também ficam registradas como notificações internas no sistema. O administrador master sempre recebe uma cópia.
+          💡 As notificações são enviadas via WhatsApp (Z-API) e também ficam registradas como notificações internas no sistema. Quando há usuários configurados, apenas eles recebem; caso contrário, o administrador master recebe.
         </p>
       </div>
     </div>
