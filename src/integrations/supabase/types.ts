@@ -368,6 +368,36 @@ export type Database = {
         }
         Relationships: []
       }
+      purchase_notification_settings: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          notify_user_ids: string[]
+          reminder_days: number | null
+          stage: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          notify_user_ids?: string[]
+          reminder_days?: number | null
+          stage: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          notify_user_ids?: string[]
+          reminder_days?: number | null
+          stage?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       recurring_task_boards: {
         Row: {
           assigned_user_id: string | null
