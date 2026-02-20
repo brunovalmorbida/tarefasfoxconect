@@ -104,7 +104,7 @@ export function useBoardDetail(boardId: string) {
   });
 
   const addTask = useMutation({
-    mutationFn: async ({ columnId, title, priority, description, assigneeId, dueDate }: { columnId: string; title: string; priority?: string; description?: string; assigneeId?: string; dueDate?: string }) => {
+    mutationFn: async ({ columnId, title, priority, description, assigneeId, dueDate, scheduledTime }: { columnId: string; title: string; priority?: string; description?: string; assigneeId?: string; dueDate?: string; scheduledTime?: string }) => {
       const colTasks = boardQuery.data?.board_columns?.find((c: any) => c.id === columnId)?.tasks ?? [];
       const position = colTasks.length;
       const { error } = await supabase.from("tasks").insert({
@@ -116,6 +116,7 @@ export function useBoardDetail(boardId: string) {
         created_by: user!.id,
         assignee_id: assigneeId || null,
         due_date: dueDate || null,
+        scheduled_time: scheduledTime || null,
       });
       if (error) throw error;
       const col = boardQuery.data?.board_columns?.find((c: any) => c.id === columnId);
@@ -130,7 +131,7 @@ export function useBoardDetail(boardId: string) {
   });
 
   const updateTask = useMutation({
-    mutationFn: async ({ id, ...updates }: { id: string } & Partial<TablesInsert<"tasks">>) => {
+    mutationFn: async ({ id, ...updates }: { id: string } & Partial<TablesInsert<"tasks">> & { scheduled_time?: string | null }) => {
       // Find previous assignee to detect changes
       let previousAssigneeId: string | null = null;
       boardQuery.data?.board_columns?.forEach((col: any) => {
