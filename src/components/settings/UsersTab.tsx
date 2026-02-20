@@ -52,6 +52,7 @@ export function UsersTab() {
   const [editOpen, setEditOpen] = useState(false);
   const [editUserId, setEditUserId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
   const [editJobTitle, setEditJobTitle] = useState("");
   const [editWhatsapp, setEditWhatsapp] = useState("");
   const [editPassword, setEditPassword] = useState("");
@@ -100,6 +101,14 @@ export function UsersTab() {
     },
   });
 
+  const { data: userEmails } = useQuery({
+    queryKey: ["admin-user-emails"],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("get-user-emails");
+      if (error) throw error;
+      return data as Record<string, string>;
+    },
+  });
   const getRoleForUser = (userId: string) => {
     const role = adminRoles?.find((r) => r.user_id === userId);
     return role?.role === "admin" ? "Admin" : "Membro";
@@ -133,6 +142,7 @@ export function UsersTab() {
   const openEditDialog = (profile: Profile) => {
     setEditUserId(profile.user_id);
     setEditName(profile.name);
+    setEditEmail(userEmails?.[profile.user_id] || "");
     setEditJobTitle(profile.job_title || "");
     setEditWhatsapp(profile.whatsapp_number || "");
     setEditPassword("");
@@ -183,6 +193,7 @@ export function UsersTab() {
         body: {
           userId: editUserId,
           name: editName.trim(),
+          email: editEmail.trim() || undefined,
           jobTitle: editJobTitle.trim(),
           whatsappNumber: editWhatsapp.trim() || null,
           password: editPassword || undefined,
@@ -197,6 +208,7 @@ export function UsersTab() {
       queryClient.invalidateQueries({ queryKey: ["admin-profiles"] });
       queryClient.invalidateQueries({ queryKey: ["admin-team-members"] });
       queryClient.invalidateQueries({ queryKey: ["admin-roles"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-user-emails"] });
       setEditOpen(false);
     } catch (err: any) {
       toast.error(err.message || "Erro ao atualizar usuário");
@@ -402,6 +414,10 @@ export function UsersTab() {
             <div className="space-y-2">
               <Label>Nome</Label>
               <Input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Nome completo" />
+            </div>
+            <div className="space-y-2">
+              <Label>E-mail</Label>
+              <Input type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} placeholder="email@exemplo.com" />
             </div>
             <div className="space-y-2">
               <Label>Cargo</Label>
