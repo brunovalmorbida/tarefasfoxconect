@@ -191,6 +191,16 @@ export function NotificationsConfigTab() {
               </div>
               <Badge variant="outline" className="shrink-0">08:30 BRT</Badge>
             </div>
+            <div className="flex items-center gap-3 rounded-lg border p-3">
+              <ShoppingCart className="h-5 w-5 text-amber-500 shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-medium">Lembretes de Compras Pendentes</p>
+                <p className="text-xs text-muted-foreground">
+                  Notifica compras pendentes ou recebimentos atrasados conforme dias configurados abaixo.
+                </p>
+              </div>
+              <Badge variant="outline" className="shrink-0">09:00 BRT</Badge>
+            </div>
           </div>
         </CardContent>
       </Card>
