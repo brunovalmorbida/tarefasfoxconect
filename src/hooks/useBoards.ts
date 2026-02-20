@@ -123,7 +123,7 @@ export function useBoardDetail(boardId: string) {
 
       // Notify via Z-API + in-app (always on task creation)
       supabase.functions.invoke("notify-task-assigned", {
-        body: { taskTitle: title, assigneeId: assigneeId || null, boardName: boardQuery.data?.name, assignedByName: user?.user_metadata?.name || user?.email, isNewTask: true, dueDate: dueDate || null },
+        body: { taskTitle: title, assigneeId: assigneeId || null, boardName: boardQuery.data?.name, assignedByName: user?.user_metadata?.name || user?.email, isNewTask: true, dueDate: dueDate || null, description: description || null },
       }).catch(console.error);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["board", boardId] }),
@@ -145,7 +145,7 @@ export function useBoardDetail(boardId: string) {
       // Notify if assignee changed
       if (updates.assignee_id && updates.assignee_id !== previousAssigneeId) {
         supabase.functions.invoke("notify-task-assigned", {
-          body: { taskTitle: updates.title, assigneeId: updates.assignee_id, boardName: boardQuery.data?.name, assignedByName: user?.user_metadata?.name || user?.email, dueDate: updates.due_date || null },
+          body: { taskTitle: updates.title, assigneeId: updates.assignee_id, boardName: boardQuery.data?.name, assignedByName: user?.user_metadata?.name || user?.email, dueDate: updates.due_date || null, description: updates.description || null },
         }).catch(console.error);
       }
     },

@@ -15,7 +15,7 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
-    const { taskTitle, assigneeId, boardName, assignedByName, isNewTask, dueDate } = await req.json();
+    const { taskTitle, assigneeId, boardName, assignedByName, isNewTask, dueDate, description } = await req.json();
 
     if (!taskTitle) {
       return new Response(JSON.stringify({ error: "taskTitle is required" }), {
@@ -73,6 +73,7 @@ Deno.serve(async (req) => {
       const formattedDueDate = dueDate ? new Date(dueDate).toLocaleDateString("pt-BR") : "—";
       const message = `${emoji} *${title}*\n\n` +
         `📋 *Tarefa:* ${taskTitle}\n` +
+        (description ? `📝 *Descrição:* ${description}\n` : "") +
         `📊 *Quadro:* ${boardName || "—"}\n` +
         `📅 *Prazo:* ${formattedDueDate}\n` +
         (isAssignment ? `👤 *Responsável:* ${assigneeProfile?.name || "—"}\n` : "") +
