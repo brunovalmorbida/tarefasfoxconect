@@ -1,0 +1,184 @@
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Switch } from "@/components/ui/switch";
+import { Loader2, Shield } from "lucide-react";
+import { toast } from "sonner";
+
+interface Profile {
+  user_id: string;
+  name: string;
+}
+
+const PERMISSIONS = [
+  { key: "can_manage_boards", label: "Quadros", shortLabel: "Quadros" },
+  { key: "can_manage_columns", label: "Colunas", shortLabel: "Colunas" },
+  { key: "can_manage_tasks", label: "Tarefas", shortLabel: "Tarefas" },
+  { key: "can_manage_recurring_tasks", label: "Tarefas Fixas", shortLabel: "T. Fixas" },
+  { key: "can_view_purchases", label: "Ver Compras", shortLabel: "Ver Compras" },
+  { key: "can_manage_purchases", label: "Ger. Compras", shortLabel: "Ger. Compras" },
+  { key: "can_be_buyer", label: "Comprador", shortLabel: "Comprador" },
+] as const;
+
+type PermissionKey = typeof PERMISSIONS[number]["key"];
+
+type UserPermission = Record<PermissionKey, boolean> & { user_id: string; id?: string };
+
+export function PermissionsTab() {
+  const queryClient = useQueryClient();
+
+  const { data: profiles, isLoading: loadingProfiles } = useQuery({
+    queryKey: ["admin-profiles"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("user_id, name")
+        .order("name");
+      if (error) throw error;
+      return data as Profile[];
+    },
+  });
+
+  const { data: adminRoles } = useQuery({
+    queryKey: ["admin-roles"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("user_roles")
+        .select("user_id, role");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: allPermissions, isLoading: loadingPerms } = useQuery({
+    queryKey: ["all-user-permissions"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("user_permissions")
+        .select("*");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const isAdmin = (userId: string) =>
+    adminRoles?.some((r) => r.user_id === userId && r.role === "admin") ?? false;
+
+  const nonAdminProfiles = profiles?.filter((p) => !isAdmin(p.user_id)) ?? [];
+
+  const getPermissions = (userId: string): UserPermission => {
+    const existing = allPermissions?.find((p: any) => p.user_id === userId);
+    if (existing) return existing as any;
+    return {
+      user_id: userId,
+      can_manage_boards: false,
+      can_manage_columns: false,
+      can_manage_tasks: false,
+      can_manage_recurring_tasks: false,
+      can_view_purchases: false,
+      can_manage_purchases: false,
+      can_be_buyer: false,
+    };
+  };
+
+  const togglePermission = async (userId: string, key: PermissionKey, currentValue: boolean) => {
+    try {
+      const existing = allPermissions?.find((p: any) => p.user_id === userId);
+      if (existing) {
+        const { error } = await supabase
+          .from("user_permissions")
+          .update({ [key]: !currentValue })
+          .eq("user_id", userId);
+        if (error) throw error;
+      } else {
+        const newRow: any = {
+          user_id: userId,
+          can_manage_boards: false,
+          can_manage_columns: false,
+          can_manage_tasks: false,
+          can_manage_recurring_tasks: false,
+          can_view_purchases: false,
+          can_manage_purchases: false,
+          can_be_buyer: false,
+          [key]: true,
+        };
+        const { error } = await supabase
+          .from("user_permissions")
+          .insert(newRow);
+        if (error) throw error;
+      }
+      queryClient.invalidateQueries({ queryKey: ["all-user-permissions"] });
+      queryClient.invalidateQueries({ queryKey: ["user-permissions"] });
+      toast.success("Permissão atualizada");
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao atualizar permissão");
+    }
+  };
+
+  const isLoading = loadingProfiles || loadingPerms;
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Shield className="h-5 w-5" />
+          Permissões de Usuários
+        </CardTitle>
+        <CardDescription>
+          Gerencie as permissões de cada usuário. Administradores possuem todas as permissões automaticamente e não aparecem nesta lista.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {nonAdminProfiles.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nenhum usuário não-admin encontrado.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="min-w-[140px]">Usuário</TableHead>
+                  {PERMISSIONS.map((p) => (
+                    <TableHead key={p.key} className="text-center text-xs min-w-[90px]">
+                      {p.shortLabel}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {nonAdminProfiles.map((profile) => {
+                  const perms = getPermissions(profile.user_id);
+                  return (
+                    <TableRow key={profile.user_id}>
+                      <TableCell className="font-medium text-sm">{profile.name}</TableCell>
+                      {PERMISSIONS.map((perm) => (
+                        <TableCell key={perm.key} className="text-center">
+                          <div className="flex justify-center">
+                            <Switch
+                              checked={perms[perm.key]}
+                              onCheckedChange={() =>
+                                togglePermission(profile.user_id, perm.key, perms[perm.key])
+                              }
+                            />
+                          </div>
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
