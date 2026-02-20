@@ -34,8 +34,14 @@ Deno.serve(async (req) => {
 
     if (!role) throw new Error("Sem permissão de administrador");
 
-    const { userId, name, jobTitle, whatsappNumber, password, teamIds, isAdmin } = await req.json();
+    const { userId, name, jobTitle, whatsappNumber, password, teamIds, isAdmin, email } = await req.json();
     if (!userId) throw new Error("userId é obrigatório");
+
+    // Update email if provided
+    if (email && email.trim()) {
+      const { error: emailError } = await adminClient.auth.admin.updateUserById(userId, { email: email.trim() });
+      if (emailError) throw emailError;
+    }
 
     // Update profile
     const profileUpdates: Record<string, any> = {};
