@@ -1,7 +1,8 @@
 import { LayoutDashboard, Columns3, Users, Bell, Settings, LogOut, ListChecks, ShoppingCart, Sun, Moon } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
-import { useState, useEffect } from "react";
+import { useIsAppAdmin, useCanManage } from "@/hooks/useUserRole";
+import { useState, useEffect, useMemo } from "react";
 import logoFox from "@/assets/logo-fox.png";
 import {
   Sidebar,
@@ -17,11 +18,10 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar";
 
-const mainNav = [
+const baseNav = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Quadros", url: "/boards", icon: Columns3 },
   { title: "Tarefas Fixas", url: "/recurring-tasks", icon: ListChecks },
-  { title: "Compras", url: "/purchases", icon: ShoppingCart },
   { title: "Equipes", url: "/teams", icon: Users },
   { title: "Notificações", url: "/notifications", icon: Bell },
   { title: "Configurações", url: "/settings", icon: Settings },
@@ -29,6 +29,8 @@ const mainNav = [
 
 export function AppSidebar() {
   const { signOut } = useAuth();
+  const { data: isAdmin } = useIsAppAdmin();
+  const canViewPurchases = useCanManage("can_view_purchases");
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains("dark"));
 
   const toggleTheme = () => {
@@ -48,6 +50,15 @@ export function AppSidebar() {
       setIsDark(false);
     }
   }, []);
+
+  const mainNav = useMemo(() => {
+    const nav = [...baseNav];
+    if (isAdmin || canViewPurchases) {
+      // Insert "Compras" after "Tarefas Fixas" (index 2)
+      nav.splice(3, 0, { title: "Compras", url: "/purchases", icon: ShoppingCart });
+    }
+    return nav;
+  }, [isAdmin, canViewPurchases]);
 
   return (
     <Sidebar>

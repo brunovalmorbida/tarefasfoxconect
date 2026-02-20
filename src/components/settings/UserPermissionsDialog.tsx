@@ -20,7 +20,9 @@ const PERMISSIONS = [
   { key: "can_manage_columns", label: "Gerenciar Colunas", description: "Criar, editar e excluir colunas nos quadros" },
   { key: "can_manage_tasks", label: "Gerenciar Tarefas", description: "Criar, editar e excluir tarefas nos quadros" },
   { key: "can_manage_recurring_tasks", label: "Gerenciar Tarefas Fixas", description: "Criar, editar e excluir tarefas diárias, semanais e mensais" },
+  { key: "can_view_purchases", label: "Visualizar Compras", description: "Acessar a aba de compras e visualizar listas" },
   { key: "can_manage_purchases", label: "Gerenciar Compras", description: "Cadastrar e editar categorias e produtos no catálogo de compras" },
+  { key: "can_be_buyer", label: "Responsável por Compras", description: "Pode ser selecionado como comprador nas listas de compras" },
 ] as const;
 
 type PermissionKey = typeof PERMISSIONS[number]["key"];
@@ -32,7 +34,9 @@ export function UserPermissionsDialog({ open, onOpenChange, userId, userName }: 
     can_manage_columns: false,
     can_manage_tasks: false,
     can_manage_recurring_tasks: false,
+    can_view_purchases: false,
     can_manage_purchases: false,
+    can_be_buyer: false,
   });
   const [saving, setSaving] = useState(false);
 
@@ -57,7 +61,9 @@ export function UserPermissionsDialog({ open, onOpenChange, userId, userName }: 
         can_manage_columns: existing.can_manage_columns,
         can_manage_tasks: existing.can_manage_tasks,
         can_manage_recurring_tasks: existing.can_manage_recurring_tasks,
+        can_view_purchases: existing.can_view_purchases,
         can_manage_purchases: existing.can_manage_purchases,
+        can_be_buyer: existing.can_be_buyer,
       });
     } else {
       setPermissions({
@@ -65,7 +71,9 @@ export function UserPermissionsDialog({ open, onOpenChange, userId, userName }: 
         can_manage_columns: false,
         can_manage_tasks: false,
         can_manage_recurring_tasks: false,
+        can_view_purchases: false,
         can_manage_purchases: false,
+        can_be_buyer: false,
       });
     }
   }, [existing]);

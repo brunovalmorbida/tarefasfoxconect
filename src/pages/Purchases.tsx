@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { usePurchases, PurchaseList } from "@/hooks/usePurchases";
 import { useAuth } from "@/hooks/useAuth";
-import { useIsAppAdmin } from "@/hooks/useUserRole";
+import { useIsAppAdmin, useCanManage } from "@/hooks/useUserRole";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -43,6 +43,7 @@ const emptyItem = (): ListItem => ({ name: "", quantity: "1", category: "other",
 export default function Purchases() {
   const { user } = useAuth();
   const { data: isAdmin } = useIsAppAdmin();
+  const canViewPurchases = useCanManage("can_view_purchases");
   const { purchases, isLoading, createList, markAsPurchased, markAsReceived, markItemPurchased, markItemReceived, deleteList } = usePurchases();
 
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -68,6 +69,35 @@ export default function Purchases() {
     queryFn: async () => {
       const { data } = await supabase.from("profiles").select("user_id, name");
       return data || [];
+    },
+    enabled: !!user,
+  });
+
+  // Fetch users with can_be_buyer permission or admin role for buyer selection
+  const { data: buyerProfiles = [] } = useQuery({
+    queryKey: ["buyer-profiles"],
+    queryFn: async () => {
+      // Get user IDs that have can_be_buyer permission
+      const { data: perms } = await supabase
+        .from("user_permissions")
+        .select("user_id")
+        .eq("can_be_buyer", true);
+      const buyerIds = new Set((perms || []).map((p: any) => p.user_id));
+
+      // Get admin user IDs
+      const { data: admins } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "admin");
+      (admins || []).forEach((a: any) => buyerIds.add(a.user_id));
+
+      if (buyerIds.size === 0) return [];
+
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("user_id, name")
+        .in("user_id", Array.from(buyerIds));
+      return profiles || [];
     },
     enabled: !!user,
   });
@@ -292,6 +322,10 @@ export default function Purchases() {
 
   if (isLoading) return <div className="flex items-center justify-center py-12 text-muted-foreground">Carregando...</div>;
 
+  if (!isAdmin && !canViewPurchases) {
+    return <div className="flex items-center justify-center py-12 text-muted-foreground">Você não tem permissão para acessar esta página.</div>;
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -342,7 +376,7 @@ export default function Purchases() {
                 <Select value={newBuyerId} onValueChange={setNewBuyerId}>
                   <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                   <SelectContent>
-                    {allProfiles?.map((p) => <SelectItem key={p.user_id} value={p.user_id}>{p.name}</SelectItem>)}
+                    {buyerProfiles.map((p: any) => <SelectItem key={p.user_id} value={p.user_id}>{p.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

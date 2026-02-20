@@ -16,6 +16,7 @@ import { useLogActivity } from "@/hooks/useActivityLog";
 export default function SettingsPage() {
   const { data: isAdmin } = useIsAppAdmin();
   const canManagePurchases = useCanManage("can_manage_purchases");
+  const canViewPurchases = useCanManage("can_view_purchases");
   const [exporting, setExporting] = useState(false);
   const logActivity = useLogActivity();
 
@@ -71,7 +72,7 @@ export default function SettingsPage() {
               Log
             </TabsTrigger>
           )}
-          {(isAdmin || canManagePurchases) && (
+          {(isAdmin || canManagePurchases || canViewPurchases) && (
             <TabsTrigger value="purchases" className="gap-2">
               <ShoppingCart className="h-4 w-4" />
               Compras
@@ -124,7 +125,7 @@ export default function SettingsPage() {
             <ActivityLogTab />
           </TabsContent>
         )}
-        {(isAdmin || canManagePurchases) && (
+        {(isAdmin || canManagePurchases || canViewPurchases) && (
           <TabsContent value="purchases" className="mt-6">
             <PurchasesConfigTab />
           </TabsContent>
