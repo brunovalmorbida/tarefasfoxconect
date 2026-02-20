@@ -5,7 +5,8 @@ import { IntegrationsTab } from "@/components/settings/IntegrationsTab";
 import { ActivityLogTab } from "@/components/settings/ActivityLogTab";
 import { PurchasesConfigTab } from "@/components/settings/PurchasesConfigTab";
 import { NotificationsConfigTab } from "@/components/settings/NotificationsConfigTab";
-import { Settings, Users, Plug, ScrollText, Download, ShoppingCart, Bell } from "lucide-react";
+import { PermissionsTab } from "@/components/settings/PermissionsTab";
+import { Settings, Users, Plug, ScrollText, Download, ShoppingCart, Bell, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
@@ -61,6 +62,12 @@ export default function SettingsPage() {
             </TabsTrigger>
           )}
           {isAdmin && (
+            <TabsTrigger value="permissions" className="gap-2">
+              <Shield className="h-4 w-4" />
+              Permissões
+            </TabsTrigger>
+          )}
+          {isAdmin && (
             <TabsTrigger value="integrations" className="gap-2">
               <Plug className="h-4 w-4" />
               Integrações
@@ -113,6 +120,11 @@ export default function SettingsPage() {
         {isAdmin && (
           <TabsContent value="users" className="mt-6">
             <UsersTab />
+          </TabsContent>
+        )}
+        {isAdmin && (
+          <TabsContent value="permissions" className="mt-6">
+            <PermissionsTab />
           </TabsContent>
         )}
         {isAdmin && (
