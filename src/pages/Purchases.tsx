@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 import { usePurchases, PurchaseList } from "@/hooks/usePurchases";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsAppAdmin, useCanManage } from "@/hooks/useUserRole";
@@ -45,6 +46,7 @@ export default function Purchases() {
   const { data: isAdmin } = useIsAppAdmin();
   const canViewPurchases = useCanManage("can_view_purchases");
   const { purchases, isLoading, createList, markAsPurchased, markAsReceived, markItemPurchased, markItemReceived, deleteList } = usePurchases();
+  const { toast } = useToast();
 
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showPurchaseDialog, setShowPurchaseDialog] = useState<PurchaseList | null>(null);
@@ -138,10 +140,14 @@ export default function Purchases() {
   const handleCreate = () => {
     const valid = listItems.filter((i) => i.name.trim());
     if (!valid.length) return;
+    if (!newBuyerId) {
+      toast({ title: "Selecione um comprador", variant: "destructive" });
+      return;
+    }
     createList.mutate({
       title: newTitle.trim() || "Lista de Compras",
       urgency: newUrgency,
-      buyer_id: newBuyerId || undefined,
+      buyer_id: newBuyerId,
       items: valid.map((i) => ({
         name: i.name.trim(),
         quantity: parseInt(i.quantity) || 1,
@@ -372,7 +378,7 @@ export default function Purchases() {
                 </Select>
               </div>
               <div>
-                <Label>Comprador</Label>
+                <Label>Comprador <span className="text-destructive">*</span></Label>
                 <Select value={newBuyerId} onValueChange={setNewBuyerId}>
                   <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                   <SelectContent>
