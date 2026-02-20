@@ -484,6 +484,7 @@ export type Database = {
           id: string
           month_day: number | null
           position: number
+          scheduled_time: string | null
           team_id: string
           title: string
           updated_at: string
@@ -498,6 +499,7 @@ export type Database = {
           id?: string
           month_day?: number | null
           position?: number
+          scheduled_time?: string | null
           team_id: string
           title: string
           updated_at?: string
@@ -512,6 +514,7 @@ export type Database = {
           id?: string
           month_day?: number | null
           position?: number
+          scheduled_time?: string | null
           team_id?: string
           title?: string
           updated_at?: string
