@@ -648,33 +648,39 @@ export type Database = {
       }
       user_permissions: {
         Row: {
+          can_be_buyer: boolean
           can_manage_boards: boolean
           can_manage_columns: boolean
           can_manage_purchases: boolean
           can_manage_recurring_tasks: boolean
           can_manage_tasks: boolean
+          can_view_purchases: boolean
           created_at: string
           id: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          can_be_buyer?: boolean
           can_manage_boards?: boolean
           can_manage_columns?: boolean
           can_manage_purchases?: boolean
           can_manage_recurring_tasks?: boolean
           can_manage_tasks?: boolean
+          can_view_purchases?: boolean
           created_at?: string
           id?: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          can_be_buyer?: boolean
           can_manage_boards?: boolean
           can_manage_columns?: boolean
           can_manage_purchases?: boolean
           can_manage_recurring_tasks?: boolean
           can_manage_tasks?: boolean
+          can_view_purchases?: boolean
           created_at?: string
           id?: string
           updated_at?: string
