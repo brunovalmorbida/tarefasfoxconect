@@ -38,6 +38,8 @@ export function KanbanBoard({ boardId, onBack }: Props) {
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskAssignee, setNewTaskAssignee] = useState<string>("");
   const [newTaskDueDate, setNewTaskDueDate] = useState<Date | undefined>(undefined);
+  const [newTaskDescription, setNewTaskDescription] = useState("");
+  const [newTaskPriority, setNewTaskPriority] = useState<string>("medium");
   const [editingTask, setEditingTask] = useState<any>(null);
   const [hoveredTask, setHoveredTask] = useState<string | null>(null);
 
@@ -77,13 +79,16 @@ export function KanbanBoard({ boardId, onBack }: Props) {
   const handleAddTask = async (columnId: string) => {
     if (!newTaskTitle.trim()) return;
     if (!newTaskDueDate) { toast.error("O prazo é obrigatório"); return; }
+    if (!newTaskAssignee || newTaskAssignee === "none") { toast.error("O responsável é obrigatório"); return; }
     try {
       await addTask.mutateAsync({
         columnId, title: newTaskTitle.trim(),
-        assigneeId: newTaskAssignee && newTaskAssignee !== "none" ? newTaskAssignee : undefined,
+        assigneeId: newTaskAssignee,
         dueDate: newTaskDueDate.toISOString(),
+        description: newTaskDescription.trim() || undefined,
+        priority: newTaskPriority || "medium",
       });
-      setNewTaskTitle(""); setNewTaskAssignee(""); setNewTaskDueDate(undefined); setAddingTaskCol(null);
+      setNewTaskTitle(""); setNewTaskAssignee(""); setNewTaskDueDate(undefined); setNewTaskDescription(""); setNewTaskPriority("medium"); setAddingTaskCol(null);
     } catch { toast.error("Erro ao criar tarefa"); }
   };
 
@@ -236,37 +241,9 @@ export function KanbanBoard({ boardId, onBack }: Props) {
                   )}
                 </Droppable>
 
-                {addingTaskCol === col.id ? (
-                  <div className="space-y-2 bg-card rounded-xl border p-3 animate-scale-in">
-                    <Input value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} placeholder="Título da tarefa" autoFocus onKeyDown={(e) => e.key === "Enter" && handleAddTask(col.id)} />
-                    <Select value={newTaskAssignee} onValueChange={setNewTaskAssignee}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Responsável (opcional)" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Sem responsável</SelectItem>
-                        {teamMembers?.map((m) => (<SelectItem key={m.user_id} value={m.user_id}>{m.name}</SelectItem>))}
-                      </SelectContent>
-                    </Select>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className={cn("h-8 text-xs w-full justify-start text-left font-normal", !newTaskDueDate && "text-muted-foreground")}>
-                          <CalendarIcon className="mr-2 h-3 w-3" />
-                          {newTaskDueDate ? format(newTaskDueDate, "dd/MM/yyyy", { locale: ptBR }) : "Prazo *"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={newTaskDueDate} onSelect={setNewTaskDueDate} disabled={(date) => date <= new Date(new Date().setHours(23, 59, 59, 999))} initialFocus className={cn("p-3 pointer-events-auto")} />
-                      </PopoverContent>
-                    </Popover>
-                    <div className="flex gap-2">
-                      <Button size="sm" onClick={() => handleAddTask(col.id)} disabled={!newTaskTitle.trim() || !newTaskDueDate}>Adicionar</Button>
-                      <Button size="sm" variant="ghost" onClick={() => { setAddingTaskCol(null); setNewTaskTitle(""); setNewTaskAssignee(""); setNewTaskDueDate(undefined); }}>Cancelar</Button>
-                    </div>
-                  </div>
-                ) : (
-                  <Button variant="ghost" size="sm" className="w-full justify-start text-muted-foreground hover:text-foreground" onClick={() => setAddingTaskCol(col.id)}>
+                <Button variant="ghost" size="sm" className="w-full justify-start text-muted-foreground hover:text-foreground" onClick={() => { setAddingTaskCol(col.id); setNewTaskTitle(""); setNewTaskAssignee(""); setNewTaskDueDate(undefined); setNewTaskDescription(""); setNewTaskPriority("medium"); }}>
                     <Plus className="mr-1.5 h-3.5 w-3.5" /> Adicionar tarefa
                   </Button>
-                )}
               </div>
             );
           })}
@@ -292,7 +269,7 @@ export function KanbanBoard({ boardId, onBack }: Props) {
 
       {/* Task edit dialog */}
       <Dialog open={!!editingTask} onOpenChange={(o) => !o && setEditingTask(null)}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader><DialogTitle>Editar Tarefa</DialogTitle></DialogHeader>
           {editingTask && (
             <div className="space-y-4">
@@ -304,30 +281,32 @@ export function KanbanBoard({ boardId, onBack }: Props) {
                 <label className="text-sm font-medium">Descrição</label>
                 <Textarea value={editingTask.description || ""} onChange={(e) => setEditingTask({ ...editingTask, description: e.target.value })} rows={3} />
               </div>
-              <div>
-                <label className="text-sm font-medium">Responsável</label>
-                <Select value={editingTask.assignee_id || "none"} onValueChange={(v) => setEditingTask({ ...editingTask, assignee_id: v === "none" ? null : v })}>
-                  <SelectTrigger><SelectValue placeholder="Selecionar responsável" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Sem responsável</SelectItem>
-                    {teamMembers?.map((m) => (<SelectItem key={m.user_id} value={m.user_id}>{m.name}</SelectItem>))}
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium">Responsável</label>
+                  <Select value={editingTask.assignee_id || "none"} onValueChange={(v) => setEditingTask({ ...editingTask, assignee_id: v === "none" ? null : v })}>
+                    <SelectTrigger><SelectValue placeholder="Selecionar responsável" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sem responsável</SelectItem>
+                      {teamMembers?.map((m) => (<SelectItem key={m.user_id} value={m.user_id}>{m.name}</SelectItem>))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Prioridade</label>
+                  <Select value={editingTask.priority} onValueChange={(v) => setEditingTask({ ...editingTask, priority: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Baixa</SelectItem>
+                      <SelectItem value="medium">Média</SelectItem>
+                      <SelectItem value="high">Alta</SelectItem>
+                      <SelectItem value="urgent">Urgente</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <div>
-                <label className="text-sm font-medium">Prioridade</label>
-                <Select value={editingTask.priority} onValueChange={(v) => setEditingTask({ ...editingTask, priority: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Baixa</SelectItem>
-                    <SelectItem value="medium">Média</SelectItem>
-                    <SelectItem value="high">Alta</SelectItem>
-                    <SelectItem value="urgent">Urgente</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-sm font-medium">Prazo</label>
+                <label className="text-sm font-medium">Prazo *</label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !editingTask.due_date && "text-muted-foreground")}>
@@ -336,7 +315,7 @@ export function KanbanBoard({ boardId, onBack }: Props) {
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={editingTask.due_date ? new Date(editingTask.due_date) : undefined} onSelect={(date) => setEditingTask({ ...editingTask, due_date: date ? date.toISOString() : null })} disabled={(date) => date <= new Date(new Date().setHours(23, 59, 59, 999))} initialFocus className={cn("p-3 pointer-events-auto")} />
+                    <Calendar mode="single" selected={editingTask.due_date ? new Date(editingTask.due_date) : undefined} onSelect={(date) => setEditingTask({ ...editingTask, due_date: date ? date.toISOString() : null })} disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))} initialFocus className={cn("p-3 pointer-events-auto")} />
                   </PopoverContent>
                 </Popover>
               </div>
@@ -348,6 +327,64 @@ export function KanbanBoard({ boardId, onBack }: Props) {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Task dialog */}
+      <Dialog open={!!addingTaskCol} onOpenChange={(o) => { if (!o) { setAddingTaskCol(null); setNewTaskTitle(""); setNewTaskAssignee(""); setNewTaskDueDate(undefined); setNewTaskDescription(""); setNewTaskPriority("medium"); } }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader><DialogTitle>Nova Tarefa</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Título *</label>
+              <Input value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} placeholder="Digite o título da tarefa" autoFocus />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Descrição</label>
+              <Textarea value={newTaskDescription} onChange={(e) => setNewTaskDescription(e.target.value)} placeholder="Adicione uma descrição (opcional)" rows={3} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Responsável *</label>
+                <Select value={newTaskAssignee} onValueChange={setNewTaskAssignee}>
+                  <SelectTrigger><SelectValue placeholder="Selecionar responsável" /></SelectTrigger>
+                  <SelectContent>
+                    {teamMembers?.map((m) => (<SelectItem key={m.user_id} value={m.user_id}>{m.name}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Prioridade</label>
+                <Select value={newTaskPriority} onValueChange={setNewTaskPriority}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Baixa</SelectItem>
+                    <SelectItem value="medium">Média</SelectItem>
+                    <SelectItem value="high">Alta</SelectItem>
+                    <SelectItem value="urgent">Urgente</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Prazo *</label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !newTaskDueDate && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {newTaskDueDate ? format(newTaskDueDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR }) : "Selecionar prazo"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={newTaskDueDate} onSelect={setNewTaskDueDate} disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))} initialFocus className={cn("p-3 pointer-events-auto")} />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="ghost" onClick={() => { setAddingTaskCol(null); setNewTaskTitle(""); setNewTaskAssignee(""); setNewTaskDueDate(undefined); setNewTaskDescription(""); setNewTaskPriority("medium"); }}>Cancelar</Button>
+              <Button onClick={() => addingTaskCol && handleAddTask(addingTaskCol)} disabled={!newTaskTitle.trim() || !newTaskDueDate || !newTaskAssignee || newTaskAssignee === "none"}>Criar Tarefa</Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
