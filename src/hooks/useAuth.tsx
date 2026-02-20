@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useRef, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -19,6 +19,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const hasLoggedSignIn = useRef(false);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -26,15 +27,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
       setLoading(false);
 
-      // Log auth events directly (can't use useLogActivity here due to circular dependency)
-      if (event === "SIGNED_IN" && session?.user) {
+      // Only log the first SIGNED_IN per session to avoid duplicates on page navigation
+      if (event === "SIGNED_IN" && session?.user && !hasLoggedSignIn.current) {
+        hasLoggedSignIn.current = true;
         supabase.from("activity_log").insert({
           action: "Fez login no sistema",
           user_id: session.user.id,
         }).then(() => {});
       }
       if (event === "SIGNED_OUT") {
-        // user is already null, we logged below in signOut
+        hasLoggedSignIn.current = false;
       }
     });
 
