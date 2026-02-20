@@ -1,5 +1,5 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useIsAppAdmin } from "@/hooks/useUserRole";
+import { useIsAppAdmin, useCanManage } from "@/hooks/useUserRole";
 import { UsersTab } from "@/components/settings/UsersTab";
 import { IntegrationsTab } from "@/components/settings/IntegrationsTab";
 import { ActivityLogTab } from "@/components/settings/ActivityLogTab";
@@ -15,6 +15,7 @@ import { useLogActivity } from "@/hooks/useActivityLog";
 
 export default function SettingsPage() {
   const { data: isAdmin } = useIsAppAdmin();
+  const canManagePurchases = useCanManage("can_manage_purchases");
   const [exporting, setExporting] = useState(false);
   const logActivity = useLogActivity();
 
@@ -70,7 +71,7 @@ export default function SettingsPage() {
               Log
             </TabsTrigger>
           )}
-          {isAdmin && (
+          {(isAdmin || canManagePurchases) && (
             <TabsTrigger value="purchases" className="gap-2">
               <ShoppingCart className="h-4 w-4" />
               Compras
@@ -123,7 +124,7 @@ export default function SettingsPage() {
             <ActivityLogTab />
           </TabsContent>
         )}
-        {isAdmin && (
+        {(isAdmin || canManagePurchases) && (
           <TabsContent value="purchases" className="mt-6">
             <PurchasesConfigTab />
           </TabsContent>

@@ -20,6 +20,7 @@ const PERMISSIONS = [
   { key: "can_manage_columns", label: "Gerenciar Colunas", description: "Criar, editar e excluir colunas nos quadros" },
   { key: "can_manage_tasks", label: "Gerenciar Tarefas", description: "Criar, editar e excluir tarefas nos quadros" },
   { key: "can_manage_recurring_tasks", label: "Gerenciar Tarefas Fixas", description: "Criar, editar e excluir tarefas diárias, semanais e mensais" },
+  { key: "can_manage_purchases", label: "Gerenciar Compras", description: "Cadastrar e editar categorias e produtos no catálogo de compras" },
 ] as const;
 
 type PermissionKey = typeof PERMISSIONS[number]["key"];
@@ -31,6 +32,7 @@ export function UserPermissionsDialog({ open, onOpenChange, userId, userName }: 
     can_manage_columns: false,
     can_manage_tasks: false,
     can_manage_recurring_tasks: false,
+    can_manage_purchases: false,
   });
   const [saving, setSaving] = useState(false);
 
@@ -55,6 +57,7 @@ export function UserPermissionsDialog({ open, onOpenChange, userId, userName }: 
         can_manage_columns: existing.can_manage_columns,
         can_manage_tasks: existing.can_manage_tasks,
         can_manage_recurring_tasks: existing.can_manage_recurring_tasks,
+        can_manage_purchases: existing.can_manage_purchases,
       });
     } else {
       setPermissions({
@@ -62,6 +65,7 @@ export function UserPermissionsDialog({ open, onOpenChange, userId, userName }: 
         can_manage_columns: false,
         can_manage_tasks: false,
         can_manage_recurring_tasks: false,
+        can_manage_purchases: false,
       });
     }
   }, [existing]);
