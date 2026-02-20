@@ -25,6 +25,7 @@ export type RecurringTask = {
   frequency: "daily" | "weekly" | "weekday" | "monthly";
   weekday: number | null;
   month_day: number | null;
+  scheduled_time: string | null;
   position: number;
   created_by: string;
   created_at: string;
@@ -268,6 +269,7 @@ export function useRecurringTasks(boardId?: string) {
       frequency: "daily" | "weekly" | "weekday" | "monthly";
       weekday?: number | null;
       monthDay?: number | null;
+      scheduledTime?: string | null;
     }) => {
       const { error } = await supabase.from("recurring_tasks" as any).insert({
         title: params.title,
@@ -278,6 +280,7 @@ export function useRecurringTasks(boardId?: string) {
         created_by: user!.id,
         weekday: params.frequency === "weekday" ? (params.weekday ?? 0) : null,
         month_day: params.frequency === "monthly" ? (params.monthDay ?? 1) : null,
+        scheduled_time: params.scheduledTime || null,
       });
       if (error) throw error;
       await logActivity("Criou uma tarefa fixa", { task_title: params.title }, params.teamId);
@@ -293,6 +296,7 @@ export function useRecurringTasks(boardId?: string) {
       frequency: "daily" | "weekly" | "weekday" | "monthly";
       weekday?: number | null;
       monthDay?: number | null;
+      scheduledTime?: string | null;
       teamId: string;
     }) => {
       const { error } = await supabase
@@ -303,6 +307,7 @@ export function useRecurringTasks(boardId?: string) {
           frequency: params.frequency,
           weekday: params.frequency === "weekday" ? (params.weekday ?? 0) : null,
           month_day: params.frequency === "monthly" ? (params.monthDay ?? 1) : null,
+          scheduled_time: params.scheduledTime || null,
         })
         .eq("id", params.id);
       if (error) throw error;

@@ -67,6 +67,7 @@ function BoardDetail({
   const [newFrequency, setNewFrequency] = useState<"daily" | "weekly" | "weekday" | "monthly">("daily");
   const [newWeekday, setNewWeekday] = useState("0");
   const [newMonthDay, setNewMonthDay] = useState("1");
+  const [newScheduledTime, setNewScheduledTime] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [assignedUser, setAssignedUser] = useState(board.assigned_user_id ?? "");
   const [editingTask, setEditingTask] = useState<RecurringTask | null>(null);
@@ -75,6 +76,7 @@ function BoardDetail({
   const [editFrequency, setEditFrequency] = useState<"daily" | "weekly" | "weekday" | "monthly">("daily");
   const [editWeekday, setEditWeekday] = useState("0");
   const [editMonthDay, setEditMonthDay] = useState("1");
+  const [editScheduledTime, setEditScheduledTime] = useState("");
 
   // Progress stats
   const progressStats = useMemo(() => {
@@ -98,8 +100,8 @@ function BoardDetail({
   const handleCreate = async () => {
     if (!newTitle.trim()) return;
     try {
-      await createTask.mutateAsync({ title: newTitle.trim(), description: newDesc.trim(), boardId: board.id, teamId: board.team_id, frequency: newFrequency, weekday: newFrequency === "weekday" ? parseInt(newWeekday) : null, monthDay: newFrequency === "monthly" ? parseInt(newMonthDay) : null });
-      setNewTitle(""); setNewDesc(""); setNewFrequency("daily"); setNewWeekday("0"); setNewMonthDay("1"); setDialogOpen(false);
+      await createTask.mutateAsync({ title: newTitle.trim(), description: newDesc.trim(), boardId: board.id, teamId: board.team_id, frequency: newFrequency, weekday: newFrequency === "weekday" ? parseInt(newWeekday) : null, monthDay: newFrequency === "monthly" ? parseInt(newMonthDay) : null, scheduledTime: newScheduledTime || null });
+      setNewTitle(""); setNewDesc(""); setNewFrequency("daily"); setNewWeekday("0"); setNewMonthDay("1"); setNewScheduledTime(""); setDialogOpen(false);
       toast({ title: "Tarefa criada com sucesso" });
     } catch { toast({ title: "Erro ao criar tarefa", variant: "destructive" }); }
   };
@@ -116,6 +118,7 @@ function BoardDetail({
     setEditFrequency(task.frequency as any);
     setEditWeekday(String(task.weekday ?? 0));
     setEditMonthDay(String(task.month_day ?? 1));
+    setEditScheduledTime(task.scheduled_time ?? "");
   };
 
   const handleEditSave = async () => {
@@ -128,6 +131,7 @@ function BoardDetail({
         frequency: editFrequency,
         weekday: editFrequency === "weekday" ? parseInt(editWeekday) : null,
         monthDay: editFrequency === "monthly" ? parseInt(editMonthDay) : null,
+        scheduledTime: editScheduledTime || null,
         teamId: editingTask.team_id,
       });
       setEditingTask(null);
@@ -220,6 +224,11 @@ function BoardDetail({
                       </Select>
                     </div>
                   )}
+                  <div>
+                    <label className="text-sm font-medium mb-1.5 block">Horário (opcional)</label>
+                    <Input type="time" value={newScheduledTime} onChange={(e) => setNewScheduledTime(e.target.value)} placeholder="Ex: 09:00" />
+                    <p className="text-xs text-muted-foreground mt-1">Se definido, você será notificado caso a tarefa não seja concluída até esse horário.</p>
+                  </div>
                   <Button onClick={handleCreate} disabled={!newTitle.trim() || createTask.isPending} className="w-full">Criar Tarefa</Button>
                 </div>
               </DialogContent>
@@ -321,6 +330,11 @@ function BoardDetail({
                                     {(task.frequency === "weekday" || task.frequency === "monthly") && (
                                       <p className="text-xs text-muted-foreground mt-0.5">{getTaskFrequencyLabel(task)}</p>
                                     )}
+                                    {task.scheduled_time && (
+                                      <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                                        <Clock className="h-3 w-3" /> {task.scheduled_time.slice(0, 5)}
+                                      </p>
+                                    )}
                                     {task.description && (
                                       <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{task.description}</p>
                                     )}
@@ -388,7 +402,12 @@ function BoardDetail({
                   <SelectContent>{MONTH_DAYS.map((d) => (<SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>))}</SelectContent>
                 </Select>
               </div>
-            )}
+             )}
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">Horário (opcional)</label>
+              <Input type="time" value={editScheduledTime} onChange={(e) => setEditScheduledTime(e.target.value)} placeholder="Ex: 09:00" />
+              <p className="text-xs text-muted-foreground mt-1">Se definido, você será notificado caso a tarefa não seja concluída até esse horário.</p>
+            </div>
             <Button onClick={handleEditSave} disabled={!editTitle.trim() || updateTask.isPending} className="w-full">Salvar Alterações</Button>
           </div>
         </DialogContent>
