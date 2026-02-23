@@ -1,4 +1,4 @@
-import { LayoutDashboard, Columns3, Users, Bell, Settings, LogOut, ListChecks, ShoppingCart, Sun, Moon } from "lucide-react";
+import { LayoutDashboard, Columns3, Bell, Settings, LogOut, ListChecks, ShoppingCart, Sun, Moon } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsAppAdmin, useCanManage } from "@/hooks/useUserRole";
@@ -22,7 +22,6 @@ const baseNav = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Quadros", url: "/boards", icon: Columns3 },
   { title: "Tarefas Fixas", url: "/recurring-tasks", icon: ListChecks },
-  { title: "Equipes", url: "/teams", icon: Users },
   { title: "Notificações", url: "/notifications", icon: Bell },
   { title: "Configurações", url: "/settings", icon: Settings },
 ];

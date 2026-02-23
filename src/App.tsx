@@ -10,7 +10,7 @@ import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import Boards from "./pages/Boards";
-import Teams from "./pages/Teams";
+// Teams page removed - now inside Settings
 import Notifications from "./pages/Notifications";
 import SettingsPage from "./pages/SettingsPage";
 import RecurringTasks from "./pages/RecurringTasks";
@@ -35,7 +35,7 @@ const App = () => (
                 <Route path="/boards" element={<Boards />} />
                 <Route path="/recurring-tasks" element={<RecurringTasks />} />
                 <Route path="/purchases" element={<Purchases />} />
-                <Route path="/teams" element={<Teams />} />
+                {/* Teams moved to Settings */}
                 <Route path="/notifications" element={<Notifications />} />
                 <Route path="/settings" element={<SettingsPage />} />
               </Route>
