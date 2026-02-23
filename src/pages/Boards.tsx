@@ -28,7 +28,7 @@ export default function Boards() {
   const { boards, isLoading } = useBoards();
   const canManageBoards = useCanManage("can_manage_boards");
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
-  const [editBoard, setEditBoard] = useState<{ id: string; name: string; description: string | null; team_id: string } | null>(null);
+  const [editBoard, setEditBoard] = useState<{ id: string; name: string; description: string | null; team_id: string; assigned_user_id: string | null } | null>(null);
   const [hoveredBoard, setHoveredBoard] = useState<string | null>(null);
 
   // Fetch profiles for avatars
@@ -138,6 +138,7 @@ export default function Boards() {
                             name: board.name,
                             description: board.description,
                             team_id: board.team_id,
+                            assigned_user_id: board.assigned_user_id,
                           });
                         }}
                       >
