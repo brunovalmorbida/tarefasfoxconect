@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Loader2, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { useTeamMembers } from "@/hooks/useBoards";
+import { useTeamMembers, useTeams } from "@/hooks/useBoards";
 
 interface EditBoardDialogProps {
   open: boolean;
@@ -20,10 +20,12 @@ interface EditBoardDialogProps {
 export function EditBoardDialog({ open, onOpenChange, board }: EditBoardDialogProps) {
   const queryClient = useQueryClient();
   const [name, setName] = useState(board.name);
+  const [teamId, setTeamId] = useState(board.team_id);
   const [assignedUserId, setAssignedUserId] = useState(board.assigned_user_id || "__none__");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const { data: members } = useTeamMembers(board.team_id);
+  const { data: teams } = useTeams();
+  const { data: members } = useTeamMembers(teamId);
 
   const handleSave = async () => {
     if (!name.trim()) return;
@@ -31,6 +33,7 @@ export function EditBoardDialog({ open, onOpenChange, board }: EditBoardDialogPr
     try {
       const { error } = await supabase.from("boards").update({ 
         name: name.trim(),
+        team_id: teamId,
         assigned_user_id: assignedUserId === "__none__" ? null : assignedUserId,
       }).eq("id", board.id);
       if (error) throw error;
@@ -70,6 +73,18 @@ export function EditBoardDialog({ open, onOpenChange, board }: EditBoardDialogPr
         </DialogHeader>
 
         <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium text-foreground">Equipe</label>
+            <Select value={teamId} onValueChange={(v) => { setTeamId(v); setAssignedUserId("__none__"); }}>
+              <SelectTrigger><SelectValue placeholder="Selecione uma equipe" /></SelectTrigger>
+              <SelectContent>
+                {teams?.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div>
             <label className="text-sm font-medium text-foreground">Nome do Quadro</label>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome do quadro" />
