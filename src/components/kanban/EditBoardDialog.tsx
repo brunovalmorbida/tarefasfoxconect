@@ -5,27 +5,34 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Loader2, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { useTeamMembers } from "@/hooks/useBoards";
 
 interface EditBoardDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  board: { id: string; name: string; description: string | null; team_id: string };
+  board: { id: string; name: string; description: string | null; team_id: string; assigned_user_id: string | null };
 }
 
 export function EditBoardDialog({ open, onOpenChange, board }: EditBoardDialogProps) {
   const queryClient = useQueryClient();
   const [name, setName] = useState(board.name);
+  const [assignedUserId, setAssignedUserId] = useState(board.assigned_user_id || "__none__");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const { data: members } = useTeamMembers(board.team_id);
 
   const handleSave = async () => {
     if (!name.trim()) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from("boards").update({ name: name.trim() }).eq("id", board.id);
+      const { error } = await supabase.from("boards").update({ 
+        name: name.trim(),
+        assigned_user_id: assignedUserId === "__none__" ? null : assignedUserId,
+      }).eq("id", board.id);
       if (error) throw error;
       toast.success("Quadro atualizado!");
       queryClient.invalidateQueries({ queryKey: ["boards"] });
@@ -66,6 +73,24 @@ export function EditBoardDialog({ open, onOpenChange, board }: EditBoardDialogPr
           <div>
             <label className="text-sm font-medium text-foreground">Nome do Quadro</label>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome do quadro" />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-foreground">Responsável</label>
+            <Select value={assignedUserId} onValueChange={setAssignedUserId}>
+              <SelectTrigger><SelectValue placeholder="Selecione um responsável" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Toda a equipe</SelectItem>
+                {members?.map((m: any) => (
+                  <SelectItem key={m.user_id} value={m.user_id}>
+                    {m.profiles?.name || "Usuário"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground mt-1">
+              Se atribuído, apenas este usuário poderá ver o quadro.
+            </p>
           </div>
 
           <Button onClick={handleSave} className="w-full" disabled={saving || !name.trim()}>
