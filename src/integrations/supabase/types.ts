@@ -712,6 +712,35 @@ export type Database = {
         }
         Relationships: []
       }
+      user_team_visibility: {
+        Row: {
+          created_at: string
+          id: string
+          team_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          team_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          team_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_team_visibility_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       zapi_config: {
         Row: {
           client_token: string | null
@@ -752,6 +781,10 @@ export type Database = {
       get_team_id_from_task: { Args: { _task_id: string }; Returns: string }
       has_permission: {
         Args: { _permission: string; _user_id: string }
+        Returns: boolean
+      }
+      has_team_visibility: {
+        Args: { _team_id: string; _user_id: string }
         Returns: boolean
       }
       is_app_admin: { Args: never; Returns: boolean }
