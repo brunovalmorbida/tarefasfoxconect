@@ -6,7 +6,8 @@ import { ActivityLogTab } from "@/components/settings/ActivityLogTab";
 import { PurchasesConfigTab } from "@/components/settings/PurchasesConfigTab";
 import { NotificationsConfigTab } from "@/components/settings/NotificationsConfigTab";
 import { PermissionsTab } from "@/components/settings/PermissionsTab";
-import { Settings, Users, Plug, ScrollText, Download, ShoppingCart, Bell, Shield } from "lucide-react";
+import { TeamsTab } from "@/components/settings/TeamsTab";
+import { Settings, Users, Plug, ScrollText, Download, ShoppingCart, Bell, Shield, Users2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
@@ -50,7 +51,7 @@ export default function SettingsPage() {
       <h1 className="text-2xl font-bold tracking-tight">Configurações</h1>
 
       <Tabs defaultValue="general" className="w-full">
-        <TabsList>
+        <TabsList className="flex-wrap">
           <TabsTrigger value="general" className="gap-2">
             <Settings className="h-4 w-4" />
             Geral
@@ -59,6 +60,12 @@ export default function SettingsPage() {
             <TabsTrigger value="users" className="gap-2">
               <Users className="h-4 w-4" />
               Usuários
+            </TabsTrigger>
+          )}
+          {isAdmin && (
+            <TabsTrigger value="teams" className="gap-2">
+              <Users2 className="h-4 w-4" />
+              Equipes
             </TabsTrigger>
           )}
           {isAdmin && (
@@ -120,6 +127,11 @@ export default function SettingsPage() {
         {isAdmin && (
           <TabsContent value="users" className="mt-6">
             <UsersTab />
+          </TabsContent>
+        )}
+        {isAdmin && (
+          <TabsContent value="teams" className="mt-6">
+            <TeamsTab />
           </TabsContent>
         )}
         {isAdmin && (
