@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Shield } from "lucide-react";
+import { Loader2, Shield, Eye } from "lucide-react";
 import { toast } from "sonner";
 
 interface Profile {
@@ -62,6 +62,29 @@ export function PermissionsTab() {
     },
   });
 
+  const { data: teams, isLoading: loadingTeams } = useQuery({
+    queryKey: ["all-teams"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("teams")
+        .select("id, name")
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: teamVisibility, isLoading: loadingVisibility } = useQuery({
+    queryKey: ["all-team-visibility"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("user_team_visibility")
+        .select("*");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const isAdmin = (userId: string) =>
     adminRoles?.some((r) => r.user_id === userId && r.role === "admin") ?? false;
 
@@ -81,6 +104,9 @@ export function PermissionsTab() {
       can_be_buyer: false,
     };
   };
+
+  const hasTeamVisibility = (userId: string, teamId: string) =>
+    teamVisibility?.some((v) => v.user_id === userId && v.team_id === teamId) ?? false;
 
   const togglePermission = async (userId: string, key: PermissionKey, currentValue: boolean) => {
     try {
@@ -116,7 +142,29 @@ export function PermissionsTab() {
     }
   };
 
-  const isLoading = loadingProfiles || loadingPerms;
+  const toggleTeamVisibility = async (userId: string, teamId: string, currentlyVisible: boolean) => {
+    try {
+      if (currentlyVisible) {
+        const { error } = await supabase
+          .from("user_team_visibility")
+          .delete()
+          .eq("user_id", userId)
+          .eq("team_id", teamId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("user_team_visibility")
+          .insert({ user_id: userId, team_id: teamId });
+        if (error) throw error;
+      }
+      queryClient.invalidateQueries({ queryKey: ["all-team-visibility"] });
+      toast.success("Visibilidade atualizada");
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao atualizar visibilidade");
+    }
+  };
+
+  const isLoading = loadingProfiles || loadingPerms || loadingTeams || loadingVisibility;
 
   if (isLoading) {
     return (
@@ -127,58 +175,117 @@ export function PermissionsTab() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Shield className="h-5 w-5" />
-          Permissões de Usuários
-        </CardTitle>
-        <CardDescription>
-          Gerencie as permissões de cada usuário. Administradores possuem todas as permissões automaticamente e não aparecem nesta lista.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {nonAdminProfiles.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nenhum usuário não-admin encontrado.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="min-w-[140px]">Usuário</TableHead>
-                  {PERMISSIONS.map((p) => (
-                    <TableHead key={p.key} className="text-center text-xs min-w-[90px]">
-                      {p.shortLabel}
-                    </TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {nonAdminProfiles.map((profile) => {
-                  const perms = getPermissions(profile.user_id);
-                  return (
-                    <TableRow key={profile.user_id}>
-                      <TableCell className="font-medium text-sm">{profile.name}</TableCell>
-                      {PERMISSIONS.map((perm) => (
-                        <TableCell key={perm.key} className="text-center">
-                          <div className="flex justify-center">
-                            <Switch
-                              checked={perms[perm.key]}
-                              onCheckedChange={() =>
-                                togglePermission(profile.user_id, perm.key, perms[perm.key])
-                              }
-                            />
-                          </div>
-                        </TableCell>
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            Permissões de Usuários
+          </CardTitle>
+          <CardDescription>
+            Gerencie as permissões de cada usuário. Administradores possuem todas as permissões automaticamente e não aparecem nesta lista.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {nonAdminProfiles.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhum usuário não-admin encontrado.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[140px]">Usuário</TableHead>
+                    {PERMISSIONS.map((p) => (
+                      <TableHead key={p.key} className="text-center text-xs min-w-[90px]">
+                        {p.shortLabel}
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {nonAdminProfiles.map((profile) => {
+                    const perms = getPermissions(profile.user_id);
+                    return (
+                      <TableRow key={profile.user_id}>
+                        <TableCell className="font-medium text-sm">{profile.name}</TableCell>
+                        {PERMISSIONS.map((perm) => (
+                          <TableCell key={perm.key} className="text-center">
+                            <div className="flex justify-center">
+                              <Switch
+                                checked={perms[perm.key]}
+                                onCheckedChange={() =>
+                                  togglePermission(profile.user_id, perm.key, perms[perm.key])
+                                }
+                              />
+                            </div>
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Team Visibility */}
+      {teams && teams.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5" />
+              Visibilidade de Quadros por Equipe
+            </CardTitle>
+            <CardDescription>
+              Libere a visualização de todos os quadros de uma equipe para usuários que não são membros dela. Membros da equipe e administradores já possuem acesso automaticamente.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {nonAdminProfiles.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nenhum usuário não-admin encontrado.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="min-w-[140px]">Usuário</TableHead>
+                      {teams.map((team) => (
+                        <TableHead key={team.id} className="text-center text-xs min-w-[100px]">
+                          {team.name}
+                        </TableHead>
                       ))}
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {nonAdminProfiles.map((profile) => (
+                      <TableRow key={profile.user_id}>
+                        <TableCell className="font-medium text-sm">{profile.name}</TableCell>
+                        {teams.map((team) => {
+                          const visible = hasTeamVisibility(profile.user_id, team.id);
+                          return (
+                            <TableCell key={team.id} className="text-center">
+                              <div className="flex justify-center">
+                                <Switch
+                                  checked={visible}
+                                  onCheckedChange={() =>
+                                    toggleTeamVisibility(profile.user_id, team.id, visible)
+                                  }
+                                />
+                              </div>
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+    </div>
   );
 }
