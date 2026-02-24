@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Plus, MoreHorizontal, Trash2, CalendarIcon, User, AlertTriangle, Pencil, Copy, ArrowRightLeft, Clock } from "lucide-react";
+import { Plus, MoreHorizontal, Trash2, CalendarIcon, User, AlertTriangle, Pencil, Copy, ArrowRightLeft, Clock, CheckCircle2 } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -140,8 +140,9 @@ export function KanbanBoard({ boardId, onBack }: Props) {
 
       <DragDropContext onDragEnd={handleDragEnd}>
         <div className="flex gap-4 overflow-x-auto pb-4" style={{ minHeight: 400 }}>
-          {board.board_columns?.map((col: any) => {
+          {board.board_columns?.map((col: any, colIndex: number) => {
             const taskCount = col.tasks?.length ?? 0;
+            const isLastColumn = colIndex === (board.board_columns?.length ?? 0) - 1;
             return (
               <div key={col.id} className="flex-shrink-0 w-[300px] bg-muted/40 rounded-xl p-3.5 space-y-3">
                 {/* Column header */}
@@ -180,6 +181,8 @@ export function KanbanBoard({ boardId, onBack }: Props) {
                         const assigneeName = getAssigneeName(task.assignee_id);
                         const isOverdue = task.due_date && isPast(new Date(task.due_date));
                         const isHovered = hoveredTask === task.id;
+                        const isCompleted = isLastColumn;
+                        const isCompletedLate = isCompleted && isOverdue;
 
                         return (
                           <Draggable key={task.id} draggableId={task.id} index={index}>
@@ -189,9 +192,10 @@ export function KanbanBoard({ boardId, onBack }: Props) {
                                 {...provided.draggableProps}
                                 {...provided.dragHandleProps}
                                 className={cn(
-                                  `bg-card rounded-xl border shadow-sm p-3.5 cursor-grab transition-all duration-200 ${priorityBorderClass[task.priority] || ""}`,
+                                  `bg-card rounded-xl border shadow-sm p-3.5 cursor-grab transition-all duration-200 ${isCompleted ? "" : priorityBorderClass[task.priority] || ""}`,
                                   snapshot.isDragging && "shadow-lg ring-2 ring-primary/20 rotate-1 cursor-grabbing",
-                                  isOverdue && "bg-destructive/5",
+                                  !isCompleted && isOverdue && "bg-destructive/5",
+                                  isCompleted && "opacity-75 bg-muted/60 border-muted-foreground/15",
                                   !snapshot.isDragging && "hover:shadow-md hover:-translate-y-0.5"
                                 )}
                                 onClick={() => setEditingTask({ ...task })}
@@ -199,7 +203,15 @@ export function KanbanBoard({ boardId, onBack }: Props) {
                                 onMouseLeave={() => setHoveredTask(null)}
                               >
                                 <div className="space-y-2 min-w-0">
-                                  <p className="text-sm font-medium leading-tight">{task.title}</p>
+                                  <div className="flex items-center gap-1.5">
+                                    {isCompleted && (
+                                      <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-emerald-500" />
+                                    )}
+                                    {isCompletedLate && (
+                                      <span className="text-destructive text-xs font-bold flex-shrink-0" title="Concluída fora do prazo">!</span>
+                                    )}
+                                    <p className={cn("text-sm font-medium leading-tight", isCompleted && "line-through text-muted-foreground")}>{task.title}</p>
+                                  </div>
                                   {task.description && (
                                     <p className="text-xs text-muted-foreground line-clamp-2">{task.description}</p>
                                   )}
