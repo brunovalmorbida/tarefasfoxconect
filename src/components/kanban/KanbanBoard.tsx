@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { useBoardDetail } from "@/hooks/useBoards";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +33,7 @@ interface Props {
 }
 
 export function KanbanBoard({ boardId, onBack }: Props) {
+  const queryClient = useQueryClient();
   const { board, isLoading, addColumn, addTask, deleteColumn, deleteTask, moveTask, updateTask } = useBoardDetail(boardId);
   const [newColumnName, setNewColumnName] = useState("");
   const [addingColumn, setAddingColumn] = useState(false);
@@ -96,12 +97,45 @@ export function KanbanBoard({ boardId, onBack }: Props) {
     } catch { toast.error("Erro ao criar tarefa"); }
   };
 
-  const handleDragEnd = async (result: DropResult) => {
+  const handleDragEnd = (result: DropResult) => {
     if (!result.destination || !board?.board_columns) return;
-    const { draggableId, destination } = result;
-    try {
-      await moveTask.mutateAsync({ taskId: draggableId, newColumnId: destination.droppableId, newPosition: destination.index });
-    } catch { toast.error("Erro ao mover tarefa"); }
+    const { draggableId, source, destination } = result;
+    if (source.droppableId === destination.droppableId && source.index === destination.index) return;
+
+    // Optimistic update: mutate cache immediately so the UI doesn't snap back
+    const queryKey = ["board", boardId];
+    const previousBoard = queryClient.getQueryData(queryKey);
+
+    queryClient.setQueryData(queryKey, (old: any) => {
+      if (!old?.board_columns) return old;
+      const cols = old.board_columns.map((c: any) => ({ ...c, tasks: [...(c.tasks || [])] }));
+      const srcCol = cols.find((c: any) => c.id === source.droppableId);
+      const dstCol = cols.find((c: any) => c.id === destination.droppableId);
+      if (!srcCol || !dstCol) return old;
+
+      const [moved] = srcCol.tasks.splice(source.index, 1);
+      if (!moved) return old;
+      moved.column_id = destination.droppableId;
+      moved.position = destination.index;
+      dstCol.tasks.splice(destination.index, 0, moved);
+
+      // Reindex positions
+      srcCol.tasks.forEach((t: any, i: number) => { t.position = i; });
+      if (srcCol !== dstCol) dstCol.tasks.forEach((t: any, i: number) => { t.position = i; });
+
+      return { ...old, board_columns: cols };
+    });
+
+    // Fire mutation without awaiting — rollback on error
+    moveTask.mutate(
+      { taskId: draggableId, newColumnId: destination.droppableId, newPosition: destination.index },
+      {
+        onError: () => {
+          queryClient.setQueryData(queryKey, previousBoard);
+          toast.error("Erro ao mover tarefa");
+        },
+      }
+    );
   };
 
   const handleUpdateTask = async () => {
