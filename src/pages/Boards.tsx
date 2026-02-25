@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useBoards } from "@/hooks/useBoards";
 import { useCanManage } from "@/hooks/useUserRole";
 import { CreateBoardDialog } from "@/components/kanban/CreateBoardDialog";
@@ -27,9 +28,18 @@ function getProgressTextColor(pct: number) {
 export default function Boards() {
   const { boards, isLoading } = useBoards();
   const canManageBoards = useCanManage("can_manage_boards");
-  const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [selectedBoardId, setSelectedBoardId] = useState<string | null>(searchParams.get("board") || null);
   const [editBoard, setEditBoard] = useState<{ id: string; name: string; description: string | null; team_id: string; assigned_user_id: string | null } | null>(null);
   const [hoveredBoard, setHoveredBoard] = useState<string | null>(null);
+
+  // Sync selectedBoardId with URL search params
+  useEffect(() => {
+    const boardParam = searchParams.get("board");
+    if (boardParam) {
+      setSelectedBoardId(boardParam);
+    }
+  }, [searchParams]);
 
   // Fetch profiles for avatars
   const { data: profiles } = useQuery({
