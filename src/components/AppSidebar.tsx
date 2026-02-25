@@ -3,6 +3,8 @@ import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsAppAdmin, useCanManage } from "@/hooks/useUserRole";
 import { useState, useEffect, useMemo } from "react";
+import { useNotificationCount } from "@/pages/Notifications";
+import { Badge } from "@/components/ui/badge";
 import logoFox from "@/assets/logo-fox.png";
 import {
   Sidebar,
@@ -31,6 +33,7 @@ export function AppSidebar() {
   const { signOut } = useAuth();
   const { data: isAdmin } = useIsAppAdmin();
   const canViewPurchases = useCanManage("can_view_purchases");
+  const notificationCount = useNotificationCount();
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains("dark"));
 
   const toggleTheme = () => {
@@ -81,7 +84,12 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url} end={item.url === "/"} activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
                       <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
+                      <span className="flex-1">{item.title}</span>
+                      {item.title === "Notificações" && notificationCount > 0 && (
+                        <Badge variant="destructive" className="ml-auto h-5 min-w-5 px-1 text-xs flex items-center justify-center">
+                          {notificationCount > 99 ? "99+" : notificationCount}
+                        </Badge>
+                      )}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
