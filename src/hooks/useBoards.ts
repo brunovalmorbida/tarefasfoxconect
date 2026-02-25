@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
@@ -45,6 +46,17 @@ export function useBoards(teamId?: string) {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["boards"] }),
   });
+
+  // Realtime: refresh boards list on any board change
+  useEffect(() => {
+    const channel = supabase
+      .channel("boards-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "boards" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["boards"] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [queryClient]);
 
   return { boards: boardsQuery.data ?? [], isLoading: boardsQuery.isLoading, createBoard };
 }
@@ -196,6 +208,25 @@ export function useBoardDetail(boardId: string) {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["board", boardId] }),
   });
+
+  // Realtime: refresh board detail on task/column/subtask changes
+  useEffect(() => {
+    if (!boardId) return;
+    const channel = supabase
+      .channel(`board-detail-${boardId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["board", boardId] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "board_columns" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["board", boardId] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "subtasks" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["board", boardId] });
+        queryClient.invalidateQueries({ queryKey: ["subtasks"] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [boardId, queryClient]);
 
   return {
     board: boardQuery.data,
