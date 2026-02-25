@@ -55,7 +55,7 @@ export function GlobalSearch() {
       const [tasksRes, boardsRes, purchasesRes] = await Promise.all([
         supabase
           .from("tasks")
-          .select("id, title, description, priority")
+          .select("id, title, description, priority, column_id")
           .or(`title.ilike.%${term}%,description.ilike.%${term}%`)
           .limit(8),
         supabase
@@ -72,7 +72,16 @@ export function GlobalSearch() {
 
       const items: SearchResult[] = [];
 
-      if (tasksRes.data) {
+      // Resolve task column_id -> board_id
+      if (tasksRes.data && tasksRes.data.length > 0) {
+        const columnIds = [...new Set(tasksRes.data.map((t) => t.column_id))];
+        const { data: columns } = await supabase
+          .from("board_columns")
+          .select("id, board_id")
+          .in("id", columnIds);
+        const colToBoardMap: Record<string, string> = {};
+        columns?.forEach((c) => { colToBoardMap[c.id] = c.board_id; });
+
         for (const t of tasksRes.data) {
           items.push({
             id: t.id,
@@ -80,6 +89,7 @@ export function GlobalSearch() {
             subtitle: t.description?.slice(0, 60) || undefined,
             type: "task",
             meta: { priority: t.priority },
+            navigateTo: `/boards?board=${colToBoardMap[t.column_id] || ""}`,
           });
         }
       }
@@ -91,7 +101,7 @@ export function GlobalSearch() {
             title: b.name,
             subtitle: b.description?.slice(0, 60) || undefined,
             type: "board",
-            navigateTo: "/boards",
+            navigateTo: `/boards?board=${b.id}`,
           });
         }
       }
@@ -125,8 +135,6 @@ export function GlobalSearch() {
     setQuery("");
     if (item.navigateTo) {
       navigate(item.navigateTo);
-    } else if (item.type === "task") {
-      navigate("/boards");
     }
   };
 
