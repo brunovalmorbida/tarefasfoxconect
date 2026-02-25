@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Plus, MoreHorizontal, Trash2, CalendarIcon, User, AlertTriangle, Pencil, Copy, ArrowRightLeft, Clock, CheckCircle2 } from "lucide-react";
 import { TaskComments } from "./TaskComments";
+import { SubtaskChecklist, SubtaskProgress } from "./SubtaskChecklist";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -242,6 +243,7 @@ export function KanbanBoard({ boardId, onBack }: Props) {
                                         </AvatarFallback>
                                       </Avatar>
                                     )}
+                                    <SubtaskProgress taskId={task.id} />
                                   </div>
                                 </div>
 
@@ -345,6 +347,9 @@ export function KanbanBoard({ boardId, onBack }: Props) {
                 <label className="text-sm font-medium">Horário Agendado</label>
                 <Input type="time" value={editingTask.scheduled_time?.slice(0, 5) || ""} onChange={(e) => setEditingTask({ ...editingTask, scheduled_time: e.target.value || null })} />
                 <p className="text-xs text-muted-foreground mt-1">Notificações 1h e 10min antes</p>
+              </div>
+              <div className="border-t pt-4">
+                <SubtaskChecklist taskId={editingTask.id} />
               </div>
               <div className="border-t pt-4">
                 <TaskComments taskId={editingTask.id} />
