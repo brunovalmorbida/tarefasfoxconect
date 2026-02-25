@@ -4,9 +4,10 @@ import { useBoardDetail } from "@/hooks/useBoards";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Plus, MoreHorizontal, Trash2, CalendarIcon, User, AlertTriangle, Pencil, Copy, ArrowRightLeft, Clock, CheckCircle2 } from "lucide-react";
+import { Plus, MoreHorizontal, Trash2, CalendarIcon, User, AlertTriangle, Pencil, Copy, ArrowRightLeft, Clock, CheckCircle2, ListChecks } from "lucide-react";
 import { TaskComments } from "./TaskComments";
 import { SubtaskChecklist, SubtaskProgress } from "./SubtaskChecklist";
 import { Calendar } from "@/components/ui/calendar";
@@ -44,6 +45,8 @@ export function KanbanBoard({ boardId, onBack }: Props) {
   const [newTaskDescription, setNewTaskDescription] = useState("");
   const [newTaskPriority, setNewTaskPriority] = useState<string>("medium");
   const [newTaskScheduledTime, setNewTaskScheduledTime] = useState<string>("");
+  const [newSubtaskTitles, setNewSubtaskTitles] = useState<string[]>([]);
+  const [newSubtaskInput, setNewSubtaskInput] = useState("");
   const [editingTask, setEditingTask] = useState<any>(null);
   const [hoveredTask, setHoveredTask] = useState<string | null>(null);
 
@@ -82,18 +85,35 @@ export function KanbanBoard({ boardId, onBack }: Props) {
 
   const handleAddTask = async (columnId: string) => {
     if (!newTaskTitle.trim()) return;
+    if (!newTaskDescription.trim()) { toast.error("A descrição é obrigatória"); return; }
     if (!newTaskDueDate) { toast.error("O prazo é obrigatório"); return; }
     if (!newTaskAssignee || newTaskAssignee === "none") { toast.error("O responsável é obrigatório"); return; }
     try {
-      await addTask.mutateAsync({
+      const result = await addTask.mutateAsync({
         columnId, title: newTaskTitle.trim(),
         assigneeId: newTaskAssignee,
         dueDate: newTaskDueDate.toISOString(),
-        description: newTaskDescription.trim() || undefined,
+        description: newTaskDescription.trim(),
         priority: newTaskPriority || "medium",
         scheduledTime: newTaskScheduledTime || undefined,
       });
-      setNewTaskTitle(""); setNewTaskAssignee(""); setNewTaskDueDate(undefined); setNewTaskDescription(""); setNewTaskPriority("medium"); setNewTaskScheduledTime(""); setAddingTaskCol(null);
+      // Create subtasks if any were added
+      if (newSubtaskTitles.length > 0 && result?.id) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await Promise.all(
+            newSubtaskTitles.map((title, index) =>
+              supabase.from("subtasks").insert({
+                task_id: result.id,
+                title,
+                position: index,
+                created_by: user.id,
+              })
+            )
+          );
+        }
+      }
+      setNewTaskTitle(""); setNewTaskAssignee(""); setNewTaskDueDate(undefined); setNewTaskDescription(""); setNewTaskPriority("medium"); setNewTaskScheduledTime(""); setNewSubtaskTitles([]); setNewSubtaskInput(""); setAddingTaskCol(null);
     } catch { toast.error("Erro ao criar tarefa"); }
   };
 
@@ -328,7 +348,7 @@ export function KanbanBoard({ boardId, onBack }: Props) {
                   )}
                 </Droppable>
 
-                <Button variant="ghost" size="sm" className="w-full justify-start text-muted-foreground hover:text-foreground" onClick={() => { setAddingTaskCol(col.id); setNewTaskTitle(""); setNewTaskAssignee(""); setNewTaskDueDate(undefined); setNewTaskDescription(""); setNewTaskPriority("medium"); setNewTaskScheduledTime(""); }}>
+                  <Button variant="ghost" size="sm" className="w-full justify-start text-muted-foreground hover:text-foreground" onClick={() => { setAddingTaskCol(col.id); setNewTaskTitle(""); setNewTaskAssignee(""); setNewTaskDueDate(undefined); setNewTaskDescription(""); setNewTaskPriority("medium"); setNewTaskScheduledTime(""); setNewSubtaskTitles([]); setNewSubtaskInput(""); }}>
                     <Plus className="mr-1.5 h-3.5 w-3.5" /> Adicionar tarefa
                   </Button>
               </div>
@@ -429,8 +449,8 @@ export function KanbanBoard({ boardId, onBack }: Props) {
       </Dialog>
 
       {/* Add Task dialog */}
-      <Dialog open={!!addingTaskCol} onOpenChange={(o) => { if (!o) { setAddingTaskCol(null); setNewTaskTitle(""); setNewTaskAssignee(""); setNewTaskDueDate(undefined); setNewTaskDescription(""); setNewTaskPriority("medium"); } }}>
-        <DialogContent className="sm:max-w-lg">
+      <Dialog open={!!addingTaskCol} onOpenChange={(o) => { if (!o) { setAddingTaskCol(null); setNewTaskTitle(""); setNewTaskAssignee(""); setNewTaskDueDate(undefined); setNewTaskDescription(""); setNewTaskPriority("medium"); setNewSubtaskTitles([]); setNewSubtaskInput(""); } }}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Nova Tarefa</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div>
@@ -438,8 +458,8 @@ export function KanbanBoard({ boardId, onBack }: Props) {
               <Input value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} placeholder="Digite o título da tarefa" autoFocus />
             </div>
             <div>
-              <label className="text-sm font-medium">Descrição</label>
-              <Textarea value={newTaskDescription} onChange={(e) => setNewTaskDescription(e.target.value)} placeholder="Adicione uma descrição (opcional)" rows={3} />
+              <label className="text-sm font-medium">Descrição *</label>
+              <Textarea value={newTaskDescription} onChange={(e) => setNewTaskDescription(e.target.value)} placeholder="Adicione uma descrição" rows={3} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -483,9 +503,48 @@ export function KanbanBoard({ boardId, onBack }: Props) {
               <Input type="time" value={newTaskScheduledTime} onChange={(e) => setNewTaskScheduledTime(e.target.value)} />
               <p className="text-xs text-muted-foreground mt-1">Notificações 1h e 10min antes</p>
             </div>
+
+            {/* Subtasks section */}
+            <div className="border-t pt-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <ListChecks className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Subtarefas</span>
+                {newSubtaskTitles.length > 0 && (
+                  <span className="text-xs text-muted-foreground">{newSubtaskTitles.length} adicionada(s)</span>
+                )}
+              </div>
+              {newSubtaskTitles.map((title, idx) => (
+                <div key={idx} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-muted/50 group">
+                  <Checkbox checked={false} disabled />
+                  <span className="text-sm flex-1">{title}</span>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => setNewSubtaskTitles(prev => prev.filter((_, i) => i !== idx))}>
+                    <Trash2 className="h-3 w-3 text-destructive" />
+                  </Button>
+                </div>
+              ))}
+              <div className="flex gap-2">
+                <Input
+                  value={newSubtaskInput}
+                  onChange={(e) => setNewSubtaskInput(e.target.value)}
+                  placeholder="Nova subtarefa..."
+                  className="h-8 text-sm"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newSubtaskInput.trim()) {
+                      e.preventDefault();
+                      setNewSubtaskTitles(prev => [...prev, newSubtaskInput.trim()]);
+                      setNewSubtaskInput("");
+                    }
+                  }}
+                />
+                <Button size="sm" className="h-8" onClick={() => { if (newSubtaskInput.trim()) { setNewSubtaskTitles(prev => [...prev, newSubtaskInput.trim()]); setNewSubtaskInput(""); } }} disabled={!newSubtaskInput.trim()}>
+                  <Plus className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+
             <div className="flex gap-2 justify-end">
-              <Button variant="ghost" onClick={() => { setAddingTaskCol(null); setNewTaskTitle(""); setNewTaskAssignee(""); setNewTaskDueDate(undefined); setNewTaskDescription(""); setNewTaskPriority("medium"); setNewTaskScheduledTime(""); }}>Cancelar</Button>
-              <Button onClick={() => addingTaskCol && handleAddTask(addingTaskCol)} disabled={!newTaskTitle.trim() || !newTaskDueDate || !newTaskAssignee || newTaskAssignee === "none"}>Criar Tarefa</Button>
+              <Button variant="ghost" onClick={() => { setAddingTaskCol(null); setNewTaskTitle(""); setNewTaskAssignee(""); setNewTaskDueDate(undefined); setNewTaskDescription(""); setNewTaskPriority("medium"); setNewTaskScheduledTime(""); setNewSubtaskTitles([]); setNewSubtaskInput(""); }}>Cancelar</Button>
+              <Button onClick={() => addingTaskCol && handleAddTask(addingTaskCol)} disabled={!newTaskTitle.trim() || !newTaskDescription.trim() || !newTaskDueDate || !newTaskAssignee || newTaskAssignee === "none"}>Criar Tarefa</Button>
             </div>
           </div>
         </DialogContent>
