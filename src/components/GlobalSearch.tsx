@@ -51,23 +51,22 @@ export function GlobalSearch() {
         return;
       }
       setLoading(true);
-      const pattern = `%${term}%`;
 
       const [tasksRes, boardsRes, purchasesRes] = await Promise.all([
         supabase
           .from("tasks")
-          .select("id, title, description, priority, column_id, board_columns!inner(board_id, boards!inner(name))")
-          .or(`title.ilike.${pattern},description.ilike.${pattern}`)
+          .select("id, title, description, priority")
+          .or(`title.ilike.%${term}%,description.ilike.%${term}%`)
           .limit(8),
         supabase
           .from("boards")
           .select("id, name, description")
-          .or(`name.ilike.${pattern},description.ilike.${pattern}`)
+          .or(`name.ilike.%${term}%,description.ilike.%${term}%`)
           .limit(5),
         supabase
           .from("purchase_lists")
           .select("id, title, status, urgency")
-          .ilike("title", pattern)
+          .ilike("title", `%${term}%`)
           .limit(5),
       ]);
 
