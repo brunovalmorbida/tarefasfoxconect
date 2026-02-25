@@ -105,6 +105,24 @@ export function UsersTab() {
       return data as Record<string, string>;
     },
   });
+
+  const { data: lastActivity } = useQuery({
+    queryKey: ["admin-last-activity"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("activity_log")
+        .select("user_id, created_at")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      const map: Record<string, string> = {};
+      for (const row of data ?? []) {
+        if (!map[row.user_id]) {
+          map[row.user_id] = row.created_at;
+        }
+      }
+      return map;
+    },
+  });
   const getRoleForUser = (userId: string) => {
     const role = adminRoles?.find((r) => r.user_id === userId);
     return role?.role === "admin" ? "Admin" : "Membro";
@@ -317,7 +335,7 @@ export function UsersTab() {
                 <TableHead>Cargo</TableHead>
                 <TableHead>Equipes</TableHead>
                 <TableHead>Papel</TableHead>
-                <TableHead>Cadastro</TableHead>
+                <TableHead>Último Acesso</TableHead>
                 <TableHead className="w-[100px]">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -342,7 +360,9 @@ export function UsersTab() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
-                      {new Date(profile.created_at).toLocaleDateString("pt-BR")}
+                      {lastActivity?.[profile.user_id]
+                        ? new Date(lastActivity[profile.user_id]).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
+                        : "Nunca acessou"}
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
