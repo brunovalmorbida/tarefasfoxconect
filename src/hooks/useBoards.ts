@@ -181,7 +181,19 @@ export function useBoardDetail(boardId: string) {
   });
 
   const moveTask = useMutation({
-    mutationFn: async ({ taskId, newColumnId, newPosition }: { taskId: string; newColumnId: string; newPosition: number }) => {
+    mutationFn: async ({
+      taskId,
+      sourceColumnId,
+      destinationColumnId,
+      sourceTaskIds,
+      destinationTaskIds,
+    }: {
+      taskId: string;
+      sourceColumnId: string;
+      destinationColumnId: string;
+      sourceTaskIds: string[];
+      destinationTaskIds: string[];
+    }) => {
       // Find task and columns info before moving
       let taskTitle = "";
       let fromCol = "";
@@ -192,10 +204,35 @@ export function useBoardDetail(boardId: string) {
           fromCol = col.name;
         }
       });
-      const toCol = boardQuery.data?.board_columns?.find((c: any) => c.id === newColumnId)?.name;
+      const toCol = boardQuery.data?.board_columns?.find((c: any) => c.id === destinationColumnId)?.name;
 
-      const { error } = await supabase.from("tasks").update({ column_id: newColumnId, position: newPosition }).eq("id", taskId);
-      if (error) throw error;
+      const updates =
+        sourceColumnId === destinationColumnId
+          ? sourceTaskIds.map((id, position) => ({
+              id,
+              column_id: sourceColumnId,
+              position,
+            }))
+          : [
+              ...sourceTaskIds.map((id, position) => ({
+                id,
+                column_id: sourceColumnId,
+                position,
+              })),
+              ...destinationTaskIds.map((id, position) => ({
+                id,
+                column_id: destinationColumnId,
+                position,
+              })),
+            ];
+
+      const updateResults = await Promise.all(
+        updates.map(({ id, column_id, position }) =>
+          supabase.from("tasks").update({ column_id, position }).eq("id", id)
+        )
+      );
+      const failedUpdate = updateResults.find((result) => result.error);
+      if (failedUpdate?.error) throw failedUpdate.error;
 
       if (fromCol !== toCol) {
         await logActivity("Moveu uma tarefa", {
@@ -206,26 +243,56 @@ export function useBoardDetail(boardId: string) {
         }, getTeamId());
       }
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["board", boardId] }),
   });
 
-  // Realtime: refresh board detail on task/column/subtask changes
+  // Realtime: refresh board detail on relevant task/column/subtask changes only
   useEffect(() => {
     if (!boardId) return;
+
+    let invalidateTimer: ReturnType<typeof setTimeout> | null = null;
+    const getCurrentBoard = () => queryClient.getQueryData<any>(["board", boardId]);
+
+    const scheduleBoardRefresh = () => {
+      if (invalidateTimer) clearTimeout(invalidateTimer);
+      invalidateTimer = setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["board", boardId] });
+      }, 120);
+    };
+
     const channel = supabase
       .channel(`board-detail-${boardId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, () => {
-        queryClient.invalidateQueries({ queryKey: ["board", boardId] });
+      .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, (payload: any) => {
+        const currentBoard = getCurrentBoard();
+        const columnIds = new Set((currentBoard?.board_columns ?? []).map((c: any) => c.id));
+        const newColumnId = payload?.new?.column_id;
+        const oldColumnId = payload?.old?.column_id;
+
+        if ((newColumnId && columnIds.has(newColumnId)) || (oldColumnId && columnIds.has(oldColumnId))) {
+          scheduleBoardRefresh();
+        }
       })
-      .on("postgres_changes", { event: "*", schema: "public", table: "board_columns" }, () => {
-        queryClient.invalidateQueries({ queryKey: ["board", boardId] });
+      .on("postgres_changes", { event: "*", schema: "public", table: "board_columns", filter: `board_id=eq.${boardId}` }, () => {
+        scheduleBoardRefresh();
       })
-      .on("postgres_changes", { event: "*", schema: "public", table: "subtasks" }, () => {
-        queryClient.invalidateQueries({ queryKey: ["board", boardId] });
-        queryClient.invalidateQueries({ queryKey: ["subtasks"] });
+      .on("postgres_changes", { event: "*", schema: "public", table: "subtasks" }, (payload: any) => {
+        const taskId = payload?.new?.task_id ?? payload?.old?.task_id;
+        if (!taskId) return;
+
+        const currentBoard = getCurrentBoard();
+        const hasTaskInBoard = currentBoard?.board_columns?.some((col: any) =>
+          col.tasks?.some((task: any) => task.id === taskId)
+        );
+        if (!hasTaskInBoard) return;
+
+        scheduleBoardRefresh();
+        queryClient.invalidateQueries({ queryKey: ["subtasks", taskId] });
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+
+    return () => {
+      if (invalidateTimer) clearTimeout(invalidateTimer);
+      supabase.removeChannel(channel);
+    };
   }, [boardId, queryClient]);
 
   return {

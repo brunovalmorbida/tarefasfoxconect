@@ -30,6 +30,10 @@ export function useSubtasks(taskId: string | null) {
       return data as Subtask[];
     },
     enabled: !!taskId,
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   const addSubtask = useMutation({
