@@ -3,6 +3,7 @@ import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useLogActivity } from "@/hooks/useActivityLog";
 import { AppSidebar } from "@/components/AppSidebar";
+import { GlobalSearch } from "@/components/GlobalSearch";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { Loader2 } from "lucide-react";
 
@@ -35,6 +36,9 @@ export function AppLayout() {
         <SidebarInset>
           <header className="flex h-14 items-center gap-2 border-b px-4">
             <SidebarTrigger />
+            <div className="ml-auto">
+              <GlobalSearch />
+            </div>
           </header>
           <main className="flex-1 p-6">
             <Outlet />
