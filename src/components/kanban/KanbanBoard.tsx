@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Plus, MoreHorizontal, Trash2, CalendarIcon, User, AlertTriangle, Pencil, Copy, ArrowRightLeft, Clock, CheckCircle2 } from "lucide-react";
+import { TaskComments } from "./TaskComments";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -290,7 +291,7 @@ export function KanbanBoard({ boardId, onBack }: Props) {
 
       {/* Task edit dialog */}
       <Dialog open={!!editingTask} onOpenChange={(o) => !o && setEditingTask(null)}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Editar Tarefa</DialogTitle></DialogHeader>
           {editingTask && (
             <div className="space-y-4">
@@ -344,6 +345,9 @@ export function KanbanBoard({ boardId, onBack }: Props) {
                 <label className="text-sm font-medium">Horário Agendado</label>
                 <Input type="time" value={editingTask.scheduled_time?.slice(0, 5) || ""} onChange={(e) => setEditingTask({ ...editingTask, scheduled_time: e.target.value || null })} />
                 <p className="text-xs text-muted-foreground mt-1">Notificações 1h e 10min antes</p>
+              </div>
+              <div className="border-t pt-4">
+                <TaskComments taskId={editingTask.id} />
               </div>
               <div className="flex gap-2 justify-end">
                 <Button variant="destructive" size="sm" onClick={async () => { await deleteTask.mutateAsync(editingTask.id); setEditingTask(null); toast.success("Tarefa excluída"); }}>
