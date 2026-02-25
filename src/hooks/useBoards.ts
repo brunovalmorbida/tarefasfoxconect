@@ -119,7 +119,7 @@ export function useBoardDetail(boardId: string) {
     mutationFn: async ({ columnId, title, priority, description, assigneeId, dueDate, scheduledTime }: { columnId: string; title: string; priority?: string; description?: string; assigneeId?: string; dueDate?: string; scheduledTime?: string }) => {
       const colTasks = boardQuery.data?.board_columns?.find((c: any) => c.id === columnId)?.tasks ?? [];
       const position = colTasks.length;
-      const { error } = await supabase.from("tasks").insert({
+      const { data, error } = await supabase.from("tasks").insert({
         column_id: columnId,
         title,
         priority: (priority || "medium") as any,
@@ -129,7 +129,7 @@ export function useBoardDetail(boardId: string) {
         assignee_id: assigneeId || null,
         due_date: dueDate || null,
         scheduled_time: scheduledTime || null,
-      });
+      }).select().single();
       if (error) throw error;
       const col = boardQuery.data?.board_columns?.find((c: any) => c.id === columnId);
       await logActivity("Criou uma tarefa", { task_title: title, column_name: col?.name, board_name: boardQuery.data?.name }, getTeamId());
@@ -138,6 +138,8 @@ export function useBoardDetail(boardId: string) {
       supabase.functions.invoke("notify-task-assigned", {
         body: { taskTitle: title, assigneeId: assigneeId || null, boardName: boardQuery.data?.name, assignedByName: user?.user_metadata?.name || user?.email, isNewTask: true, dueDate: dueDate || null, description: description || null },
       }).catch(console.error);
+
+      return data;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["board", boardId] }),
   });
