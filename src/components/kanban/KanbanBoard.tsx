@@ -98,37 +98,66 @@ export function KanbanBoard({ boardId, onBack }: Props) {
   };
 
   const handleDragEnd = (result: DropResult) => {
-    if (!result.destination || !board?.board_columns) return;
+    if (!result.destination || !board?.board_columns || moveTask.isPending) return;
+
     const { draggableId, source, destination } = result;
     if (source.droppableId === destination.droppableId && source.index === destination.index) return;
 
-    // Optimistic update: mutate cache immediately so the UI doesn't snap back
     const queryKey = ["board", boardId];
     const previousBoard = queryClient.getQueryData(queryKey);
+    const updatedOrder = {
+      sourceTaskIds: [] as string[],
+      destinationTaskIds: [] as string[],
+    };
+
+    void queryClient.cancelQueries({ queryKey });
 
     queryClient.setQueryData(queryKey, (old: any) => {
       if (!old?.board_columns) return old;
+
       const cols = old.board_columns.map((c: any) => ({ ...c, tasks: [...(c.tasks || [])] }));
       const srcCol = cols.find((c: any) => c.id === source.droppableId);
       const dstCol = cols.find((c: any) => c.id === destination.droppableId);
       if (!srcCol || !dstCol) return old;
 
-      const [moved] = srcCol.tasks.splice(source.index, 1);
-      if (!moved) return old;
-      moved.column_id = destination.droppableId;
-      moved.position = destination.index;
-      dstCol.tasks.splice(destination.index, 0, moved);
+      const sourceTasks = [...srcCol.tasks];
+      const destinationTasks = srcCol.id === dstCol.id ? sourceTasks : [...dstCol.tasks];
 
-      // Reindex positions
-      srcCol.tasks.forEach((t: any, i: number) => { t.position = i; });
-      if (srcCol !== dstCol) dstCol.tasks.forEach((t: any, i: number) => { t.position = i; });
+      const [movedTask] = sourceTasks.splice(source.index, 1);
+      if (!movedTask) return old;
 
-      return { ...old, board_columns: cols };
+      const moved = { ...movedTask, column_id: destination.droppableId };
+      destinationTasks.splice(destination.index, 0, moved);
+
+      const normalize = (tasks: any[]) => tasks.map((task, position) => ({ ...task, position }));
+      const normalizedSource = normalize(sourceTasks);
+      const normalizedDestination = srcCol.id === dstCol.id ? normalizedSource : normalize(destinationTasks);
+
+      updatedOrder.sourceTaskIds = normalizedSource.map((task: any) => task.id);
+      updatedOrder.destinationTaskIds = normalizedDestination.map((task: any) => task.id);
+
+      const updatedColumns = cols.map((col: any) => {
+        if (col.id === srcCol.id) return { ...col, tasks: normalizedSource };
+        if (col.id === dstCol.id) return { ...col, tasks: normalizedDestination };
+        return col;
+      });
+
+      return { ...old, board_columns: updatedColumns };
     });
 
-    // Fire mutation without awaiting — rollback on error
+    if (!updatedOrder.sourceTaskIds.length || !updatedOrder.destinationTaskIds.length) {
+      queryClient.setQueryData(queryKey, previousBoard);
+      return;
+    }
+
     moveTask.mutate(
-      { taskId: draggableId, newColumnId: destination.droppableId, newPosition: destination.index },
+      {
+        taskId: draggableId,
+        sourceColumnId: source.droppableId,
+        destinationColumnId: destination.droppableId,
+        sourceTaskIds: updatedOrder.sourceTaskIds,
+        destinationTaskIds: updatedOrder.destinationTaskIds,
+      },
       {
         onError: () => {
           queryClient.setQueryData(queryKey, previousBoard);
