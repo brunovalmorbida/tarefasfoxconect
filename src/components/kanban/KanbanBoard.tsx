@@ -165,7 +165,7 @@ export function KanbanBoard({ boardId, onBack }: Props) {
       return { ...old, board_columns: updatedColumns };
     });
 
-    if (!updatedOrder.sourceTaskIds.length || !updatedOrder.destinationTaskIds.length) {
+    if (!updatedOrder.destinationTaskIds.length) {
       queryClient.setQueryData(queryKey, previousBoard);
       return;
     }
