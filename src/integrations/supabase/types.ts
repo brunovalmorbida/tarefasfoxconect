@@ -782,6 +782,39 @@ export type Database = {
           },
         ]
       }
+      whatsapp_chat_history: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          phone: string
+          role: string
+          tool_args: Json | null
+          tool_name: string | null
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          phone: string
+          role: string
+          tool_args?: Json | null
+          tool_name?: string | null
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          phone?: string
+          role?: string
+          tool_args?: Json | null
+          tool_name?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       zapi_config: {
         Row: {
           client_token: string | null
