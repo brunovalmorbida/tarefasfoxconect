@@ -15,10 +15,12 @@ export function NotificationsConfigTab() {
   const [sendingDue, setSendingDue] = useState(false);
   const [sendingRecurring, setSendingRecurring] = useState(false);
   const [sendingPurchaseReminders, setSendingPurchaseReminders] = useState(false);
+  const [sendingEndOfDay, setSendingEndOfDay] = useState(false);
   const [overdueResult, setOverdueResult] = useState<any>(null);
   const [dueResult, setDueResult] = useState<any>(null);
   const [recurringResult, setRecurringResult] = useState<any>(null);
   const [purchaseReminderResult, setPurchaseReminderResult] = useState<any>(null);
+  const [endOfDayResult, setEndOfDayResult] = useState<any>(null);
 
   const { data: zapiConfig, isLoading } = useQuery({
     queryKey: ["zapi-config"],
@@ -115,6 +117,26 @@ export function NotificationsConfigTab() {
     }
   };
 
+  const handleSendEndOfDay = async () => {
+    setSendingEndOfDay(true);
+    setEndOfDayResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("notify-end-of-day", { body: {} });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setEndOfDayResult(data);
+      toast({
+        title: data.sent > 0
+          ? `${data.sent} notificação(ões) enviada(s)!`
+          : data.message || "Nenhuma tarefa pendente para hoje.",
+      });
+    } catch (e: any) {
+      toast({ title: "Erro ao enviar", description: e.message, variant: "destructive" });
+    } finally {
+      setSendingEndOfDay(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center py-8">
@@ -200,6 +222,16 @@ export function NotificationsConfigTab() {
                 </p>
               </div>
               <Badge variant="outline" className="shrink-0">09:00 BRT</Badge>
+            </div>
+            <div className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50/50 dark:border-red-900 dark:bg-red-950/30 p-3">
+              <AlertTriangle className="h-5 w-5 text-red-600 shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-medium">🚨 Fim do Expediente (Urgência)</p>
+                <p className="text-xs text-muted-foreground">
+                  Lembrete urgente para tarefas com prazo HOJE que ainda estão pendentes. Enviado 1h30 antes do fim do expediente (18:00).
+                </p>
+              </div>
+              <Badge variant="destructive" className="shrink-0">16:30 BRT</Badge>
             </div>
           </div>
         </CardContent>
@@ -349,6 +381,32 @@ export function NotificationsConfigTab() {
                   <p>✅ WhatsApp enviados: <strong>{purchaseReminderResult.sent}</strong></p>
                   <p>🔔 Notificações in-app: <strong>{purchaseReminderResult.in_app}</strong></p>
                   {purchaseReminderResult.errors > 0 && <p>❌ Erros: <strong>{purchaseReminderResult.errors}</strong></p>}
+                </div>
+              )}
+            </div>
+
+            <Separator />
+
+            {/* Fim do Expediente */}
+            <div className="space-y-2">
+              <Button
+                variant="outline"
+                onClick={handleSendEndOfDay}
+                disabled={sendingEndOfDay}
+                className="w-full justify-start"
+              >
+                {sendingEndOfDay ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <AlertTriangle className="h-4 w-4 mr-2 text-red-600" />
+                )}
+                {sendingEndOfDay ? "Enviando..." : "🚨 Notificar Fim do Expediente (Tarefas Pendentes Hoje)"}
+              </Button>
+              {endOfDayResult && (
+                <div className="text-xs text-muted-foreground rounded-md border p-3 space-y-1">
+                  <p>📊 Tarefas pendentes hoje: <strong>{endOfDayResult.pending_tasks}</strong></p>
+                  <p>✅ Enviadas: <strong>{endOfDayResult.sent}</strong></p>
+                  {endOfDayResult.errors > 0 && <p>❌ Erros: <strong>{endOfDayResult.errors}</strong></p>}
                 </div>
               )}
             </div>
