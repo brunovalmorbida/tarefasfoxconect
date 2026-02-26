@@ -187,7 +187,11 @@ Regras:
 - Para lista de compras, extraia itens e quantidades. Quantidade padrão é 1
 - Quando pedir resumo com período, use resumo_completo
 - "tarefas diárias", "rotina", "tarefas fixas" de alguém → tarefas_diarias_usuario
-- "tarefas", "quadro" de alguém → tarefas_usuario`;
+- "tarefas", "quadro" de alguém → tarefas_usuario
+- IMPORTANTE: Você tem acesso ao histórico recente da conversa. Se a mensagem do usuário parece ser uma RESPOSTA a uma pergunta anterior (ex: um nome, uma data, um número de quadro), use o contexto da conversa para completar o comando original. NÃO trate como um novo comando.
+- Exemplo: Se você pediu o prazo e o usuário responde "amanhã" → complete o criar_tarefa com o prazo
+- Exemplo: Se houve erro de nome e o usuário corrige com "Leonardo Graeff" → complete o criar_tarefa com o nome correto
+- Se a mensagem é curta e parece uma correção/complemento (nome, data, hora), olhe o histórico para entender o contexto`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -286,6 +290,52 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ─── Fetch conversation history (last 10 messages within 30 min) ───
+    const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    const { data: chatHistory } = await supabase
+      .from("whatsapp_chat_history")
+      .select("role, content, tool_name, tool_args")
+      .eq("phone", cleanPhone)
+      .gte("created_at", thirtyMinAgo)
+      .order("created_at", { ascending: true })
+      .limit(10);
+
+    // Build conversation messages from history
+    const historyMessages: any[] = [];
+    for (const msg of (chatHistory || [])) {
+      if (msg.role === "user") {
+        historyMessages.push({ role: "user", content: msg.content });
+      } else if (msg.role === "assistant") {
+        if (msg.tool_name && msg.tool_args) {
+          // Reconstruct the assistant tool call + tool result so the AI has context
+          historyMessages.push({
+            role: "assistant",
+            content: null,
+            tool_calls: [{
+              id: "hist_" + Math.random().toString(36).slice(2, 8),
+              type: "function",
+              function: { name: msg.tool_name, arguments: JSON.stringify(msg.tool_args) },
+            }],
+          });
+          historyMessages.push({
+            role: "tool",
+            tool_call_id: historyMessages[historyMessages.length - 1].tool_calls[0].id,
+            content: msg.content,
+          });
+        } else {
+          historyMessages.push({ role: "assistant", content: msg.content });
+        }
+      }
+    }
+
+    // Save current user message to history
+    await supabase.from("whatsapp_chat_history").insert({
+      user_id: userProfile.user_id,
+      phone: cleanPhone,
+      role: "user",
+      content: messageText,
+    });
+
     // Call Lovable AI to interpret the command
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -297,6 +347,7 @@ Deno.serve(async (req) => {
         model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
+          ...historyMessages,
           { role: "user", content: messageText },
         ],
         tools: TOOLS,
@@ -379,6 +430,16 @@ Deno.serve(async (req) => {
 
     if (responseMessage) {
       await sendWhatsApp(supabase, cleanPhone, responseMessage);
+
+      // Save assistant response to conversation history
+      await supabase.from("whatsapp_chat_history").insert({
+        user_id: userProfile.user_id,
+        phone: cleanPhone,
+        role: "assistant",
+        content: responseMessage,
+        tool_name: functionName,
+        tool_args: args,
+      });
     }
 
     // Log activity
