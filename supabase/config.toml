@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.whatsapp-webhook]
 verify_jwt = false
+
+[functions.notify-end-of-day]
+verify_jwt = false
