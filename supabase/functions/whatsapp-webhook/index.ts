@@ -10,13 +10,16 @@ const TOOLS = [
     type: "function",
     function: {
       name: "criar_tarefa",
-      description: "Cria uma nova tarefa no quadro Kanban do usuário",
+      description: "Cria uma nova tarefa no quadro Kanban. Pode ser no quadro do próprio usuário ou de outro (se admin/gestor). Extraia prazo, horário e responsável da mensagem quando informados.",
       parameters: {
         type: "object",
         properties: {
           titulo: { type: "string", description: "Título da tarefa" },
-          descricao: { type: "string", description: "Descrição opcional da tarefa" },
+          descricao: { type: "string", description: "Descrição da tarefa" },
           prioridade: { type: "string", enum: ["low", "medium", "high", "urgent"], description: "Prioridade da tarefa" },
+          prazo: { type: "string", description: "Data do prazo em formato YYYY-MM-DD. Interprete: 'hoje'=data atual, 'amanhã'=+1 dia, 'sexta'=próxima sexta, 'dia 10'=dia 10 do mês atual/próximo, etc." },
+          horario: { type: "string", description: "Horário agendado no formato HH:MM (24h). Ex: 'às 14h'='14:00', 'meio-dia'='12:00', '9h30'='09:30'" },
+          nome_responsavel: { type: "string", description: "Nome (ou parte) do responsável/dono do quadro onde criar a tarefa. Se não informado, cria no quadro do próprio usuário." },
         },
         required: ["titulo"],
         additionalProperties: false,
@@ -157,30 +160,32 @@ const TOOLS = [
 
 const SYSTEM_PROMPT = `Você é o assistente TaskFox, um bot de gestão de tarefas via WhatsApp.
 Interprete a mensagem do usuário em linguagem natural e execute o comando mais adequado.
+A data de hoje é ${new Date().toISOString().split("T")[0]}.
 
 Exemplos:
-- "Criar tarefa revisar relatório" → criar_tarefa
+- "Criar tarefa revisar relatório para amanhã" → criar_tarefa (titulo, prazo=amanhã)
+- "Criar tarefa reunião às 14h para o dia 28" → criar_tarefa (titulo, horario="14:00", prazo="2024-02-28")
+- "Criar tarefa X para o Leonardo" → criar_tarefa (titulo, nome_responsavel="Leonardo")
+- "Tarefa urgente ligar pro cliente amanhã 9h" → criar_tarefa (titulo, prioridade="urgent", prazo=amanhã, horario="09:00")
 - "Preciso comprar 5 resmas de papel e 2 toners" → criar_lista_compras  
-- "Quais minhas tarefas?" ou "Minhas tarefas" → listar_tarefas
+- "Quais minhas tarefas?" → listar_tarefas
 - "Concluir tarefa relatório" → concluir_tarefa
 - "Como tá meu dia?" → resumo_dia
-- "Meu resumo da semana" ou "Resumo semanal" → resumo_completo (periodo: "semana", sem nome_usuario)
-- "Resumo do mês" → resumo_completo (periodo: "mes", sem nome_usuario)
+- "Meu resumo da semana" → resumo_completo (periodo: "semana")
 - "Resumo do dia do João" → resumo_completo (periodo: "dia", nome_usuario: "João")
-- "Resumo semanal da Maria" → resumo_completo (periodo: "semana", nome_usuario: "Maria")
-- "Tarefas do João" ou "Quadro do João" → tarefas_usuario (pegar nome "João")
-- "Tarefas diárias da Maria" ou "Rotina da Maria" ou "Tarefas fixas do João" → tarefas_diarias_usuario (pegar nome)
+- "Tarefas do João" → tarefas_usuario (nome "João")
+- "Tarefas diárias da Maria" → tarefas_diarias_usuario (nome "Maria")
 - "O que posso fazer?" → ajuda
 
 Regras:
 - Sempre execute UMA ferramenta por mensagem
 - Se não entender, use ajuda
 - Para prioridade, infira do contexto (urgente, importante = high; normal = medium; pode esperar = low)
-- Para lista de compras, extraia os itens e quantidades da mensagem
-- Quantidade padrão é 1 se não especificada
-- Quando o usuário pedir um resumo completo (com período dia/semana/mês), use resumo_completo
-- Se o usuário pedir resumo de OUTRA pessoa, inclua nome_usuario no resumo_completo
-- Quando o usuário pedir tarefas de OUTRA pessoa, use tarefas_usuario ou tarefas_diarias_usuario
+- Para criar_tarefa: SEMPRE tente extrair o prazo (prazo) da mensagem. Converta datas relativas para YYYY-MM-DD baseado na data de hoje
+- Se o usuário mencionar um horário (ex: "às 14h", "9:30"), extraia como horario em formato HH:MM
+- Se o usuário mencionar outra pessoa (ex: "para o João", "no quadro da Maria"), coloque em nome_responsavel
+- Para lista de compras, extraia itens e quantidades. Quantidade padrão é 1
+- Quando pedir resumo com período, use resumo_completo
 - "tarefas diárias", "rotina", "tarefas fixas" de alguém → tarefas_diarias_usuario
 - "tarefas", "quadro" de alguém → tarefas_usuario`;
 
@@ -334,7 +339,7 @@ Deno.serve(async (req) => {
 
     switch (functionName) {
       case "criar_tarefa":
-        responseMessage = await handleCriarTarefa(supabase, userProfile, args);
+        responseMessage = await handleCriarTarefa(supabase, userProfile, args, isAdmin, profiles || []);
         break;
       case "listar_tarefas":
         responseMessage = await handleListarTarefas(supabase, userProfile, args);
@@ -431,25 +436,81 @@ function findProfileByName(profiles: any[], nome: string) {
 }
 
 // ─── COMMAND: Criar Tarefa ─────────────────────────────────
-async function handleCriarTarefa(supabase: any, profile: any, args: any) {
-  const { titulo, descricao, prioridade } = args;
+async function handleCriarTarefa(supabase: any, profile: any, args: any, isAdmin: boolean, allProfiles: any[]) {
+  const { titulo, descricao, prioridade, prazo, horario, nome_responsavel } = args;
 
+  // Determine target user (whose board to create in)
+  let targetProfile = profile;
+  let targetBoard: any = null;
+
+  if (nome_responsavel) {
+    // Check permissions: only admin or team admin of the target's team
+    if (!isAdmin) {
+      // Check if user is team admin for any team the target is in
+      const targetFound = findProfileByName(allProfiles, nome_responsavel);
+      if (!targetFound) {
+        return `❌ Não encontrei nenhum usuário com o nome "${nome_responsavel}".`;
+      }
+      // Check if sender is team admin for any common team
+      const { data: senderTeams } = await supabase
+        .from("team_members")
+        .select("team_id, role")
+        .eq("user_id", profile.user_id);
+      const { data: targetTeams } = await supabase
+        .from("team_members")
+        .select("team_id")
+        .eq("user_id", targetFound.user_id);
+      const senderAdminTeams = (senderTeams || []).filter((t: any) => t.role === "admin").map((t: any) => t.team_id);
+      const targetTeamIds = (targetTeams || []).map((t: any) => t.team_id);
+      const canManage = senderAdminTeams.some((tid: string) => targetTeamIds.includes(tid));
+      if (!canManage) {
+        return `🔒 Você não tem permissão para criar tarefas no quadro de ${targetFound.name}. Apenas administradores ou gestores da equipe podem fazer isso.`;
+      }
+      targetProfile = targetFound;
+    } else {
+      const targetFound = findProfileByName(allProfiles, nome_responsavel);
+      if (!targetFound) {
+        return `❌ Não encontrei nenhum usuário com o nome "${nome_responsavel}".`;
+      }
+      targetProfile = targetFound;
+    }
+  }
+
+  // Find the target's board
   const { data: boards } = await supabase
     .from("boards")
     .select("id, name")
-    .or(`assigned_user_id.eq.${profile.user_id},created_by.eq.${profile.user_id}`)
-    .limit(1);
+    .or(`assigned_user_id.eq.${targetProfile.user_id},created_by.eq.${targetProfile.user_id}`);
 
   if (!boards || boards.length === 0) {
-    return "❌ Você não tem nenhum quadro Kanban disponível. Peça ao administrador para criar um.";
+    return `❌ ${targetProfile.user_id === profile.user_id ? "Você não tem" : targetProfile.name + " não tem"} nenhum quadro Kanban disponível.`;
   }
 
-  const board = boards[0];
+  // If multiple boards, pick the one assigned to the user first
+  if (boards.length === 1) {
+    targetBoard = boards[0];
+  } else {
+    // Prefer the assigned board
+    const { data: assignedBoards } = await supabase
+      .from("boards")
+      .select("id, name")
+      .eq("assigned_user_id", targetProfile.user_id);
+    if (assignedBoards && assignedBoards.length === 1) {
+      targetBoard = assignedBoards[0];
+    } else if (assignedBoards && assignedBoards.length > 1) {
+      // Multiple assigned boards - list them and ask
+      const boardList = assignedBoards.map((b: any, i: number) => `${i + 1}. ${b.name}`).join("\n");
+      return `📋 ${targetProfile.name} tem múltiplos quadros. Em qual deseja criar a tarefa?\n\n${boardList}\n\n_Responda com: "criar tarefa ${titulo} no quadro [nome]"_`;
+    } else {
+      targetBoard = boards[0];
+    }
+  }
 
+  // Get first column
   const { data: columns } = await supabase
     .from("board_columns")
     .select("id, name")
-    .eq("board_id", board.id)
+    .eq("board_id", targetBoard.id)
     .order("position", { ascending: true })
     .limit(1);
 
@@ -457,6 +518,43 @@ async function handleCriarTarefa(supabase: any, profile: any, args: any) {
     return "❌ O quadro não tem colunas. Peça ao administrador para configurá-lo.";
   }
 
+  // Validate prazo
+  let dueDate: string | null = null;
+  if (prazo) {
+    const parsed = new Date(prazo + "T18:00:00-03:00"); // End of business day BRT
+    if (isNaN(parsed.getTime())) {
+      return `❌ Não consegui entender a data "${prazo}". Use formatos como "amanhã", "sexta", "dia 28" ou "2024-03-15".`;
+    }
+    // Don't allow past dates
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const parsedDate = new Date(prazo);
+    parsedDate.setHours(0, 0, 0, 0);
+    if (parsedDate < today) {
+      return `❌ O prazo não pode ser uma data no passado. Informe uma data a partir de hoje.`;
+    }
+    dueDate = parsed.toISOString();
+  }
+
+  // Validate horario
+  let scheduledTime: string | null = null;
+  if (horario) {
+    const timeMatch = horario.match(/^(\d{1,2}):(\d{2})$/);
+    if (!timeMatch) {
+      return `❌ Não consegui entender o horário "${horario}". Use formato como "14:00" ou "09:30".`;
+    }
+    scheduledTime = horario;
+  }
+
+  // If no prazo provided, ask for it
+  if (!dueDate) {
+    let msg = `⚠️ *Prazo obrigatório!*\n\nPara criar a tarefa *"${titulo}"*`;
+    if (targetProfile.user_id !== profile.user_id) msg += ` no quadro de *${targetProfile.name}*`;
+    msg += `, informe o prazo.\n\n_Responda com: "criar tarefa ${titulo} para [data]"_\n_Ex: "para amanhã", "para sexta", "para dia 28"_`;
+    return msg;
+  }
+
+  // Get next position
   const { data: existingTasks } = await supabase
     .from("tasks")
     .select("position")
@@ -466,15 +564,20 @@ async function handleCriarTarefa(supabase: any, profile: any, args: any) {
 
   const nextPosition = (existingTasks?.[0]?.position ?? -1) + 1;
 
-  const { error } = await supabase.from("tasks").insert({
+  // Create the task
+  const taskData: any = {
     title: titulo,
     description: descricao || null,
     priority: prioridade || "medium",
     column_id: columns[0].id,
     created_by: profile.user_id,
-    assignee_id: profile.user_id,
+    assignee_id: targetProfile.user_id,
     position: nextPosition,
-  });
+    due_date: dueDate,
+  };
+  if (scheduledTime) taskData.scheduled_time = scheduledTime;
+
+  const { error } = await supabase.from("tasks").insert(taskData);
 
   if (error) {
     console.error("Error creating task:", error);
@@ -482,13 +585,44 @@ async function handleCriarTarefa(supabase: any, profile: any, args: any) {
   }
 
   const priorityLabels: Record<string, string> = { low: "🟢 Baixa", medium: "🟡 Média", high: "🟠 Alta", urgent: "🔴 Urgente" };
+  const formattedDate = new Date(dueDate!).toLocaleDateString("pt-BR");
 
-  return `✅ *Tarefa criada com sucesso!*\n\n` +
+  let response = `✅ *Tarefa criada com sucesso!*\n\n` +
     `📋 *Título:* ${titulo}\n` +
     (descricao ? `📝 *Descrição:* ${descricao}\n` : "") +
     `🔥 *Prioridade:* ${priorityLabels[prioridade || "medium"]}\n` +
-    `📊 *Quadro:* ${board.name}\n` +
+    `📅 *Prazo:* ${formattedDate}\n` +
+    (scheduledTime ? `⏰ *Horário:* ${scheduledTime}\n` : "") +
+    `📊 *Quadro:* ${targetBoard.name}\n` +
     `📂 *Coluna:* ${columns[0].name}`;
+
+  if (targetProfile.user_id !== profile.user_id) {
+    response += `\n👤 *Responsável:* ${targetProfile.name}`;
+  }
+
+  // Send notification to target if different from creator
+  if (targetProfile.user_id !== profile.user_id) {
+    await supabase.from("notifications").insert({
+      user_id: targetProfile.user_id,
+      title: "Nova tarefa criada",
+      message: `A tarefa "${titulo}" foi atribuída a você no quadro ${targetBoard.name}.`,
+      link: "/boards",
+    });
+
+    // Also send WhatsApp notification to assignee
+    if (targetProfile.whatsapp_number) {
+      const notifMsg = `📋 *Nova Tarefa Atribuída*\n\n` +
+        `Olá ${targetProfile.name}, uma nova tarefa foi criada para você por ${profile.name}:\n\n` +
+        `📋 *Tarefa:* ${titulo}\n` +
+        (descricao ? `📝 *Descrição:* ${descricao}\n` : "") +
+        `📅 *Prazo:* ${formattedDate}\n` +
+        (scheduledTime ? `⏰ *Horário:* ${scheduledTime}\n` : "") +
+        `📊 *Quadro:* ${targetBoard.name}`;
+      await sendWhatsApp(supabase, targetProfile.whatsapp_number.replace(/\D/g, ""), notifMsg);
+    }
+  }
+
+  return response;
 }
 
 // ─── COMMAND: Listar Tarefas ───────────────────────────────
