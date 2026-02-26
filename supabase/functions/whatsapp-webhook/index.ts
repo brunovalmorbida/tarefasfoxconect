@@ -30,11 +30,11 @@ const TOOLS = [
     type: "function",
     function: {
       name: "listar_tarefas",
-      description: "Lista as tarefas do usuário. Pode filtrar por status ou mostrar atrasadas.",
+      description: "Lista as tarefas pendentes do usuário. Mostra tarefas do quadro Kanban (não concluídas) e tarefas fixas/recorrentes (não feitas no período). Pode filtrar por 'hoje', 'semana', 'mes', 'atrasadas', 'fixas' (só recorrentes), 'kanban' (só quadro), ou 'todas' (tudo pendente).",
       parameters: {
         type: "object",
         properties: {
-          filtro: { type: "string", enum: ["todas", "atrasadas", "hoje", "pendentes", "concluidas"], description: "Filtro das tarefas" },
+          filtro: { type: "string", enum: ["todas", "hoje", "semana", "mes", "atrasadas", "fixas", "kanban", "pendentes", "concluidas"], description: "Filtro: 'hoje' mostra tarefas kanban com prazo hoje + fixas do dia; 'semana' mostra kanban com prazo na semana + fixas da semana; 'mes' similar; 'fixas' só recorrentes pendentes; 'kanban' só quadro; 'atrasadas' só atrasadas; 'todas'/'pendentes' tudo pendente" },
         },
         required: ["filtro"],
         additionalProperties: false,
@@ -168,7 +168,13 @@ Exemplos:
 - "Criar tarefa X para o Leonardo" → criar_tarefa (titulo, nome_responsavel="Leonardo")
 - "Tarefa urgente ligar pro cliente amanhã 9h" → criar_tarefa (titulo, prioridade="urgent", prazo=amanhã, horario="09:00")
 - "Preciso comprar 5 resmas de papel e 2 toners" → criar_lista_compras  
-- "Quais minhas tarefas?" → listar_tarefas
+- "Quais minhas tarefas?" → listar_tarefas (filtro: "todas")
+- "Tarefas de hoje" → listar_tarefas (filtro: "hoje")
+- "Tarefas da semana" → listar_tarefas (filtro: "semana")
+- "Tarefas do mês" → listar_tarefas (filtro: "mes")
+- "Tarefas fixas pendentes" → listar_tarefas (filtro: "fixas")
+- "Tarefas atrasadas" → listar_tarefas (filtro: "atrasadas")
+- "O que falta fazer?" → listar_tarefas (filtro: "hoje")
 - "Concluir tarefa relatório" → concluir_tarefa
 - "Como tá meu dia?" → resumo_dia
 - "Meu resumo da semana" → resumo_completo (periodo: "semana")
@@ -689,67 +695,297 @@ async function handleCriarTarefa(supabase: any, profile: any, args: any, isAdmin
 // ─── COMMAND: Listar Tarefas ───────────────────────────────
 async function handleListarTarefas(supabase: any, profile: any, args: any) {
   const { filtro } = args;
+  const now = new Date();
+  const brtOffset = -3 * 60;
+  const brtNow = new Date(now.getTime() + (brtOffset + now.getTimezoneOffset()) * 60000);
+  const todayStr = `${brtNow.getFullYear()}-${String(brtNow.getMonth() + 1).padStart(2, "0")}-${String(brtNow.getDate()).padStart(2, "0")}`;
 
-  let query = supabase
-    .from("tasks")
-    .select("id, title, priority, due_date, column_id")
-    .eq("assignee_id", profile.user_id)
-    .order("created_at", { ascending: false })
-    .limit(10);
+  const showKanban = !["fixas"].includes(filtro);
+  const showRecurring = !["kanban", "concluidas"].includes(filtro);
 
-  const now = new Date().toISOString();
+  let msg = "";
 
-  if (filtro === "atrasadas") {
-    query = query.lt("due_date", now).not("due_date", "is", null);
-  } else if (filtro === "hoje") {
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date();
-    endOfDay.setHours(23, 59, 59, 999);
-    query = query
-      .gte("due_date", startOfDay.toISOString())
-      .lte("due_date", endOfDay.toISOString());
+  // ── KANBAN TASKS ──
+  if (showKanban) {
+    const { data: allTasks } = await supabase
+      .from("tasks")
+      .select("id, title, priority, due_date, column_id, scheduled_time")
+      .eq("assignee_id", profile.user_id);
+
+    const tasks = allTasks || [];
+
+    // Get column info to identify done columns
+    const columnIds = [...new Set(tasks.map((t: any) => t.column_id))];
+    let columns: any[] = [];
+    if (columnIds.length > 0) {
+      const { data } = await supabase.from("board_columns").select("id, name, board_id, position").in("id", columnIds);
+      columns = data || [];
+    }
+
+    const boardMaxPos = new Map<string, number>();
+    columns.forEach((c: any) => {
+      const curr = boardMaxPos.get(c.board_id) || 0;
+      if (c.position > curr) boardMaxPos.set(c.board_id, c.position);
+    });
+    const doneColumnIds = new Set(
+      columns.filter((c: any) => c.position === boardMaxPos.get(c.board_id)).map((c: any) => c.id)
+    );
+    const colMap = new Map(columns.map((c: any) => [c.id, c.name]));
+
+    // Get board names
+    const boardIds = [...new Set(columns.map((c: any) => c.board_id))];
+    let boardMap = new Map<string, string>();
+    if (boardIds.length > 0) {
+      const { data: boards } = await supabase.from("boards").select("id, name").in("id", boardIds);
+      boardMap = new Map((boards || []).map((b: any) => [b.id, b.name]));
+    }
+    const colBoardMap = new Map(columns.map((c: any) => [c.id, c.board_id]));
+
+    let filteredTasks: any[] = [];
+    const priorityEmoji: Record<string, string> = { low: "🟢", medium: "🟡", high: "🟠", urgent: "🔴" };
+
+    if (filtro === "concluidas") {
+      filteredTasks = tasks.filter((t: any) => doneColumnIds.has(t.column_id));
+    } else if (filtro === "atrasadas") {
+      filteredTasks = tasks.filter((t: any) => t.due_date && new Date(t.due_date) < now && !doneColumnIds.has(t.column_id));
+    } else {
+      // All pending (not done)
+      filteredTasks = tasks.filter((t: any) => !doneColumnIds.has(t.column_id));
+    }
+
+    // Determine date range emphasis
+    let emphasisStart: Date | null = null;
+    let emphasisEnd: Date | null = null;
+    let emphasisLabel = "";
+
+    if (filtro === "hoje") {
+      emphasisStart = new Date(brtNow); emphasisStart.setHours(0,0,0,0);
+      emphasisEnd = new Date(brtNow); emphasisEnd.setHours(23,59,59,999);
+      emphasisLabel = "hoje";
+    } else if (filtro === "semana") {
+      const day = brtNow.getDay();
+      const diff = day === 0 ? 6 : day - 1;
+      emphasisStart = new Date(brtNow); emphasisStart.setDate(brtNow.getDate() - diff); emphasisStart.setHours(0,0,0,0);
+      emphasisEnd = new Date(emphasisStart); emphasisEnd.setDate(emphasisStart.getDate() + 6); emphasisEnd.setHours(23,59,59,999);
+      emphasisLabel = "esta semana";
+    } else if (filtro === "mes") {
+      emphasisStart = new Date(brtNow.getFullYear(), brtNow.getMonth(), 1);
+      emphasisEnd = new Date(brtNow.getFullYear(), brtNow.getMonth() + 1, 0, 23, 59, 59, 999);
+      emphasisLabel = "este mês";
+    }
+
+    // Sort: tasks with due date in emphasis period first, then overdue, then rest
+    filteredTasks.sort((a: any, b: any) => {
+      const aDate = a.due_date ? new Date(a.due_date) : null;
+      const bDate = b.due_date ? new Date(b.due_date) : null;
+      const aInEmphasis = emphasisStart && aDate && aDate >= emphasisStart && aDate <= emphasisEnd! ? 1 : 0;
+      const bInEmphasis = emphasisStart && bDate && bDate >= emphasisStart && bDate <= emphasisEnd! ? 1 : 0;
+      if (aInEmphasis !== bInEmphasis) return bInEmphasis - aInEmphasis;
+      const aOverdue = aDate && aDate < now ? 1 : 0;
+      const bOverdue = bDate && bDate < now ? 1 : 0;
+      if (aOverdue !== bOverdue) return bOverdue - aOverdue;
+      if (aDate && bDate) return aDate.getTime() - bDate.getTime();
+      return 0;
+    });
+
+    if (filteredTasks.length > 0) {
+      const filtroTitles: Record<string, string> = {
+        todas: "Tarefas Pendentes (Kanban)",
+        hoje: "Tarefas Kanban",
+        semana: "Tarefas Kanban",
+        mes: "Tarefas Kanban",
+        atrasadas: "Tarefas Atrasadas (Kanban)",
+        kanban: "Tarefas Pendentes (Kanban)",
+        pendentes: "Tarefas Pendentes (Kanban)",
+        concluidas: "Tarefas Concluídas (Kanban)",
+      };
+
+      msg += `📋 *${filtroTitles[filtro] || "Tarefas Kanban"}*\n`;
+      if (emphasisLabel) msg += `📌 _Ênfase: prazo ${emphasisLabel}_\n`;
+      msg += `\n`;
+
+      // Separate emphasized tasks
+      const emphasizedTasks = emphasisStart
+        ? filteredTasks.filter((t: any) => {
+            if (!t.due_date) return false;
+            const d = new Date(t.due_date);
+            return d >= emphasisStart! && d <= emphasisEnd!;
+          })
+        : [];
+      const otherTasks = emphasisStart
+        ? filteredTasks.filter((t: any) => {
+            if (!t.due_date) return true;
+            const d = new Date(t.due_date);
+            return d < emphasisStart! || d > emphasisEnd!;
+          })
+        : filteredTasks;
+
+      if (emphasizedTasks.length > 0) {
+        const periodEmoji = filtro === "hoje" ? "🔴" : "⚡";
+        msg += `${periodEmoji} *Prazo ${emphasisLabel} (${emphasizedTasks.length}):*\n`;
+        emphasizedTasks.slice(0, 10).forEach((t: any, i: number) => {
+          const emoji = priorityEmoji[t.priority] || "⚪";
+          const boardName = boardMap.get(colBoardMap.get(t.column_id) || "") || "";
+          const dueStr = t.due_date ? new Date(t.due_date).toLocaleDateString("pt-BR") : "";
+          const timeStr = t.scheduled_time ? ` ⏰${t.scheduled_time.slice(0,5)}` : "";
+          const isOverdue = t.due_date && new Date(t.due_date) < now ? " ⚠️" : "";
+          msg += `  ${i + 1}. ${emoji} *${t.title}*${isOverdue}\n     📊 ${boardName} | 📅 ${dueStr}${timeStr}\n`;
+        });
+        msg += `\n`;
+      }
+
+      if (otherTasks.length > 0 && filtro !== "atrasadas") {
+        if (emphasizedTasks.length > 0) msg += `📋 *Outras pendentes (${otherTasks.length}):*\n`;
+        otherTasks.slice(0, 10).forEach((t: any, i: number) => {
+          const emoji = priorityEmoji[t.priority] || "⚪";
+          const boardName = boardMap.get(colBoardMap.get(t.column_id) || "") || "";
+          const dueStr = t.due_date ? ` | 📅 ${new Date(t.due_date).toLocaleDateString("pt-BR")}` : "";
+          const isOverdue = t.due_date && new Date(t.due_date) < now ? " ⚠️" : "";
+          msg += `  ${i + 1}. ${emoji} ${t.title}${isOverdue}\n     📊 ${boardName}${dueStr}\n`;
+        });
+        if (otherTasks.length > 10) msg += `  ... e mais ${otherTasks.length - 10}\n`;
+        msg += `\n`;
+      }
+    } else {
+      if (filtro === "concluidas") {
+        msg += `📋 Nenhuma tarefa concluída no quadro Kanban.\n\n`;
+      } else if (filtro === "atrasadas") {
+        msg += `✅ Nenhuma tarefa atrasada no Kanban! 🎉\n\n`;
+      } else {
+        msg += `✅ Nenhuma tarefa pendente no Kanban! 🎉\n\n`;
+      }
+    }
   }
 
-  const { data: tasks, error } = await query;
+  // ── RECURRING TASKS ──
+  if (showRecurring) {
+    // Get boards assigned to user
+    const { data: recBoards } = await supabase
+      .from("recurring_task_boards")
+      .select("id, name, assigned_user_id, frequency_type, weekday")
+      .or(`assigned_user_id.eq.${profile.user_id},assigned_user_id.is.null`);
 
-  if (error) return `❌ Erro ao buscar tarefas: ${error.message}`;
+    const boards = recBoards || [];
+    const boardIds = boards.map((b: any) => b.id);
 
-  if (!tasks || tasks.length === 0) {
-    const filtroLabels: Record<string, string> = {
-      todas: "nenhuma tarefa",
-      atrasadas: "nenhuma tarefa atrasada",
-      hoje: "nenhuma tarefa para hoje",
-      pendentes: "nenhuma tarefa pendente",
-      concluidas: "nenhuma tarefa concluída",
-    };
-    return `📋 Você não tem ${filtroLabels[filtro] || "tarefas"} no momento. Bom trabalho! 🎉`;
+    if (boardIds.length > 0) {
+      const { data: recTasks } = await supabase
+        .from("recurring_tasks")
+        .select("id, title, frequency, weekday, month_day, board_id, scheduled_time")
+        .in("board_id", boardIds)
+        .order("position");
+
+      const allRecTasks = recTasks || [];
+
+      // Get completions
+      const recTaskIds = allRecTasks.map((t: any) => t.id);
+      let completions: any[] = [];
+      if (recTaskIds.length > 0) {
+        // For period filtering, get completions in a range
+        const jsDay = brtNow.getDay();
+        let periodStartStr = todayStr;
+        if (filtro === "semana") {
+          const diff = jsDay === 0 ? 6 : jsDay - 1;
+          const weekStart = new Date(brtNow);
+          weekStart.setDate(brtNow.getDate() - diff);
+          periodStartStr = `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, "0")}-${String(weekStart.getDate()).padStart(2, "0")}`;
+        } else if (filtro === "mes") {
+          periodStartStr = `${brtNow.getFullYear()}-${String(brtNow.getMonth() + 1).padStart(2, "0")}-01`;
+        }
+
+        const { data } = await supabase
+          .from("recurring_task_completions")
+          .select("recurring_task_id, period_start")
+          .in("recurring_task_id", recTaskIds)
+          .gte("period_start", periodStartStr)
+          .lte("period_start", todayStr);
+        completions = data || [];
+      }
+
+      const completedSet = new Set(completions.map((c: any) => `${c.recurring_task_id}_${c.period_start}`));
+
+      // Filter active tasks for today
+      const jsDay = brtNow.getDay();
+      const ourDay = jsDay === 0 ? 6 : jsDay - 1;
+
+      const activeTodayTasks = allRecTasks.filter((t: any) => {
+        if (jsDay === 0) return false; // Sunday off
+        if (t.frequency === "daily") return true;
+        if (t.frequency === "weekday" && t.weekday !== null) return ourDay === t.weekday;
+        if (t.frequency === "monthly" && t.month_day !== null) return brtNow.getDate() === t.month_day;
+        if (t.frequency === "weekly") return true;
+        return false;
+      });
+
+      // Find pending (not completed today)
+      const pendingToday = activeTodayTasks.filter((t: any) => !completedSet.has(`${t.id}_${todayStr}`));
+      const doneToday = activeTodayTasks.filter((t: any) => completedSet.has(`${t.id}_${todayStr}`));
+
+      const boardNameMap = new Map(boards.map((b: any) => [b.id, b.name]));
+
+      const showAll = ["todas", "pendentes", "fixas"].includes(filtro);
+      const showToday = filtro === "hoje" || showAll;
+      const showWeek = filtro === "semana";
+      const showMonth = filtro === "mes";
+
+      if (showToday && activeTodayTasks.length > 0) {
+        const progress = activeTodayTasks.length > 0 ? Math.round((doneToday.length / activeTodayTasks.length) * 100) : 0;
+        let pEmoji = "🔴";
+        if (progress >= 80) pEmoji = "🟢";
+        else if (progress >= 50) pEmoji = "🟡";
+
+        msg += `🔄 *Tarefas Fixas - Hoje* ${pEmoji} ${progress}% (${doneToday.length}/${activeTodayTasks.length})\n\n`;
+
+        if (pendingToday.length > 0) {
+          msg += `⏳ *Pendentes (${pendingToday.length}):*\n`;
+          pendingToday.forEach((t: any, i: number) => {
+            const boardName = boardNameMap.get(t.board_id) || "";
+            const timeStr = t.scheduled_time ? ` ⏰ ${t.scheduled_time.slice(0,5)}` : "";
+            const isLate = t.scheduled_time && t.scheduled_time.slice(0,5) < `${String(brtNow.getHours()).padStart(2,"0")}:${String(brtNow.getMinutes()).padStart(2,"0")}`;
+            msg += `  ${i + 1}. ${isLate ? "⚠️" : "⏳"} ${t.title}${timeStr}\n     📌 ${boardName}\n`;
+          });
+          msg += `\n`;
+        }
+
+        if (doneToday.length > 0) {
+          msg += `✅ *Concluídas (${doneToday.length}):*\n`;
+          doneToday.forEach((t: any, i: number) => {
+            msg += `  ${i + 1}. ✅ ${t.title}\n`;
+          });
+          msg += `\n`;
+        }
+      } else if (showToday && activeTodayTasks.length === 0 && filtro === "fixas") {
+        msg += `🔄 Sem tarefas fixas para hoje.\n\n`;
+      }
+
+      // Week/Month: show all tasks with completion status summary
+      if (showWeek || showMonth) {
+        const periodLabel = showWeek ? "Semana" : "Mês";
+        const totalInPeriod = allRecTasks.length;
+        const completionsInPeriod = completions.length;
+
+        msg += `🔄 *Tarefas Fixas - ${periodLabel}*\n`;
+        msg += `📈 Conclusões no período: ${completionsInPeriod}\n\n`;
+
+        // Still show today's pending
+        if (pendingToday.length > 0) {
+          msg += `⏳ *Pendentes HOJE (${pendingToday.length}):*\n`;
+          pendingToday.forEach((t: any, i: number) => {
+            const boardName = boardNameMap.get(t.board_id) || "";
+            const timeStr = t.scheduled_time ? ` ⏰ ${t.scheduled_time.slice(0,5)}` : "";
+            msg += `  ${i + 1}. ⏳ ${t.title}${timeStr}\n     📌 ${boardName}\n`;
+          });
+          msg += `\n`;
+        } else if (activeTodayTasks.length > 0) {
+          msg += `✅ Todas as tarefas fixas de hoje concluídas! 🎉\n\n`;
+        }
+      }
+    }
   }
 
-  const columnIds = [...new Set(tasks.map((t: any) => t.column_id))];
-  const { data: columns } = await supabase
-    .from("board_columns")
-    .select("id, name")
-    .in("id", columnIds);
-  const colMap = new Map((columns || []).map((c: any) => [c.id, c.name]));
-
-  const priorityEmoji: Record<string, string> = { low: "🟢", medium: "🟡", high: "🟠", urgent: "🔴" };
-
-  const filtroTitles: Record<string, string> = {
-    todas: "Suas Tarefas",
-    atrasadas: "Tarefas Atrasadas ⚠️",
-    hoje: "Tarefas de Hoje",
-    pendentes: "Tarefas Pendentes",
-    concluidas: "Tarefas Concluídas",
-  };
-
-  let msg = `📋 *${filtroTitles[filtro] || "Tarefas"}*\n\n`;
-  tasks.forEach((t: any, i: number) => {
-    const emoji = priorityEmoji[t.priority] || "⚪";
-    const colName = colMap.get(t.column_id) || "";
-    const dueStr = t.due_date ? ` | 📅 ${new Date(t.due_date).toLocaleDateString("pt-BR")}` : "";
-    msg += `${i + 1}. ${emoji} ${t.title}\n   📂 ${colName}${dueStr}\n\n`;
-  });
+  if (!msg.trim()) {
+    return `📋 Sem tarefas encontradas para o filtro "${filtro}". Bom trabalho! 🎉`;
+  }
 
   return msg.trim();
 }
