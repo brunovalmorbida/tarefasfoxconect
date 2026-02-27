@@ -8,6 +8,7 @@ import { NotificationsConfigTab } from "@/components/settings/NotificationsConfi
 import { PermissionsTab } from "@/components/settings/PermissionsTab";
 import { TeamsTab } from "@/components/settings/TeamsTab";
 import { Settings, Users, Plug, ScrollText, Download, ShoppingCart, Bell, Shield, Users2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
@@ -101,7 +102,18 @@ export default function SettingsPage() {
         </TabsList>
 
         <TabsContent value="general" className="mt-6 space-y-4">
-          <p className="text-muted-foreground">Configurações gerais do sistema.</p>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="h-5 w-5" />
+                TaskFox
+              </CardTitle>
+              <CardDescription>Versão atual do sistema</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Badge variant="secondary" className="text-sm font-mono">v1.3</Badge>
+            </CardContent>
+          </Card>
 
           {isAdmin && (
             <Card>
