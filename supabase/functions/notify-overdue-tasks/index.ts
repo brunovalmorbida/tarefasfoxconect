@@ -11,6 +11,24 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Business hours check (BRT): Mon-Fri 08:30-18:00, Sat 08:00-12:00, Sun blocked
+    const _now = new Date();
+    const _brtNow = new Date(_now.getTime() + (-3 * 60 + _now.getTimezoneOffset()) * 60000);
+    const _dayOfWeek = _brtNow.getDay();
+    const _totalMin = _brtNow.getHours() * 60 + _brtNow.getMinutes();
+
+    const isBusinessHours = (() => {
+      if (_dayOfWeek === 0) return false;
+      if (_dayOfWeek === 6) return _totalMin >= 480 && _totalMin < 720;
+      return _totalMin >= 510 && _totalMin < 1080;
+    })();
+
+    if (!isBusinessHours) {
+      return new Response(JSON.stringify({ message: "Fora do horário comercial — notificação não enviada", skipped: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
