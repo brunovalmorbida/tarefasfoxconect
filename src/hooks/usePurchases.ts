@@ -278,10 +278,59 @@ export function usePurchases() {
     },
   });
 
+  const updateList = useMutation({
+    mutationFn: async (data: {
+      id: string;
+      title: string;
+      urgency: string;
+      buyer_id?: string;
+      items: Array<{ id?: string; name: string; quantity: number; category: string; estimated_value?: number; description?: string }>;
+    }) => {
+      const { error } = await supabase
+        .from("purchase_lists")
+        .update({
+          title: data.title,
+          urgency: data.urgency,
+          buyer_id: data.buyer_id || null,
+        } as any)
+        .eq("id", data.id);
+      if (error) throw error;
+
+      // Delete existing items and re-insert
+      await supabase.from("purchase_list_items").delete().eq("list_id", data.id);
+
+      const rows = data.items.map((item) => ({
+        list_id: data.id,
+        name: item.name,
+        quantity: item.quantity,
+        category: item.category,
+        estimated_value: item.estimated_value || null,
+        description: item.description || null,
+      }));
+      if (rows.length > 0) {
+        const { error: itemsError } = await supabase
+          .from("purchase_list_items")
+          .insert(rows as any);
+        if (itemsError) throw itemsError;
+      }
+
+      return data;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["purchase-lists"] });
+      toast({ title: "Lista atualizada!" });
+      logActivity("Editou uma lista de compras", { title: variables.title, items: variables.items.length });
+    },
+    onError: (e: any) => {
+      toast({ title: "Erro ao atualizar lista", description: e.message, variant: "destructive" });
+    },
+  });
+
   return {
     purchases: purchasesQuery.data || [],
     isLoading: purchasesQuery.isLoading,
     createList,
+    updateList,
     markAsPurchased,
     markAsReceived,
     markItemPurchased,
