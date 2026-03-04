@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, ShoppingCart, PackageCheck, Trash2, Clock, X, ChevronDown, ChevronUp, Check } from "lucide-react";
+import { Plus, ShoppingCart, PackageCheck, Trash2, Clock, X, ChevronDown, ChevronUp, Check, Pencil } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
@@ -45,13 +45,20 @@ export default function Purchases() {
   const { user } = useAuth();
   const { data: isAdmin } = useIsAppAdmin();
   const canViewPurchases = useCanManage("can_view_purchases");
-  const { purchases, isLoading, createList, markAsPurchased, markAsReceived, markItemPurchased, markItemReceived, deleteList } = usePurchases();
+  const { purchases, isLoading, createList, updateList, markAsPurchased, markAsReceived, markItemPurchased, markItemReceived, deleteList } = usePurchases();
   const { toast } = useToast();
 
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showPurchaseDialog, setShowPurchaseDialog] = useState<PurchaseList | null>(null);
   const [showReceiveDialog, setShowReceiveDialog] = useState<PurchaseList | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [showEditDialog, setShowEditDialog] = useState<PurchaseList | null>(null);
+
+  // Edit form
+  const [editTitle, setEditTitle] = useState("");
+  const [editUrgency, setEditUrgency] = useState("medium");
+  const [editBuyerId, setEditBuyerId] = useState("");
+  const [editItems, setEditItems] = useState<ListItem[]>([emptyItem()]);
 
   // Create form
   const [newTitle, setNewTitle] = useState("Lista de Compras");
@@ -132,6 +139,49 @@ export default function Purchases() {
   });
 
   const [openProductPopover, setOpenProductPopover] = useState<number | null>(null);
+
+  const updateEditItem = (i: number, field: keyof ListItem, value: string) => {
+    setEditItems((prev) => prev.map((item, idx) => idx === i ? { ...item, [field]: value } : item));
+  };
+
+  const openEdit = (list: PurchaseList) => {
+    setEditTitle(list.title);
+    setEditUrgency(list.urgency);
+    setEditBuyerId(list.buyer_id || "");
+    setEditItems(list.items.map((i) => ({
+      name: i.name,
+      quantity: String(i.quantity),
+      category: i.category,
+      estimated_value: i.estimated_value ? String(i.estimated_value) : "",
+      description: i.description || "",
+    })));
+    setShowEditDialog(list);
+  };
+
+  const handleEdit = () => {
+    if (!showEditDialog) return;
+    const valid = editItems.filter((i) => i.name.trim());
+    if (!valid.length) return;
+    if (!editBuyerId) {
+      toast({ title: "Selecione um comprador", variant: "destructive" });
+      return;
+    }
+    updateList.mutate({
+      id: showEditDialog.id,
+      title: editTitle.trim() || "Lista de Compras",
+      urgency: editUrgency,
+      buyer_id: editBuyerId,
+      items: valid.map((i) => ({
+        name: i.name.trim(),
+        quantity: parseInt(i.quantity) || 1,
+        category: i.category,
+        estimated_value: i.estimated_value ? parseFloat(i.estimated_value) : undefined,
+        description: i.description.trim() || undefined,
+      })),
+    }, {
+      onSuccess: () => setShowEditDialog(null),
+    });
+  };
 
   const updateItem = (i: number, field: keyof ListItem, value: string) => {
     setListItems((prev) => prev.map((item, idx) => idx === i ? { ...item, [field]: value } : item));
@@ -300,6 +350,11 @@ export default function Purchases() {
           </div>
 
           <div className="flex gap-1 pt-1">
+            {list.status === "pending" && (isAdmin || list.requested_by === user?.id) && (
+              <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => openEdit(list)}>
+                <Pencil className="h-3 w-3 mr-1" /> Editar
+              </Button>
+            )}
             {list.status === "pending" && (
               <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => {
                 const vals: Record<string, string> = {};
@@ -463,6 +518,115 @@ export default function Purchases() {
             <Button variant="outline" onClick={() => setShowCreateDialog(false)}>Cancelar</Button>
             <Button onClick={handleCreate} disabled={!listItems.some((i) => i.name.trim()) || createList.isPending}>
               {createList.isPending ? "Criando..." : `Criar Lista (${listItems.filter((i) => i.name.trim()).length} itens)`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!showEditDialog} onOpenChange={(open) => { if (!open) setShowEditDialog(null); }}>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Editar Lista de Compras</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="col-span-1">
+                <Label>Título</Label>
+                <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+              </div>
+              <div>
+                <Label>Urgência</Label>
+                <Select value={editUrgency} onValueChange={setEditUrgency}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(urgencyLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Comprador <span className="text-destructive">*</span></Label>
+                <Select value={editBuyerId} onValueChange={setEditBuyerId}>
+                  <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                  <SelectContent>
+                    {buyerProfiles.map((p: any) => <SelectItem key={p.user_id} value={p.user_id}>{p.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-semibold">Itens ({editItems.length})</Label>
+                <Button type="button" variant="outline" size="sm" onClick={() => setEditItems((p) => [...p, emptyItem()])}>
+                  <Plus className="h-3 w-3 mr-1" /> Item
+                </Button>
+              </div>
+              {editItems.map((item, i) => (
+                <div key={i} className="flex gap-2 items-start">
+                  <div className="flex-1 grid grid-cols-5 gap-2">
+                    <div className="col-span-2">
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className="h-8 text-sm w-full justify-start font-normal truncate">
+                            {item.name || <span className="text-muted-foreground">Selecionar produto...</span>}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="p-0 w-[280px]" align="start">
+                          <Command>
+                            <CommandInput placeholder="Buscar produto..." />
+                            <CommandList>
+                              <CommandEmpty>Nenhum produto encontrado.</CommandEmpty>
+                              <CommandGroup heading="Catálogo">
+                                {productCatalog.map((p: any) => (
+                                  <CommandItem
+                                    key={p.id}
+                                    value={p.name}
+                                    onSelect={() => {
+                                      const catId = p.category_id || "other";
+                                      updateEditItem(i, "name", p.name);
+                                      updateEditItem(i, "category", catId);
+                                      if (p.default_estimated_value) {
+                                        updateEditItem(i, "estimated_value", String(p.default_estimated_value));
+                                      }
+                                    }}
+                                  >
+                                    <div className="flex flex-col">
+                                      <span>{p.name}</span>
+                                      <span className="text-xs text-muted-foreground">
+                                        {p.product_categories?.name || "Sem categoria"}
+                                        {p.default_estimated_value ? ` · R$ ${Number(p.default_estimated_value).toFixed(2)}` : ""}
+                                      </span>
+                                    </div>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <Input type="number" min="1" value={item.quantity} onChange={(e) => updateEditItem(i, "quantity", e.target.value)} placeholder="Qtd" className="h-8 text-sm" />
+                    <Select value={item.category} onValueChange={(v) => updateEditItem(i, "category", v)}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(allCategoryLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <Input type="number" step="0.01" value={item.estimated_value} onChange={(e) => updateEditItem(i, "estimated_value", e.target.value)} placeholder="R$" className="h-8 text-sm" />
+                  </div>
+                  {editItems.length > 1 && (
+                    <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive shrink-0"
+                      onClick={() => setEditItems((p) => p.filter((_, idx) => idx !== i))}>
+                      <X className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditDialog(null)}>Cancelar</Button>
+            <Button onClick={handleEdit} disabled={!editItems.some((i) => i.name.trim()) || updateList.isPending}>
+              {updateList.isPending ? "Salvando..." : `Salvar Alterações (${editItems.filter((i) => i.name.trim()).length} itens)`}
             </Button>
           </DialogFooter>
         </DialogContent>
