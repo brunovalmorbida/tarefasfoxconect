@@ -1,0 +1,458 @@
+================================================================================
+TASKFOX v1.3 — DOCUMENTAÇÃO TÉCNICA COMPLETA DO SISTEMA
+Sistema de Gestão de Tarefas — Fox Conect
+================================================================================
+
+## 1. VISÃO GERAL
+
+TaskFox é uma plataforma SaaS de gestão de tarefas e produtividade desenvolvida
+para a Fox Conect. Combina quadros Kanban, tarefas recorrentes (fixas), gestão de
+compras de materiais, dashboards analíticos e automações via WhatsApp.
+
+Stack: React + TypeScript + Vite + Tailwind CSS + shadcn/ui (frontend)
+       Supabase (Auth, PostgreSQL, Edge Functions, Realtime) (backend)
+       Z-API (integração WhatsApp)
+       Lovable AI (IA para comandos via WhatsApp)
+
+================================================================================
+
+## 2. AUTENTICAÇÃO E PERFIS
+
+### 2.1 Autenticação
+- Login e cadastro com email/senha (Supabase Auth)
+- Verificação de email obrigatória (auto-confirm desativado)
+- Recuperação de senha com link por email
+- Sessão persistente via Supabase
+
+### 2.2 Perfil do Usuário (tabela: profiles)
+Campos: user_id, name, avatar_url, job_title, whatsapp_number
+- Criado automaticamente via trigger handle_new_user ao registrar
+- Editável pelo próprio usuário na página /profile
+- WhatsApp number usado para notificações automáticas
+
+### 2.3 Roles e Permissões
+Tabela user_roles: user_id + role (enum: admin | user)
+- Admins têm visibilidade e controle total
+- Verificação via função SQL is_app_admin() (SECURITY DEFINER)
+
+Tabela user_permissions: permissões granulares por usuário
+- can_manage_boards, can_manage_columns, can_manage_tasks
+- can_manage_recurring_tasks, can_manage_purchases
+- can_view_purchases, can_be_buyer
+- Verificação via função SQL has_permission()
+- Gerenciável por admins em Configurações > Permissões
+
+================================================================================
+
+## 3. GESTÃO DE EQUIPES
+
+### 3.1 Equipes (tabela: teams)
+Campos: id, name, description, created_by, created_at, updated_at
+- Qualquer usuário autenticado pode criar equipes
+- Criador é automaticamente adicionado como admin (trigger handle_new_team)
+
+### 3.2 Membros (tabela: team_members)
+Campos: team_id, user_id, role (enum: admin | member)
+- Admins da equipe podem adicionar/remover membros
+- Membros da equipe veem os quadros e tarefas da equipe
+
+### 3.3 Visibilidade de Equipes (tabela: user_team_visibility)
+Campos: user_id, team_id
+- Admins do app podem configurar quais equipes cada usuário vê
+- Boards com assigned_user_id são visíveis apenas para o responsável e admins
+
+================================================================================
+
+## 4. MÓDULO KANBAN (QUADROS E TAREFAS)
+
+### 4.1 Quadros (tabela: boards)
+Campos: id, name, description, team_id, created_by, assigned_user_id
+- Vinculados a uma equipe
+- Podem ter um responsável específico (assigned_user_id)
+- Ao criar, 4 colunas padrão são geradas: A Fazer, Em Andamento, Em Revisão, Concluído
+
+### 4.2 Colunas (tabela: board_columns)
+Campos: id, board_id, name, position
+- Personalizáveis (adicionar, renomear, excluir)
+- Ordenadas por position
+
+### 4.3 Tarefas (tabela: tasks)
+Campos: id, column_id, title, description, priority (low|medium|high|urgent),
+        assignee_id, due_date, scheduled_time, labels[], position, created_by
+- Drag & drop entre colunas (otimista) via @hello-pangea/dnd
+- Prioridade com borda lateral colorida (verde/amarelo/laranja/vermelho)
+- Tarefas na última coluna (Concluído): visual foscado, texto tachado, ícone check
+- Indicador '!' vermelho se concluída após o prazo original
+- Horário agendado opcional (scheduled_time) com alertas automáticos
+
+### 4.4 Subtarefas (tabela: subtasks)
+Campos: id, task_id, title, is_completed, position, created_by
+- Checklist dentro de cada tarefa
+- Barra de progresso visual no card da tarefa
+- Criação inline durante edição da tarefa
+
+### 4.5 Comentários (tabela: comments)
+Campos: id, task_id, user_id, content, created_at
+- Comentários por tarefa
+- Apenas o autor pode editar/excluir
+- Visíveis para membros da equipe
+
+### 4.6 Funcionalidades do Kanban
+- Criação/edição de quadros com seleção de equipe e responsável
+- Adição de colunas personalizadas
+- Criação de tarefas com: título, descrição, responsável, prioridade, prazo, horário, subtarefas
+- Drag & drop para reordenação e movimentação entre colunas
+- Duplicação de tarefas
+- Movimentação rápida entre colunas via menu
+- Edição inline de tarefas com todos os campos + comentários + subtarefas
+
+================================================================================
+
+## 5. MÓDULO DE TAREFAS RECORRENTES (FIXAS)
+
+### 5.1 Quadros Recorrentes (tabela: recurring_task_boards)
+Campos: id, name, team_id, frequency_type, weekday, assigned_user_id, created_by
+- frequency_type: 'weekday' (dia específico), 'weekly', 'monthly'
+- weekday: 0-6 (Segunda a Domingo) quando frequency_type = 'weekday'
+- Validação via trigger validate_recurring_task_board
+
+### 5.2 Tarefas Recorrentes (tabela: recurring_tasks)
+Campos: id, board_id, team_id, title, description, frequency, weekday, month_day,
+        scheduled_time, position, created_by
+- frequency: 'daily', 'weekdays' (seg-sex), 'weekly', 'monthly', 'weekday_X'
+- scheduled_time: horário limite para conclusão
+- Reordenáveis via drag & drop
+
+### 5.3 Completions (tabela: recurring_task_completions)
+Campos: id, recurring_task_id, completed_by, period_start (date), completed_at
+- Registra cada conclusão com data do período
+- Toggle: marcar/desmarcar conclusão do dia
+
+### 5.4 Lógica de Ativação
+Função isTaskActiveToday(task):
+- 'daily': ativa todos os dias
+- 'weekdays': ativa seg-sex
+- 'weekly': ativa se weekday da tarefa = dia atual
+- 'monthly': ativa se month_day = dia do mês atual
+- 'weekday_X': ativa se dia da semana = X
+
+### 5.5 Interface
+- Lista de quadros por equipe com filtro
+- Dentro do quadro: lista de tarefas com checkbox de conclusão
+- Barra de progresso diária (tarefas ativas hoje vs concluídas)
+- Criação/edição/exclusão de tarefas e quadros
+- Badges de frequência e horário
+
+================================================================================
+
+## 6. MÓDULO DE COMPRAS
+
+### 6.1 Listas de Compras (tabela: purchase_lists)
+Campos: id, title, requested_by, buyer_id, status (pending|purchased|received),
+        urgency (low|medium|high|urgent), purchase_notes, receive_notes,
+        purchased_at, received_at, received_by
+
+### 6.2 Itens da Lista (tabela: purchase_list_items)
+Campos: id, list_id, name, category, description, quantity,
+        estimated_value, actual_value, status
+
+### 6.3 Catálogo de Produtos (tabela: product_catalog)
+Campos: id, name, category_id, default_estimated_value
+- Integração com categorias (product_categories)
+- Admins gerenciam via Configurações
+
+### 6.4 Fluxo de Status
+1. Criação: status 'pending', buyer obrigatório
+2. Compra: buyer marca como 'purchased', informa valores reais e observações
+3. Recebimento: receptor marca como 'received', informa observações
+
+### 6.5 Regras de Negócio
+- Listas pendentes podem ser editadas (título, urgência, comprador, itens)
+- Status da lista é atualizado automaticamente baseado nos status dos itens
+- Apenas criador, buyer ou admin podem atualizar
+- Apenas admins podem excluir listas
+
+### 6.6 Notificações de Compras (tabela: purchase_notification_settings)
+Campos: id, stage, is_active, notify_user_ids[], reminder_days
+- Configurável por estágio (criação, compra, recebimento)
+- Lembretes automáticos com prazo customizável
+- Notificações via WhatsApp e in-app
+
+================================================================================
+
+## 7. DASHBOARD
+
+### 7.1 Estrutura
+3 abas: Kanban, Tarefas Fixas (Recorrentes), Compras
+- Saudação personalizada com nome do usuário
+- Skeleton loading durante carregamento
+
+### 7.2 Dashboard Kanban
+- Total de tarefas atribuídas ao usuário
+- Em andamento, concluídas, atrasadas
+- Lista de tarefas atrasadas com detalhes
+- Tarefas do dia atual
+- Score de produtividade
+
+### 7.3 Dashboard Tarefas Fixas
+- Total de quadros e tarefas
+- Tarefas ativas hoje, concluídas hoje, pendentes
+- Lista de tarefas pendentes do dia
+- Barras de progresso com gradiente
+
+### 7.4 Dashboard Compras
+- Total de listas, pendentes, compradas, recebidas
+- Resumo financeiro: valor estimado vs valor real
+- Barras de progresso por status
+
+### 7.5 Feed de Atividades
+- Últimas ações do sistema (activity_log)
+- Nome do usuário, ação, timestamp
+
+================================================================================
+
+## 8. BUSCA GLOBAL
+
+- Atalho Ctrl+K / Cmd+K
+- Pesquisa em tempo real em:
+  - Tarefas Kanban (título, descrição)
+  - Quadros Kanban (nome)
+  - Listas de Compras (título, itens)
+- Navegação direta ao clicar no resultado
+- Interface via CommandDialog (cmdk)
+
+================================================================================
+
+## 9. NOTIFICAÇÕES
+
+### 9.1 In-App (tabela: notifications)
+Campos: id, user_id, title, message, is_read, link, created_at
+- Badge com contagem na sidebar
+- Página /notifications para visualizar
+- Marcar como lida / excluir
+
+### 9.2 WhatsApp (Z-API)
+Configuração em zapi_config: instance_id, token, client_token, is_active
+- Gerenciável por admins em Configurações > Integrações
+
+### 9.3 Tipos de Notificações Automáticas (Edge Functions + pg_cron)
+1. notify-task-assigned: ao criar/atribuir tarefa
+2. notify-due-tasks: tarefas com prazo hoje ou em 3 dias (09:00 BRT)
+3. notify-overdue-tasks: tarefas atrasadas
+4. notify-end-of-day: tarefas pendentes no fim do expediente
+5. notify-scheduled-tasks: alertas 1h e 10min antes do horário agendado
+6. notify-recurring-tasks: lembretes de tarefas recorrentes (08:30 BRT)
+7. notify-overdue-recurring-tasks: tarefas recorrentes atrasadas (a cada 30min)
+8. notify-purchase-reminders: lembretes de compras pendentes
+
+### 9.4 Regras de Horário
+- Seg-Sex: 08:30–18:00 BRT
+- Sáb: 08:00–12:00 BRT
+- Fora do horário comercial: notificações são suprimidas
+
+================================================================================
+
+## 10. WHATSAPP BOT (TaskFox AI)
+
+### 10.1 Webhook (whatsapp-webhook)
+- Recebe mensagens via Z-API webhook
+- Identifica usuário pelo número de WhatsApp (ignora 9º dígito BR)
+- Usa Lovable AI (Gemini) para interpretar linguagem natural
+
+### 10.2 Comandos Disponíveis
+1. criar_tarefa: Cria tarefa Kanban (título + prazo obrigatórios)
+2. listar_tarefas: Lista tarefas com filtros (hoje, semana, mês, atrasadas, etc.)
+3. concluir_tarefa: Move tarefa para última coluna
+4. criar_lista_compras: Cria lista de compras com itens
+5. resumo_dia: Resumo diário (pendentes, concluídas, atrasadas, compras)
+6. resumo_completo: Resumo por período (dia/semana/mês)
+7. tarefas_usuario: Lista tarefas de outro usuário (admin only)
+8. tarefas_diarias_usuario: Tarefas recorrentes de outro usuário (admin only)
+9. ajuda: Lista de comandos
+
+### 10.3 Memória Conversacional
+- Histórico das últimas 10 mensagens (30 min) em whatsapp_chat_history
+- Cleanup automático de mensagens > 24h via trigger
+
+### 10.4 Permissões
+- Usuários comuns: apenas seus próprios quadros
+- Admins: podem atribuir tarefas a outros e consultar dados de terceiros
+
+================================================================================
+
+## 11. CONFIGURAÇÕES (Página /settings)
+
+### 11.1 Geral
+- Versão do sistema
+- Exportação de backup (admin)
+
+### 11.2 Usuários (admin)
+- Lista de usuários do sistema
+- Criar/editar/excluir usuários (via Edge Functions admin)
+- Visualizar emails
+
+### 11.3 Equipes (admin)
+- Gerenciar equipes e membros
+- Configurar visibilidade por usuário
+
+### 11.4 Permissões (admin)
+- Configurar permissões granulares por usuário
+- 7 permissões independentes
+
+### 11.5 Integrações (admin)
+- Configurar Z-API (instância, tokens)
+- Testar conexão
+
+### 11.6 Log de Atividades (admin)
+- Histórico completo de ações do sistema
+- Filtros por usuário e período
+
+### 11.7 Compras (admin)
+- Catálogo de produtos e categorias
+- Configurações de notificações de compras
+
+================================================================================
+
+## 12. ESTRUTURA DO BANCO DE DADOS
+
+### 12.1 Tabelas Principais
+- profiles: dados do usuário (nome, avatar, whatsapp, cargo)
+- teams: equipes
+- team_members: membros das equipes (role: admin|member)
+- boards: quadros Kanban
+- board_columns: colunas dos quadros
+- tasks: tarefas Kanban
+- subtasks: subtarefas/checklist
+- comments: comentários em tarefas
+- recurring_task_boards: quadros de tarefas recorrentes
+- recurring_tasks: tarefas recorrentes
+- recurring_task_completions: registros de conclusão
+- purchase_lists: listas de compras
+- purchase_list_items: itens das listas
+- product_catalog: catálogo de produtos
+- product_categories: categorias de produtos
+
+### 12.2 Tabelas de Configuração
+- user_roles: papéis (admin|user)
+- user_permissions: permissões granulares
+- user_team_visibility: visibilidade de equipes
+- notifications: notificações in-app
+- zapi_config: configuração Z-API
+- purchase_notification_settings: config notificações de compras
+- activity_log: log de atividades
+- whatsapp_chat_history: histórico do bot WhatsApp
+
+### 12.3 Enums
+- app_role: admin, user
+- team_role: admin, member
+- task_priority: low, medium, high, urgent
+- purchase_status: pending, purchased, received
+- purchase_urgency: low, medium, high, urgent
+- purchase_category: office, cleaning, technology, maintenance, food, other
+
+### 12.4 Funções SQL (SECURITY DEFINER)
+- is_app_admin(): verifica se usuário é admin do app
+- is_team_member(_team_id): verifica membro da equipe
+- is_team_admin(_team_id): verifica admin da equipe
+- has_permission(_user_id, _permission): verifica permissão específica
+- has_team_visibility(_user_id, _team_id): verifica visibilidade
+- get_team_id_from_board/column/task: resolve team_id a partir de entidades
+- handle_new_user(): trigger para criar profile automaticamente
+- handle_new_team(): trigger para adicionar criador como admin
+
+### 12.5 Row Level Security (RLS)
+- Todas as tabelas têm RLS habilitado
+- Isolamento por equipe para dados operacionais
+- Admins têm visibilidade global
+- Perfis visíveis entre membros da mesma equipe
+
+================================================================================
+
+## 13. EDGE FUNCTIONS (Supabase)
+
+1. create-user: criação de usuários (admin)
+2. delete-user: exclusão de usuários (admin)
+3. update-user: atualização de usuários (admin)
+4. get-user-emails: busca emails de usuários (admin)
+5. export-backup: exportação de dados do sistema
+6. notify-task-assigned: notificação de atribuição de tarefa
+7. notify-due-tasks: notificação de tarefas com prazo próximo
+8. notify-overdue-tasks: notificação de tarefas atrasadas
+9. notify-end-of-day: resumo de fim de dia
+10. notify-scheduled-tasks: alertas de horário agendado
+11. notify-recurring-tasks: lembretes de tarefas recorrentes
+12. notify-overdue-recurring-tasks: alertas de recorrentes atrasadas
+13. notify-purchase-reminders: lembretes de compras pendentes
+14. notify-purchase: notificação de eventos de compras
+15. whatsapp-webhook: bot WhatsApp com IA
+
+================================================================================
+
+## 14. REALTIME
+
+- Quadros Kanban: atualização em tempo real via Supabase Realtime
+  - Canal por board_id para tarefas, colunas e subtarefas
+  - Debounce de 120ms para evitar excesso de queries
+- Lista de quadros: canal global para mudanças na tabela boards
+
+================================================================================
+
+## 15. DESIGN SYSTEM
+
+### 15.1 Tema
+- Suporte a tema claro e escuro (toggle na sidebar)
+- Persistência em localStorage
+- Tokens semânticos CSS (HSL) em index.css
+
+### 15.2 Animações
+- fade-in, scale-in, slide-up (entrada de elementos)
+- check-strike (conclusão de tarefas)
+- progress-fill (barras de progresso)
+
+### 15.3 Cards Kanban
+- Borda lateral colorida por prioridade
+- Avatar do responsável
+- Barra de progresso de subtarefas
+- Badges de prazo (vermelho se atrasado)
+- Hover com elevação e botão editar
+- Drag & drop pelo card inteiro (cursor grab/grabbing)
+
+### 15.4 Fonte
+- Inter (otimizada com text-rendering: optimizeLegibility)
+
+================================================================================
+
+## 16. ROTAS DA APLICAÇÃO
+
+/ .................. Dashboard (abas: Kanban, Recorrentes, Compras)
+/auth .............. Login / Cadastro
+/reset-password .... Recuperação de senha
+/boards ............ Lista de quadros Kanban
+/recurring-tasks ... Tarefas recorrentes (fixas)
+/purchases ......... Módulo de compras
+/notifications ..... Notificações
+/settings .......... Configurações (admin)
+/profile ........... Perfil do usuário
+
+================================================================================
+
+## 17. HOOKS PRINCIPAIS
+
+- useAuth: autenticação (login, signup, logout, reset)
+- useBoards: CRUD de quadros
+- useBoardDetail: detalhes do quadro + CRUD de colunas/tarefas + realtime
+- useTeams/useTeamMembers: equipes e membros
+- useRecurringTaskBoards: CRUD quadros recorrentes
+- useRecurringTasks: CRUD tarefas recorrentes + completions
+- usePurchases: CRUD compras + fluxo de status
+- useSubtasks: CRUD subtarefas
+- useIsAppAdmin: verifica admin
+- useUserPermissions: permissões do usuário
+- useCanManage: verifica permissão específica
+- useActivityLog: log de atividades
+
+================================================================================
+
+FIM DA DOCUMENTAÇÃO
+Versão: 1.3 | Data: Março 2026
+================================================================================
