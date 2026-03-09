@@ -178,6 +178,11 @@ export default function SettingsPage() {
             <NotificationsConfigTab />
           </TabsContent>
         )}
+        {isAdmin && (
+          <TabsContent value="fleet" className="mt-6">
+            <FleetConfigTab />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
