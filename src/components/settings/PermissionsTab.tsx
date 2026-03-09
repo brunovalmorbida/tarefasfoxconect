@@ -104,6 +104,8 @@ export function PermissionsTab() {
       can_view_purchases: false,
       can_manage_purchases: false,
       can_be_buyer: false,
+      can_view_fleet: false,
+      can_manage_fleet: false,
     };
   };
 
