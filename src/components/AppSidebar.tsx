@@ -1,4 +1,4 @@
-import { LayoutDashboard, Columns3, Bell, Settings, LogOut, ListChecks, ShoppingCart, Sun, Moon, UserCircle } from "lucide-react";
+import { LayoutDashboard, Columns3, Bell, Settings, LogOut, ListChecks, ShoppingCart, Sun, Moon, UserCircle, Car } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsAppAdmin, useCanManage } from "@/hooks/useUserRole";
@@ -33,6 +33,8 @@ export function AppSidebar() {
   const { signOut } = useAuth();
   const { data: isAdmin } = useIsAppAdmin();
   const canViewPurchases = useCanManage("can_view_purchases");
+  const canViewFleet = useCanManage("can_view_fleet");
+  const canManageFleet = useCanManage("can_manage_fleet");
   const notificationCount = useNotificationCount();
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains("dark"));
 
@@ -57,11 +59,14 @@ export function AppSidebar() {
   const mainNav = useMemo(() => {
     const nav = [...baseNav];
     if (isAdmin || canViewPurchases) {
-      // Insert "Compras" after "Tarefas Fixas" (index 2)
       nav.splice(3, 0, { title: "Compras", url: "/purchases", icon: ShoppingCart });
     }
+    if (isAdmin || canViewFleet || canManageFleet) {
+      const insertIdx = nav.findIndex(n => n.title === "Notificações");
+      nav.splice(insertIdx >= 0 ? insertIdx : nav.length, 0, { title: "Frota", url: "/fleet", icon: Car });
+    }
     return nav;
-  }, [isAdmin, canViewPurchases]);
+  }, [isAdmin, canViewPurchases, canViewFleet, canManageFleet]);
 
   return (
     <Sidebar>
