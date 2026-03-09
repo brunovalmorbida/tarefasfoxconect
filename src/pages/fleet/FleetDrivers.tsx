@@ -40,7 +40,7 @@ export default function FleetDrivers() {
     if (!form.name.trim()) return;
     const payload: any = {
       name: form.name, phone: form.phone || null, job_title: form.job_title || null,
-      city: form.city || null, vehicle_id: form.vehicle_id || null,
+      city: form.city || null, vehicle_id: form.vehicle_id && form.vehicle_id !== "none" ? form.vehicle_id : null,
       status: form.status, notes: form.notes || null,
     };
     if (editing) {

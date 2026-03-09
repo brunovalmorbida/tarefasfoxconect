@@ -60,7 +60,7 @@ export default function FleetDocuments() {
     if (!form.vehicle_id || !form.title) return;
     await createDocument.mutateAsync({
       vehicle_id: form.vehicle_id,
-      maintenance_id: form.maintenance_id || null,
+      maintenance_id: form.maintenance_id && form.maintenance_id !== "none" ? form.maintenance_id : null,
       document_type: form.document_type as any,
       title: form.title,
       supplier: form.supplier || null,

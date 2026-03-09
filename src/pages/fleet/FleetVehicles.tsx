@@ -55,7 +55,7 @@ export default function FleetVehicles() {
       model: form.model || null, year: form.year ? parseInt(form.year) : null,
       current_km: form.current_km ? parseInt(form.current_km) : 0,
       city: form.city || null, status: form.status,
-      driver_id: form.driver_id || null, notes: form.notes || null,
+      driver_id: form.driver_id && form.driver_id !== "none" ? form.driver_id : null, notes: form.notes || null,
     };
     if (editing) {
       await updateVehicle.mutateAsync({ id: editing.id, ...payload });
