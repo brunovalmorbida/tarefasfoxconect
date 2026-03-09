@@ -111,7 +111,7 @@ export default function SettingsPage() {
               <CardDescription>Versão atual do sistema</CardDescription>
             </CardHeader>
             <CardContent>
-              <Badge variant="secondary" className="text-sm font-mono">v1.3</Badge>
+              <Badge variant="secondary" className="text-sm font-mono">v2.0</Badge>
             </CardContent>
           </Card>
 
