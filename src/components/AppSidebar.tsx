@@ -59,11 +59,14 @@ export function AppSidebar() {
   const mainNav = useMemo(() => {
     const nav = [...baseNav];
     if (isAdmin || canViewPurchases) {
-      // Insert "Compras" after "Tarefas Fixas" (index 2)
       nav.splice(3, 0, { title: "Compras", url: "/purchases", icon: ShoppingCart });
     }
+    if (isAdmin || canViewFleet || canManageFleet) {
+      const insertIdx = nav.findIndex(n => n.title === "Notificações");
+      nav.splice(insertIdx >= 0 ? insertIdx : nav.length, 0, { title: "Frota", url: "/fleet", icon: Car });
+    }
     return nav;
-  }, [isAdmin, canViewPurchases]);
+  }, [isAdmin, canViewPurchases, canViewFleet, canManageFleet]);
 
   return (
     <Sidebar>
