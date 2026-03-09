@@ -1,8 +1,6 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Car, Users, ClipboardCheck, Wrench, FileText, LayoutDashboard } from "lucide-react";
+import { ClipboardCheck, Wrench, FileText, LayoutDashboard } from "lucide-react";
 import FleetDashboard from "./fleet/FleetDashboard";
-import FleetVehicles from "./fleet/FleetVehicles";
-import FleetDrivers from "./fleet/FleetDrivers";
 import FleetCheckins from "./fleet/FleetCheckins";
 import FleetMaintenances from "./fleet/FleetMaintenances";
 import FleetDocuments from "./fleet/FleetDocuments";
@@ -12,7 +10,7 @@ export default function Fleet() {
     <div className="p-4 md:p-6 max-w-7xl mx-auto">
       <div className="mb-6">
         <h1 className="text-3xl font-bold tracking-tight">Frota</h1>
-        <p className="text-muted-foreground">Gestão de veículos, motoristas e manutenções</p>
+        <p className="text-muted-foreground">Operação e acompanhamento da frota</p>
       </div>
 
       <Tabs defaultValue="dashboard" className="space-y-6">
@@ -20,14 +18,6 @@ export default function Fleet() {
           <TabsTrigger value="dashboard" className="gap-1.5">
             <LayoutDashboard className="h-4 w-4" />
             <span className="hidden sm:inline">Dashboard</span>
-          </TabsTrigger>
-          <TabsTrigger value="vehicles" className="gap-1.5">
-            <Car className="h-4 w-4" />
-            <span className="hidden sm:inline">Veículos</span>
-          </TabsTrigger>
-          <TabsTrigger value="drivers" className="gap-1.5">
-            <Users className="h-4 w-4" />
-            <span className="hidden sm:inline">Motoristas</span>
           </TabsTrigger>
           <TabsTrigger value="checkins" className="gap-1.5">
             <ClipboardCheck className="h-4 w-4" />
@@ -44,8 +34,6 @@ export default function Fleet() {
         </TabsList>
 
         <TabsContent value="dashboard"><FleetDashboard /></TabsContent>
-        <TabsContent value="vehicles"><FleetVehicles /></TabsContent>
-        <TabsContent value="drivers"><FleetDrivers /></TabsContent>
         <TabsContent value="checkins"><FleetCheckins /></TabsContent>
         <TabsContent value="maintenances"><FleetMaintenances /></TabsContent>
         <TabsContent value="documents"><FleetDocuments /></TabsContent>

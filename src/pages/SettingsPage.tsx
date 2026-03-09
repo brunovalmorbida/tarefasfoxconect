@@ -7,7 +7,8 @@ import { PurchasesConfigTab } from "@/components/settings/PurchasesConfigTab";
 import { NotificationsConfigTab } from "@/components/settings/NotificationsConfigTab";
 import { PermissionsTab } from "@/components/settings/PermissionsTab";
 import { TeamsTab } from "@/components/settings/TeamsTab";
-import { Settings, Users, Plug, ScrollText, Download, ShoppingCart, Bell, Shield, Users2 } from "lucide-react";
+import { FleetConfigTab } from "@/components/settings/FleetConfigTab";
+import { Settings, Users, Plug, ScrollText, Download, ShoppingCart, Bell, Shield, Users2, Car } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -99,6 +100,12 @@ export default function SettingsPage() {
               Notificações
             </TabsTrigger>
           )}
+          {isAdmin && (
+            <TabsTrigger value="fleet" className="gap-2">
+              <Car className="h-4 w-4" />
+              Frota
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="general" className="mt-6 space-y-4">
@@ -169,6 +176,11 @@ export default function SettingsPage() {
         {isAdmin && (
           <TabsContent value="notifications" className="mt-6">
             <NotificationsConfigTab />
+          </TabsContent>
+        )}
+        {isAdmin && (
+          <TabsContent value="fleet" className="mt-6">
+            <FleetConfigTab />
           </TabsContent>
         )}
       </Tabs>

@@ -21,6 +21,7 @@ const PERMISSIONS = [
   { key: "can_be_buyer", label: "Comprador", shortLabel: "Comprador" },
   { key: "can_view_fleet", label: "Ver Frota", shortLabel: "Ver Frota" },
   { key: "can_manage_fleet", label: "Ger. Frota", shortLabel: "Ger. Frota" },
+  { key: "is_driver", label: "Motorista", shortLabel: "Motorista" },
 ] as const;
 
 type PermissionKey = typeof PERMISSIONS[number]["key"];
@@ -106,6 +107,7 @@ export function PermissionsTab() {
       can_be_buyer: false,
       can_view_fleet: false,
       can_manage_fleet: false,
+      is_driver: false,
     };
   };
 
