@@ -157,6 +157,336 @@ export type Database = {
           },
         ]
       }
+      fleet_checkins: {
+        Row: {
+          checkin_date: string
+          created_at: string
+          description: string | null
+          driver_id: string
+          id: string
+          km_reported: number | null
+          needs_maintenance: boolean | null
+          status: string
+          task_id: string | null
+          updated_at: string
+          vehicle_id: string
+        }
+        Insert: {
+          checkin_date?: string
+          created_at?: string
+          description?: string | null
+          driver_id: string
+          id?: string
+          km_reported?: number | null
+          needs_maintenance?: boolean | null
+          status?: string
+          task_id?: string | null
+          updated_at?: string
+          vehicle_id: string
+        }
+        Update: {
+          checkin_date?: string
+          created_at?: string
+          description?: string | null
+          driver_id?: string
+          id?: string
+          km_reported?: number | null
+          needs_maintenance?: boolean | null
+          status?: string
+          task_id?: string | null
+          updated_at?: string
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fleet_checkins_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "fleet_drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fleet_checkins_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "fleet_vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fleet_documents: {
+        Row: {
+          created_at: string
+          created_by: string
+          document_date: string | null
+          document_type: string
+          file_name: string | null
+          file_url: string | null
+          id: string
+          maintenance_id: string | null
+          notes: string | null
+          supplier: string | null
+          title: string
+          updated_at: string
+          vehicle_id: string
+          warranty_expiry: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          document_date?: string | null
+          document_type?: string
+          file_name?: string | null
+          file_url?: string | null
+          id?: string
+          maintenance_id?: string | null
+          notes?: string | null
+          supplier?: string | null
+          title: string
+          updated_at?: string
+          vehicle_id: string
+          warranty_expiry?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          document_date?: string | null
+          document_type?: string
+          file_name?: string | null
+          file_url?: string | null
+          id?: string
+          maintenance_id?: string | null
+          notes?: string | null
+          supplier?: string | null
+          title?: string
+          updated_at?: string
+          vehicle_id?: string
+          warranty_expiry?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fleet_documents_maintenance_id_fkey"
+            columns: ["maintenance_id"]
+            isOneToOne: false
+            referencedRelation: "fleet_maintenances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fleet_documents_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "fleet_vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fleet_drivers: {
+        Row: {
+          city: string | null
+          created_at: string
+          created_by: string
+          id: string
+          job_title: string | null
+          name: string
+          notes: string | null
+          phone: string | null
+          status: string
+          updated_at: string
+          vehicle_id: string | null
+        }
+        Insert: {
+          city?: string | null
+          created_at?: string
+          created_by: string
+          id?: string
+          job_title?: string | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          status?: string
+          updated_at?: string
+          vehicle_id?: string | null
+        }
+        Update: {
+          city?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          job_title?: string | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          status?: string
+          updated_at?: string
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fleet_drivers_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "fleet_vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fleet_maintenances: {
+        Row: {
+          cost: number | null
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          km_at_maintenance: number | null
+          maintenance_date: string
+          maintenance_type: string
+          notes: string | null
+          status: string
+          supplier: string | null
+          updated_at: string
+          vehicle_id: string
+        }
+        Insert: {
+          cost?: number | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          km_at_maintenance?: number | null
+          maintenance_date?: string
+          maintenance_type?: string
+          notes?: string | null
+          status?: string
+          supplier?: string | null
+          updated_at?: string
+          vehicle_id: string
+        }
+        Update: {
+          cost?: number | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          km_at_maintenance?: number | null
+          maintenance_date?: string
+          maintenance_type?: string
+          notes?: string | null
+          status?: string
+          supplier?: string | null
+          updated_at?: string
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fleet_maintenances_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "fleet_vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fleet_settings: {
+        Row: {
+          auto_checkin_enabled: boolean
+          checkin_day: number
+          checkin_message_template: string | null
+          checkin_time: string
+          created_at: string
+          default_assignee_id: string | null
+          default_board_id: string | null
+          default_task_deadline_days: number
+          id: string
+          updated_at: string
+          warranty_alerts_enabled: boolean
+        }
+        Insert: {
+          auto_checkin_enabled?: boolean
+          checkin_day?: number
+          checkin_message_template?: string | null
+          checkin_time?: string
+          created_at?: string
+          default_assignee_id?: string | null
+          default_board_id?: string | null
+          default_task_deadline_days?: number
+          id?: string
+          updated_at?: string
+          warranty_alerts_enabled?: boolean
+        }
+        Update: {
+          auto_checkin_enabled?: boolean
+          checkin_day?: number
+          checkin_message_template?: string | null
+          checkin_time?: string
+          created_at?: string
+          default_assignee_id?: string | null
+          default_board_id?: string | null
+          default_task_deadline_days?: number
+          id?: string
+          updated_at?: string
+          warranty_alerts_enabled?: boolean
+        }
+        Relationships: []
+      }
+      fleet_vehicles: {
+        Row: {
+          brand: string | null
+          city: string | null
+          created_at: string
+          created_by: string
+          current_km: number | null
+          driver_id: string | null
+          id: string
+          model: string | null
+          name: string
+          notes: string | null
+          plate: string
+          status: string
+          updated_at: string
+          year: number | null
+        }
+        Insert: {
+          brand?: string | null
+          city?: string | null
+          created_at?: string
+          created_by: string
+          current_km?: number | null
+          driver_id?: string | null
+          id?: string
+          model?: string | null
+          name: string
+          notes?: string | null
+          plate: string
+          status?: string
+          updated_at?: string
+          year?: number | null
+        }
+        Update: {
+          brand?: string | null
+          city?: string | null
+          created_at?: string
+          created_by?: string
+          current_km?: number | null
+          driver_id?: string | null
+          id?: string
+          model?: string | null
+          name?: string
+          notes?: string | null
+          plate?: string
+          status?: string
+          updated_at?: string
+          year?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fleet_vehicles_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "fleet_drivers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string
@@ -698,9 +1028,11 @@ export type Database = {
           can_be_buyer: boolean
           can_manage_boards: boolean
           can_manage_columns: boolean
+          can_manage_fleet: boolean
           can_manage_purchases: boolean
           can_manage_recurring_tasks: boolean
           can_manage_tasks: boolean
+          can_view_fleet: boolean
           can_view_purchases: boolean
           created_at: string
           id: string
@@ -711,9 +1043,11 @@ export type Database = {
           can_be_buyer?: boolean
           can_manage_boards?: boolean
           can_manage_columns?: boolean
+          can_manage_fleet?: boolean
           can_manage_purchases?: boolean
           can_manage_recurring_tasks?: boolean
           can_manage_tasks?: boolean
+          can_view_fleet?: boolean
           can_view_purchases?: boolean
           created_at?: string
           id?: string
@@ -724,9 +1058,11 @@ export type Database = {
           can_be_buyer?: boolean
           can_manage_boards?: boolean
           can_manage_columns?: boolean
+          can_manage_fleet?: boolean
           can_manage_purchases?: boolean
           can_manage_recurring_tasks?: boolean
           can_manage_tasks?: boolean
+          can_view_fleet?: boolean
           can_view_purchases?: boolean
           created_at?: string
           id?: string
