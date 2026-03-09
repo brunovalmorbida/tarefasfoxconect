@@ -55,7 +55,7 @@ export default function FleetVehicles() {
       model: form.model || null, year: form.year ? parseInt(form.year) : null,
       current_km: form.current_km ? parseInt(form.current_km) : 0,
       city: form.city || null, status: form.status,
-      driver_id: form.driver_id || null, notes: form.notes || null,
+      driver_id: form.driver_id && form.driver_id !== "none" ? form.driver_id : null, notes: form.notes || null,
     };
     if (editing) {
       await updateVehicle.mutateAsync({ id: editing.id, ...payload });
@@ -195,7 +195,7 @@ export default function FleetVehicles() {
                 <Select value={form.driver_id} onValueChange={v => setForm(f => ({ ...f, driver_id: v }))}>
                   <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Nenhum</SelectItem>
+                    <SelectItem value="none">Nenhum</SelectItem>
                     {drivers.filter(d => d.status === "active").map(d => (
                       <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                     ))}

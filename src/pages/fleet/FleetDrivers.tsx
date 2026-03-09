@@ -40,7 +40,7 @@ export default function FleetDrivers() {
     if (!form.name.trim()) return;
     const payload: any = {
       name: form.name, phone: form.phone || null, job_title: form.job_title || null,
-      city: form.city || null, vehicle_id: form.vehicle_id || null,
+      city: form.city || null, vehicle_id: form.vehicle_id && form.vehicle_id !== "none" ? form.vehicle_id : null,
       status: form.status, notes: form.notes || null,
     };
     if (editing) {
@@ -153,7 +153,7 @@ export default function FleetDrivers() {
                 <Select value={form.vehicle_id} onValueChange={v => setForm(f => ({ ...f, vehicle_id: v }))}>
                   <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Nenhum</SelectItem>
+                    <SelectItem value="none">Nenhum</SelectItem>
                     {vehicles.filter(v => v.status === "active").map(v => (
                       <SelectItem key={v.id} value={v.id}>{v.name} ({v.plate})</SelectItem>
                     ))}

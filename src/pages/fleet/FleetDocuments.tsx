@@ -60,7 +60,7 @@ export default function FleetDocuments() {
     if (!form.vehicle_id || !form.title) return;
     await createDocument.mutateAsync({
       vehicle_id: form.vehicle_id,
-      maintenance_id: form.maintenance_id || null,
+      maintenance_id: form.maintenance_id && form.maintenance_id !== "none" ? form.maintenance_id : null,
       document_type: form.document_type as any,
       title: form.title,
       supplier: form.supplier || null,
@@ -210,7 +210,7 @@ export default function FleetDocuments() {
                 <Select value={form.maintenance_id} onValueChange={v => setForm(f => ({ ...f, maintenance_id: v }))}>
                   <SelectTrigger><SelectValue placeholder="Nenhuma" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Nenhuma</SelectItem>
+                    <SelectItem value="none">Nenhuma</SelectItem>
                     {maintenances.filter(m => m.vehicle_id === form.vehicle_id).map(m => (
                       <SelectItem key={m.id} value={m.id}>{m.maintenance_type} - {format(new Date(m.maintenance_date), "dd/MM/yyyy")}</SelectItem>
                     ))}
