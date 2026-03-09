@@ -153,7 +153,7 @@ export default function FleetDrivers() {
                 <Select value={form.vehicle_id} onValueChange={v => setForm(f => ({ ...f, vehicle_id: v }))}>
                   <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Nenhum</SelectItem>
+                    <SelectItem value="none">Nenhum</SelectItem>
                     {vehicles.filter(v => v.status === "active").map(v => (
                       <SelectItem key={v.id} value={v.id}>{v.name} ({v.plate})</SelectItem>
                     ))}
