@@ -1,5 +1,20 @@
 
-# TaskFlow - Sistema de Gestão de Tarefas
+# TaskFox - Sistema de Gestão de Tarefas
+
+## 🏁 Marco: Versão V2.0 (09/03/2026)
+> Consolidação completa do TaskFox sobre a base V1.3:
+> - **Documentação técnica completa** do sistema exportável em formato público (.txt) para análise por IAs externas
+> - **Busca global** (Ctrl+K) em tarefas, quadros e compras
+> - **Subtarefas/Checklist** com barra de progresso nos cards Kanban
+> - **Comentários** em tarefas com controle de autoria
+> - **Perfis de usuário** editáveis (nome, avatar, cargo, WhatsApp)
+> - **Edição de listas de compras** pendentes (título, urgência, comprador, itens)
+> - **WhatsApp Bot com IA** (Gemini): comandos por linguagem natural, memória conversacional (10 msgs / 30min), roteamento por permissão
+> - **Automações avançadas**: 8 Edge Functions de notificação com controle de horário comercial (BRT)
+> - **Permissões granulares**: 7 permissões independentes + visibilidade de equipes por usuário
+> - Todas funcionalidades das versões anteriores mantidas
+>
+> **Para restaurar esta versão:** Use o Histórico de edições do Lovable e encontre esta mensagem.
 
 ## 🏁 Marco: Versão V1.2 (19/02/2026)
 > Melhorias de UX e interação sobre a base V1.1:
