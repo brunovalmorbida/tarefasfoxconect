@@ -37,7 +37,7 @@ export function useUserPermissions() {
   });
 }
 
-export function useCanManage(permission: "can_manage_boards" | "can_manage_columns" | "can_manage_tasks" | "can_manage_recurring_tasks" | "can_manage_purchases" | "can_view_purchases" | "can_be_buyer") {
+export function useCanManage(permission: "can_manage_boards" | "can_manage_columns" | "can_manage_tasks" | "can_manage_recurring_tasks" | "can_manage_purchases" | "can_view_purchases" | "can_be_buyer" | "can_manage_fleet" | "can_view_fleet") {
   const { data: isAdmin } = useIsAppAdmin();
   const { data: permissions } = useUserPermissions();
   return isAdmin || (permissions?.[permission] ?? false);
