@@ -19,6 +19,8 @@ const PERMISSIONS = [
   { key: "can_view_purchases", label: "Ver Compras", shortLabel: "Ver Compras" },
   { key: "can_manage_purchases", label: "Ger. Compras", shortLabel: "Ger. Compras" },
   { key: "can_be_buyer", label: "Comprador", shortLabel: "Comprador" },
+  { key: "can_view_fleet", label: "Ver Frota", shortLabel: "Ver Frota" },
+  { key: "can_manage_fleet", label: "Ger. Frota", shortLabel: "Ger. Frota" },
 ] as const;
 
 type PermissionKey = typeof PERMISSIONS[number]["key"];
