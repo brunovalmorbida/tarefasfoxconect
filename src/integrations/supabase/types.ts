@@ -163,6 +163,7 @@ export type Database = {
           created_at: string
           description: string | null
           driver_id: string
+          driver_user_id: string | null
           id: string
           km_reported: number | null
           needs_maintenance: boolean | null
@@ -176,6 +177,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           driver_id: string
+          driver_user_id?: string | null
           id?: string
           km_reported?: number | null
           needs_maintenance?: boolean | null
@@ -189,6 +191,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           driver_id?: string
+          driver_user_id?: string | null
           id?: string
           km_reported?: number | null
           needs_maintenance?: boolean | null
@@ -436,6 +439,7 @@ export type Database = {
           created_by: string
           current_km: number | null
           driver_id: string | null
+          driver_user_id: string | null
           id: string
           model: string | null
           name: string
@@ -452,6 +456,7 @@ export type Database = {
           created_by: string
           current_km?: number | null
           driver_id?: string | null
+          driver_user_id?: string | null
           id?: string
           model?: string | null
           name: string
@@ -468,6 +473,7 @@ export type Database = {
           created_by?: string
           current_km?: number | null
           driver_id?: string | null
+          driver_user_id?: string | null
           id?: string
           model?: string | null
           name?: string
@@ -1036,6 +1042,7 @@ export type Database = {
           can_view_purchases: boolean
           created_at: string
           id: string
+          is_driver: boolean
           updated_at: string
           user_id: string
         }
@@ -1051,6 +1058,7 @@ export type Database = {
           can_view_purchases?: boolean
           created_at?: string
           id?: string
+          is_driver?: boolean
           updated_at?: string
           user_id: string
         }
@@ -1066,6 +1074,7 @@ export type Database = {
           can_view_purchases?: boolean
           created_at?: string
           id?: string
+          is_driver?: boolean
           updated_at?: string
           user_id?: string
         }
