@@ -45,11 +45,11 @@ function VehiclesSection() {
     queryKey: ["driver-profiles"],
     queryFn: async () => {
       const { data: perms } = await supabase
-        .from("user_permissions")
+        .from("user_permissions" as any)
         .select("user_id")
-        .eq("is_driver" as any, true);
+        .eq("is_driver", true);
       if (!perms || perms.length === 0) return [];
-      const driverIds = perms.map(p => p.user_id);
+      const driverIds = (perms as any[]).map((p: any) => p.user_id);
       const { data: profiles } = await supabase
         .from("profiles")
         .select("user_id, name")
