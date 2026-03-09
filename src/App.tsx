@@ -16,6 +16,7 @@ import SettingsPage from "./pages/SettingsPage";
 import RecurringTasks from "./pages/RecurringTasks";
 import Purchases from "./pages/Purchases";
 import ProfilePage from "./pages/ProfilePage";
+import Fleet from "./pages/Fleet";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
