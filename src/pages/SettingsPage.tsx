@@ -100,6 +100,12 @@ export default function SettingsPage() {
               Notificações
             </TabsTrigger>
           )}
+          {isAdmin && (
+            <TabsTrigger value="fleet" className="gap-2">
+              <Car className="h-4 w-4" />
+              Frota
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="general" className="mt-6 space-y-4">
