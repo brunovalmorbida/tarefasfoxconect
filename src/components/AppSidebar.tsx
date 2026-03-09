@@ -33,6 +33,8 @@ export function AppSidebar() {
   const { signOut } = useAuth();
   const { data: isAdmin } = useIsAppAdmin();
   const canViewPurchases = useCanManage("can_view_purchases");
+  const canViewFleet = useCanManage("can_view_fleet");
+  const canManageFleet = useCanManage("can_manage_fleet");
   const notificationCount = useNotificationCount();
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains("dark"));
 
