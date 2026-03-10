@@ -224,6 +224,13 @@ export function IntegrationsTab() {
               <div className="flex items-start gap-2 rounded-lg border p-2.5">
                 <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 shrink-0" />
                 <div>
+                  <p className="font-medium">Concluir Tarefa Fixa/Diária</p>
+                  <p className="text-muted-foreground">"Feita tarefa limpeza", "Concluir diária organizar estoque"</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2 rounded-lg border p-2.5">
+                <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                <div>
                   <p className="font-medium">Lista de Compras</p>
                   <p className="text-muted-foreground">"Comprar 5 resmas de papel e 2 toners"</p>
                 </div>

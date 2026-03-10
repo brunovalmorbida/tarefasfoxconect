@@ -174,7 +174,8 @@ Deno.serve(async (req) => {
         message += `\n`;
       }
 
-      message += `Total: *${userTasks.length}* tarefa(s) atrasada(s). Por favor, conclua-as o mais rápido possível! ⏳`;
+      message += `Total: *${userTasks.length}* tarefa(s) atrasada(s). Por favor, conclua-as o mais rápido possível! ⏳\n\n`;
+      message += `💡 _Responda com "Feita [nome da tarefa]" para marcar como concluída direto aqui!_`;
 
       // Send WhatsApp to user
       if (profile.whatsapp_number) {
