@@ -449,6 +449,9 @@ Deno.serve(async (req) => {
       case "concluir_tarefa":
         responseMessage = await handleConcluirTarefa(supabase, userProfile, args);
         break;
+      case "concluir_tarefa_fixa":
+        responseMessage = await handleConcluirTarefaFixa(supabase, userProfile, args);
+        break;
       case "criar_lista_compras":
         responseMessage = await handleCriarListaCompras(supabase, userProfile, args);
         break;
