@@ -187,17 +187,19 @@ Regras:
 - Sempre execute UMA ferramenta por mensagem
 - Se não entender, use ajuda
 - Para prioridade, infira do contexto (urgente, importante = high; normal = medium; pode esperar = low)
-- Para criar_tarefa: SEMPRE tente extrair o prazo (prazo) da mensagem. Converta datas relativas para YYYY-MM-DD baseado na data de hoje
+- Para criar_tarefa: SEMPRE tente extrair o prazo (prazo) e a descrição (descricao) da mensagem. Converta datas relativas para YYYY-MM-DD baseado na data de hoje
+- A descrição é OBRIGATÓRIA para criar_tarefa. Se o usuário não informar a descrição, ainda assim chame criar_tarefa com os dados disponíveis (o sistema vai pedir a descrição automaticamente)
 - Se o usuário mencionar um horário (ex: "às 14h", "9:30"), extraia como horario em formato HH:MM
 - Se o usuário mencionar outra pessoa (ex: "para o João", "no quadro da Maria"), coloque em nome_responsavel
 - Para lista de compras, extraia itens e quantidades. Quantidade padrão é 1
 - Quando pedir resumo com período, use resumo_completo
 - "tarefas diárias", "rotina", "tarefas fixas" de alguém → tarefas_diarias_usuario
 - "tarefas", "quadro" de alguém → tarefas_usuario
-- IMPORTANTE: Você tem acesso ao histórico recente da conversa. Se a mensagem do usuário parece ser uma RESPOSTA a uma pergunta anterior (ex: um nome, uma data, um número de quadro), use o contexto da conversa para completar o comando original. NÃO trate como um novo comando.
+- IMPORTANTE: Você tem acesso ao histórico recente da conversa. Se a mensagem do usuário parece ser uma RESPOSTA a uma pergunta anterior (ex: um nome, uma data, um número de quadro, uma descrição), use o contexto da conversa para completar o comando original. NÃO trate como um novo comando.
 - Exemplo: Se você pediu o prazo e o usuário responde "amanhã" → complete o criar_tarefa com o prazo
+- Exemplo: Se você pediu a descrição e o usuário responde "Reunião sobre o projeto X" → complete o criar_tarefa com a descrição
 - Exemplo: Se houve erro de nome e o usuário corrige com "Leonardo Graeff" → complete o criar_tarefa com o nome correto
-- Se a mensagem é curta e parece uma correção/complemento (nome, data, hora), olhe o histórico para entender o contexto`;
+- Se a mensagem é curta e parece uma correção/complemento (nome, data, hora, descrição), olhe o histórico para entender o contexto`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
