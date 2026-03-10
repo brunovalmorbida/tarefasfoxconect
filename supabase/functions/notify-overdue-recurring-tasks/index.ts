@@ -159,6 +159,41 @@ Deno.serve(async (req) => {
       }
     };
 
+    const sendWhatsAppWithButtons = async (phone: string, message: string, buttons: { id: string; label: string }[], label: string) => {
+      if (!zapiConfig) return;
+      try {
+        const zapiUrl = `https://api.z-api.io/instances/${zapiConfig.instance_id}/token/${zapiConfig.token}/send-button-list`;
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (zapiConfig.client_token) headers["Client-Token"] = zapiConfig.client_token;
+
+        const response = await fetch(zapiUrl, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            phone: phone.replace(/\D/g, ""),
+            message,
+            buttonList: { buttons },
+          }),
+        });
+        const responseData = await response.json();
+        
+        // If button message fails, fallback to plain text with hint
+        if (!response.ok) {
+          console.log("Button message failed, falling back to text:", JSON.stringify(responseData));
+          const fallbackMsg = message + `\n\n💡 _Responda com "Feita [nome da tarefa]" para marcar como concluída!_`;
+          await sendWhatsApp(phone, fallbackMsg, label);
+          return;
+        }
+        
+        results.push({ to: label, phone, status: "sent" });
+      } catch (e: any) {
+        // Fallback to plain text
+        console.error("Button message error, falling back:", e.message);
+        const fallbackMsg = message + `\n\n💡 _Responda com "Feita [nome da tarefa]" para marcar como concluída!_`;
+        await sendWhatsApp(phone, fallbackMsg, label);
+      }
+    };
+
     for (const [userId, userTasks] of tasksByUser) {
       const profile = profileMap.get(userId);
       if (!profile) continue;
@@ -174,12 +209,16 @@ Deno.serve(async (req) => {
         message += `\n`;
       }
 
-      message += `Total: *${userTasks.length}* tarefa(s) atrasada(s). Por favor, conclua-as o mais rápido possível! ⏳\n\n`;
-      message += `💡 _Responda com "Feita [nome da tarefa]" para marcar como concluída direto aqui!_`;
+      message += `Total: *${userTasks.length}* tarefa(s) atrasada(s). Por favor, conclua-as o mais rápido possível! ⏳`;
 
-      // Send WhatsApp to user
+      // Send WhatsApp to user with buttons (max 3 buttons per WhatsApp limitation)
       if (profile.whatsapp_number) {
-        await sendWhatsApp(profile.whatsapp_number, message, `user:${profile.name}`);
+        const buttons = userTasks.slice(0, 3).map((t: any, i: number) => ({
+          id: `done_${i}`,
+          label: `✅ Feita: ${t.title.slice(0, 20)}`,
+        }));
+
+        await sendWhatsAppWithButtons(profile.whatsapp_number, message, buttons, `user:${profile.name}`);
       }
 
       // Send to master admin
