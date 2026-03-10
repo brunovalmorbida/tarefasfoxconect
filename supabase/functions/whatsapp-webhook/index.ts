@@ -1093,6 +1093,100 @@ async function handleConcluirTarefa(supabase: any, profile: any, args: any) {
     `Ótimo trabalho! 🎉`;
 }
 
+// ─── COMMAND: Concluir Tarefa Fixa ─────────────────────────
+async function handleConcluirTarefaFixa(supabase: any, profile: any, args: any) {
+  const { titulo_parcial } = args;
+
+  const now = new Date();
+  const brtOffset = -3 * 60;
+  const brtNow = new Date(now.getTime() + (brtOffset + now.getTimezoneOffset()) * 60000);
+  const todayStr = `${brtNow.getFullYear()}-${String(brtNow.getMonth() + 1).padStart(2, "0")}-${String(brtNow.getDate()).padStart(2, "0")}`;
+  const jsDay = brtNow.getDay();
+  const ourDay = jsDay === 0 ? 6 : jsDay - 1;
+
+  // Get boards assigned to this user
+  const { data: recBoards } = await supabase
+    .from("recurring_task_boards")
+    .select("id, name, assigned_user_id")
+    .or(`assigned_user_id.eq.${profile.user_id},assigned_user_id.is.null`);
+
+  const boardIds = (recBoards || []).map((b: any) => b.id);
+  if (boardIds.length === 0) {
+    return `❌ Você não tem quadros de tarefas fixas atribuídos.`;
+  }
+
+  // Get recurring tasks matching the title
+  const { data: recTasks } = await supabase
+    .from("recurring_tasks")
+    .select("id, title, frequency, weekday, month_day, board_id, team_id, scheduled_time")
+    .in("board_id", boardIds)
+    .ilike("title", `%${titulo_parcial}%`);
+
+  if (!recTasks || recTasks.length === 0) {
+    return `❌ Nenhuma tarefa fixa encontrada com "${titulo_parcial}". Verifique o nome e tente novamente.`;
+  }
+
+  // Filter to only tasks active today
+  const activeTasks = recTasks.filter((t: any) => {
+    if (jsDay === 0) return false;
+    if (t.frequency === "daily") return true;
+    if (t.frequency === "weekday" && t.weekday !== null) return ourDay === t.weekday;
+    if (t.frequency === "monthly" && t.month_day !== null) return brtNow.getDate() === t.month_day;
+    if (t.frequency === "weekly") return true;
+    return false;
+  });
+
+  if (activeTasks.length === 0) {
+    return `❌ A tarefa "${recTasks[0].title}" não está ativa hoje.`;
+  }
+
+  const task = activeTasks[0];
+
+  // Determine period_start based on frequency
+  let periodStart = todayStr;
+  if (task.frequency === "weekly") {
+    const diff = jsDay === 0 ? 6 : jsDay - 1;
+    const weekStart = new Date(brtNow);
+    weekStart.setDate(brtNow.getDate() - diff);
+    periodStart = `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, "0")}-${String(weekStart.getDate()).padStart(2, "0")}`;
+  } else if (task.frequency === "monthly") {
+    periodStart = `${brtNow.getFullYear()}-${String(brtNow.getMonth() + 1).padStart(2, "0")}-01`;
+  }
+
+  // Check if already completed
+  const { data: existing } = await supabase
+    .from("recurring_task_completions")
+    .select("id")
+    .eq("recurring_task_id", task.id)
+    .eq("period_start", periodStart)
+    .limit(1);
+
+  if (existing && existing.length > 0) {
+    return `✅ A tarefa *"${task.title}"* já foi marcada como concluída hoje!`;
+  }
+
+  // Mark as completed
+  const { error } = await supabase
+    .from("recurring_task_completions")
+    .insert({
+      recurring_task_id: task.id,
+      completed_by: profile.user_id,
+      period_start: periodStart,
+    });
+
+  if (error) {
+    console.error("Error completing recurring task:", error);
+    return `❌ Erro ao concluir tarefa fixa: ${error.message}`;
+  }
+
+  const boardName = (recBoards || []).find((b: any) => b.id === task.board_id)?.name || "";
+
+  return `✅ *Tarefa fixa concluída!*\n\n` +
+    `📋 *${task.title}*\n` +
+    `📌 Quadro: *${boardName}*\n` +
+    (task.scheduled_time ? `⏰ Horário previsto: ${task.scheduled_time.slice(0, 5)}\n` : "") +
+    `\nÓtimo trabalho! 🎉`;
+
 // ─── COMMAND: Criar Lista de Compras ───────────────────────
 async function handleCriarListaCompras(supabase: any, profile: any, args: any) {
   const { titulo, urgencia, itens } = args;
