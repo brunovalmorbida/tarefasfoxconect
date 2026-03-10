@@ -101,7 +101,7 @@ export default function SettingsPage() {
               Notificações
             </TabsTrigger>
           )}
-          {isAdmin && (
+          {(isAdmin || canManageFleet) && (
             <TabsTrigger value="fleet" className="gap-2">
               <Car className="h-4 w-4" />
               Frota
