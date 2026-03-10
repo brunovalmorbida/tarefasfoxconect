@@ -1,4 +1,4 @@
-import { LayoutDashboard, Columns3, Bell, Settings, LogOut, ListChecks, ShoppingCart, Sun, Moon, UserCircle, Car } from "lucide-react";
+import { LayoutDashboard, Columns3, Bell, Settings, LogOut, ListChecks, ShoppingCart, Sun, Moon, UserCircle, Car, Instagram } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsAppAdmin, useCanManage } from "@/hooks/useUserRole";
