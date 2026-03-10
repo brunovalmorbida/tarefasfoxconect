@@ -641,6 +641,14 @@ async function handleCriarTarefa(supabase: any, profile: any, args: any, isAdmin
     return msg;
   }
 
+  // If no description provided, ask for it
+  if (!descricao || !descricao.trim()) {
+    let msg = `⚠️ *Descrição obrigatória!*\n\nPara criar a tarefa *"${titulo}"*`;
+    if (targetProfile.user_id !== profile.user_id) msg += ` no quadro de *${targetProfile.name}*`;
+    msg += `, informe uma descrição.\n\n_Responda com a descrição da tarefa._`;
+    return msg;
+  }
+
   // Get next position
   const { data: existingTasks } = await supabase
     .from("tasks")
