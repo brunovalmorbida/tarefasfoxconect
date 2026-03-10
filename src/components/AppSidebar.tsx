@@ -35,6 +35,8 @@ export function AppSidebar() {
   const canViewPurchases = useCanManage("can_view_purchases");
   const canViewFleet = useCanManage("can_view_fleet");
   const canManageFleet = useCanManage("can_manage_fleet");
+  const canViewSocial = useCanManage("can_view_social");
+  const canManageSocial = useCanManage("can_manage_social");
   const notificationCount = useNotificationCount();
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains("dark"));
 
