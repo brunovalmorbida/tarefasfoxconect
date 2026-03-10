@@ -873,6 +873,47 @@ export type Database = {
           },
         ]
       }
+      social_auto_goals: {
+        Row: {
+          auto_create: boolean
+          category_id: string
+          created_at: string
+          created_by: string
+          default_assigned_to: string | null
+          id: string
+          target_count: number
+          updated_at: string
+        }
+        Insert: {
+          auto_create?: boolean
+          category_id: string
+          created_at?: string
+          created_by: string
+          default_assigned_to?: string | null
+          id?: string
+          target_count?: number
+          updated_at?: string
+        }
+        Update: {
+          auto_create?: boolean
+          category_id?: string
+          created_at?: string
+          created_by?: string
+          default_assigned_to?: string | null
+          id?: string
+          target_count?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_auto_goals_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: true
+            referencedRelation: "social_content_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       social_content_categories: {
         Row: {
           color: string | null
@@ -982,12 +1023,15 @@ export type Database = {
           category_id: string
           completed_at: string | null
           completed_by: string | null
+          content_strategy_type: string | null
           created_at: string
           created_by: string
           description: string | null
           due_date: string | null
           goal_id: string | null
           id: string
+          pipeline_status: string
+          post_link: string | null
           status: string
           title: string
           updated_at: string
@@ -997,12 +1041,15 @@ export type Database = {
           category_id: string
           completed_at?: string | null
           completed_by?: string | null
+          content_strategy_type?: string | null
           created_at?: string
           created_by: string
           description?: string | null
           due_date?: string | null
           goal_id?: string | null
           id?: string
+          pipeline_status?: string
+          post_link?: string | null
           status?: string
           title: string
           updated_at?: string
@@ -1012,12 +1059,15 @@ export type Database = {
           category_id?: string
           completed_at?: string | null
           completed_by?: string | null
+          content_strategy_type?: string | null
           created_at?: string
           created_by?: string
           description?: string | null
           due_date?: string | null
           goal_id?: string | null
           id?: string
+          pipeline_status?: string
+          post_link?: string | null
           status?: string
           title?: string
           updated_at?: string
