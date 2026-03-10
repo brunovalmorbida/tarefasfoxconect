@@ -39,6 +39,7 @@ const App = () => (
                 <Route path="/recurring-tasks" element={<RecurringTasks />} />
                 <Route path="/purchases" element={<Purchases />} />
                 <Route path="/fleet" element={<Fleet />} />
+                <Route path="/social-media" element={<SocialMedia />} />
                 {/* Teams moved to Settings */}
                 <Route path="/notifications" element={<Notifications />} />
                 <Route path="/settings" element={<SettingsPage />} />

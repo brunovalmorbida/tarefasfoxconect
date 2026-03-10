@@ -67,8 +67,12 @@ export function AppSidebar() {
       const insertIdx = nav.findIndex(n => n.title === "Notificações");
       nav.splice(insertIdx >= 0 ? insertIdx : nav.length, 0, { title: "Frota", url: "/fleet", icon: Car });
     }
+    if (isAdmin || canViewSocial || canManageSocial) {
+      const insertIdx = nav.findIndex(n => n.title === "Notificações");
+      nav.splice(insertIdx >= 0 ? insertIdx : nav.length, 0, { title: "Social Media", url: "/social-media", icon: Instagram });
+    }
     return nav;
-  }, [isAdmin, canViewPurchases, canViewFleet, canManageFleet]);
+  }, [isAdmin, canViewPurchases, canViewFleet, canManageFleet, canViewSocial, canManageSocial]);
 
   return (
     <Sidebar>
