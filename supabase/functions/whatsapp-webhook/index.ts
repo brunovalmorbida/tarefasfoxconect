@@ -45,11 +45,26 @@ const TOOLS = [
     type: "function",
     function: {
       name: "concluir_tarefa",
-      description: "Marca uma tarefa como concluída movendo-a para a última coluna do quadro",
+      description: "Marca uma tarefa do Kanban como concluída movendo-a para a última coluna do quadro",
       parameters: {
         type: "object",
         properties: {
           titulo_parcial: { type: "string", description: "Parte do título da tarefa para buscar" },
+        },
+        required: ["titulo_parcial"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "concluir_tarefa_fixa",
+      description: "Marca uma tarefa fixa/recorrente/diária como concluída para o período atual (hoje). Use quando o usuário disser 'feita', 'concluída', 'pronta' referindo-se a uma tarefa fixa/diária/recorrente.",
+      parameters: {
+        type: "object",
+        properties: {
+          titulo_parcial: { type: "string", description: "Parte do título da tarefa fixa para buscar" },
         },
         required: ["titulo_parcial"],
         additionalProperties: false,
