@@ -214,6 +214,10 @@ Regras:
 - Quando pedir resumo com período, use resumo_completo
 - "tarefas diárias", "rotina", "tarefas fixas" de alguém → tarefas_diarias_usuario
 - "tarefas", "quadro" de alguém → tarefas_usuario
+- IMPORTANTE: Diferencie entre tarefas do Kanban e tarefas fixas/recorrentes/diárias:
+  - "concluir tarefa X" (sem qualificação) → concluir_tarefa (Kanban)
+  - "feita tarefa fixa X", "concluir diária X", "tarefa fixa feita X" → concluir_tarefa_fixa
+  - Se no histórico recente há notificação de tarefa fixa atrasada e o usuário responde "feita" ou "pronta" com nome de tarefa → concluir_tarefa_fixa
 - IMPORTANTE: Você tem acesso ao histórico recente da conversa. Se a mensagem do usuário parece ser uma RESPOSTA a uma pergunta anterior (ex: um nome, uma data, um número de quadro, uma descrição), use o contexto da conversa para completar o comando original. NÃO trate como um novo comando.
 - Exemplo: Se você pediu o prazo e o usuário responde "amanhã" → complete o criar_tarefa com o prazo
 - Exemplo: Se você pediu a descrição e o usuário responde "Reunião sobre o projeto X" → complete o criar_tarefa com a descrição
