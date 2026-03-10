@@ -1738,6 +1738,10 @@ function handleAjuda(userName: string, isAdmin: boolean = false) {
     `  • "Minhas tarefas"\n` +
     `  • "Tarefas atrasadas"\n` +
     `  • "Concluir tarefa relatório"\n\n` +
+    `🔄 *Tarefas Fixas/Diárias:*\n` +
+    `  • "Tarefas fixas pendentes"\n` +
+    `  • "Feita tarefa limpeza" (marca como concluída)\n` +
+    `  • "Concluir diária organizar estoque"\n\n` +
     `🛒 *Compras:*\n` +
     `  • "Comprar 5 resmas de papel e 2 toners"\n` +
     `  • "Preciso de material de limpeza"\n\n` +
