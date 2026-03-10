@@ -1186,6 +1186,7 @@ async function handleConcluirTarefaFixa(supabase: any, profile: any, args: any) 
     `📌 Quadro: *${boardName}*\n` +
     (task.scheduled_time ? `⏰ Horário previsto: ${task.scheduled_time.slice(0, 5)}\n` : "") +
     `\nÓtimo trabalho! 🎉`;
+}
 
 // ─── COMMAND: Criar Lista de Compras ───────────────────────
 async function handleCriarListaCompras(supabase: any, profile: any, args: any) {
