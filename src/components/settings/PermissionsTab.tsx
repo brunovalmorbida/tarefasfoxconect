@@ -22,6 +22,8 @@ const PERMISSIONS = [
   { key: "can_view_fleet", label: "Ver Frota", shortLabel: "Ver Frota" },
   { key: "can_manage_fleet", label: "Ger. Frota", shortLabel: "Ger. Frota" },
   { key: "is_driver", label: "Motorista", shortLabel: "Motorista" },
+  { key: "can_view_social", label: "Ver Social", shortLabel: "Ver Social" },
+  { key: "can_manage_social", label: "Ger. Social", shortLabel: "Ger. Social" },
 ] as const;
 
 type PermissionKey = typeof PERMISSIONS[number]["key"];
@@ -108,6 +110,8 @@ export function PermissionsTab() {
       can_view_fleet: false,
       can_manage_fleet: false,
       is_driver: false,
+      can_view_social: false,
+      can_manage_social: false,
     };
   };
 

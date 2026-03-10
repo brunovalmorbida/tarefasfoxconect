@@ -873,6 +873,172 @@ export type Database = {
           },
         ]
       }
+      social_content_categories: {
+        Row: {
+          color: string | null
+          created_at: string
+          icon: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          icon?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          icon?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      social_goals: {
+        Row: {
+          category_id: string
+          created_at: string
+          created_by: string
+          id: string
+          target_count: number
+          updated_at: string
+          week_start: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          created_by: string
+          id?: string
+          target_count?: number
+          updated_at?: string
+          week_start: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          target_count?: number
+          updated_at?: string
+          week_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_goals_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "social_content_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_task_proofs: {
+        Row: {
+          created_at: string
+          file_name: string | null
+          file_type: string | null
+          file_url: string
+          id: string
+          source: string
+          task_id: string
+          uploaded_by: string
+        }
+        Insert: {
+          created_at?: string
+          file_name?: string | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+          source?: string
+          task_id: string
+          uploaded_by: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          source?: string
+          task_id?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_task_proofs_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "social_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_tasks: {
+        Row: {
+          assigned_to: string | null
+          category_id: string
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          due_date: string | null
+          goal_id: string | null
+          id: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          category_id: string
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          due_date?: string | null
+          goal_id?: string | null
+          id?: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          category_id?: string
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          due_date?: string | null
+          goal_id?: string | null
+          id?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_tasks_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "social_content_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_tasks_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "social_goals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subtasks: {
         Row: {
           created_at: string
@@ -1037,9 +1203,11 @@ export type Database = {
           can_manage_fleet: boolean
           can_manage_purchases: boolean
           can_manage_recurring_tasks: boolean
+          can_manage_social: boolean
           can_manage_tasks: boolean
           can_view_fleet: boolean
           can_view_purchases: boolean
+          can_view_social: boolean
           created_at: string
           id: string
           is_driver: boolean
@@ -1053,9 +1221,11 @@ export type Database = {
           can_manage_fleet?: boolean
           can_manage_purchases?: boolean
           can_manage_recurring_tasks?: boolean
+          can_manage_social?: boolean
           can_manage_tasks?: boolean
           can_view_fleet?: boolean
           can_view_purchases?: boolean
+          can_view_social?: boolean
           created_at?: string
           id?: string
           is_driver?: boolean
@@ -1069,9 +1239,11 @@ export type Database = {
           can_manage_fleet?: boolean
           can_manage_purchases?: boolean
           can_manage_recurring_tasks?: boolean
+          can_manage_social?: boolean
           can_manage_tasks?: boolean
           can_view_fleet?: boolean
           can_view_purchases?: boolean
+          can_view_social?: boolean
           created_at?: string
           id?: string
           is_driver?: boolean

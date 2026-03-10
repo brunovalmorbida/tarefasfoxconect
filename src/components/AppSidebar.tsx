@@ -1,4 +1,4 @@
-import { LayoutDashboard, Columns3, Bell, Settings, LogOut, ListChecks, ShoppingCart, Sun, Moon, UserCircle, Car } from "lucide-react";
+import { LayoutDashboard, Columns3, Bell, Settings, LogOut, ListChecks, ShoppingCart, Sun, Moon, UserCircle, Car, Instagram } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsAppAdmin, useCanManage } from "@/hooks/useUserRole";
@@ -35,6 +35,8 @@ export function AppSidebar() {
   const canViewPurchases = useCanManage("can_view_purchases");
   const canViewFleet = useCanManage("can_view_fleet");
   const canManageFleet = useCanManage("can_manage_fleet");
+  const canViewSocial = useCanManage("can_view_social");
+  const canManageSocial = useCanManage("can_manage_social");
   const notificationCount = useNotificationCount();
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains("dark"));
 
@@ -65,8 +67,12 @@ export function AppSidebar() {
       const insertIdx = nav.findIndex(n => n.title === "Notificações");
       nav.splice(insertIdx >= 0 ? insertIdx : nav.length, 0, { title: "Frota", url: "/fleet", icon: Car });
     }
+    if (isAdmin || canViewSocial || canManageSocial) {
+      const insertIdx = nav.findIndex(n => n.title === "Notificações");
+      nav.splice(insertIdx >= 0 ? insertIdx : nav.length, 0, { title: "Social Media", url: "/social-media", icon: Instagram });
+    }
     return nav;
-  }, [isAdmin, canViewPurchases, canViewFleet, canManageFleet]);
+  }, [isAdmin, canViewPurchases, canViewFleet, canManageFleet, canViewSocial, canManageSocial]);
 
   return (
     <Sidebar>

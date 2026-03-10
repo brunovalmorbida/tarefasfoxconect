@@ -17,6 +17,7 @@ import RecurringTasks from "./pages/RecurringTasks";
 import Purchases from "./pages/Purchases";
 import ProfilePage from "./pages/ProfilePage";
 import Fleet from "./pages/Fleet";
+import SocialMedia from "./pages/SocialMedia";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +39,7 @@ const App = () => (
                 <Route path="/recurring-tasks" element={<RecurringTasks />} />
                 <Route path="/purchases" element={<Purchases />} />
                 <Route path="/fleet" element={<Fleet />} />
+                <Route path="/social-media" element={<SocialMedia />} />
                 {/* Teams moved to Settings */}
                 <Route path="/notifications" element={<Notifications />} />
                 <Route path="/settings" element={<SettingsPage />} />
