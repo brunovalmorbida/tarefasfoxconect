@@ -11,6 +11,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useLogActivity } from "@/hooks/useActivityLog";
 import { MessageSquare, Loader2, Copy, Bot, CheckCircle2 } from "lucide-react";
+import { GoogleDriveIntegration } from "./GoogleDriveIntegration";
 
 export function IntegrationsTab() {
   const { toast } = useToast();
