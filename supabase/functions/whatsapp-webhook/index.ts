@@ -229,6 +229,26 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ─── Deduplication: ignore duplicate webhooks from Z-API ───
+    const messageId = body.messageId || body.id?.id || body.ids?.[0]?.id || null;
+    if (messageId) {
+      const cleanPhoneDedup = phone.replace(/\D/g, "");
+      const { data: existingMsg } = await supabase
+        .from("whatsapp_chat_history")
+        .select("id")
+        .eq("phone", cleanPhoneDedup)
+        .eq("content", messageText)
+        .eq("role", "user")
+        .gte("created_at", new Date(Date.now() - 30 * 1000).toISOString())
+        .limit(1);
+      if (existingMsg && existingMsg.length > 0) {
+        console.log("Duplicate webhook detected, skipping. messageId:", messageId);
+        return new Response(JSON.stringify({ ok: true, skipped: "duplicate" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     const cleanPhone = phone.replace(/\D/g, "");
     console.log("Received phone raw:", phone, "| cleaned:", cleanPhone);
 
