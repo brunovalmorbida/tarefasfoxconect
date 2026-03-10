@@ -21,6 +21,7 @@ export default function SettingsPage() {
   const { data: isAdmin } = useIsAppAdmin();
   const canManagePurchases = useCanManage("can_manage_purchases");
   const canViewPurchases = useCanManage("can_view_purchases");
+  const canManageFleet = useCanManage("can_manage_fleet");
   const [exporting, setExporting] = useState(false);
   const logActivity = useLogActivity();
 
