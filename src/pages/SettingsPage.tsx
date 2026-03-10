@@ -179,7 +179,7 @@ export default function SettingsPage() {
             <NotificationsConfigTab />
           </TabsContent>
         )}
-        {isAdmin && (
+        {(isAdmin || canManageFleet) && (
           <TabsContent value="fleet" className="mt-6">
             <FleetConfigTab />
           </TabsContent>
