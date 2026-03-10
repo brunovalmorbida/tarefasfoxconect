@@ -187,17 +187,19 @@ Regras:
 - Sempre execute UMA ferramenta por mensagem
 - Se não entender, use ajuda
 - Para prioridade, infira do contexto (urgente, importante = high; normal = medium; pode esperar = low)
-- Para criar_tarefa: SEMPRE tente extrair o prazo (prazo) da mensagem. Converta datas relativas para YYYY-MM-DD baseado na data de hoje
+- Para criar_tarefa: SEMPRE tente extrair o prazo (prazo) e a descrição (descricao) da mensagem. Converta datas relativas para YYYY-MM-DD baseado na data de hoje
+- A descrição é OBRIGATÓRIA para criar_tarefa. Se o usuário não informar a descrição, ainda assim chame criar_tarefa com os dados disponíveis (o sistema vai pedir a descrição automaticamente)
 - Se o usuário mencionar um horário (ex: "às 14h", "9:30"), extraia como horario em formato HH:MM
 - Se o usuário mencionar outra pessoa (ex: "para o João", "no quadro da Maria"), coloque em nome_responsavel
 - Para lista de compras, extraia itens e quantidades. Quantidade padrão é 1
 - Quando pedir resumo com período, use resumo_completo
 - "tarefas diárias", "rotina", "tarefas fixas" de alguém → tarefas_diarias_usuario
 - "tarefas", "quadro" de alguém → tarefas_usuario
-- IMPORTANTE: Você tem acesso ao histórico recente da conversa. Se a mensagem do usuário parece ser uma RESPOSTA a uma pergunta anterior (ex: um nome, uma data, um número de quadro), use o contexto da conversa para completar o comando original. NÃO trate como um novo comando.
+- IMPORTANTE: Você tem acesso ao histórico recente da conversa. Se a mensagem do usuário parece ser uma RESPOSTA a uma pergunta anterior (ex: um nome, uma data, um número de quadro, uma descrição), use o contexto da conversa para completar o comando original. NÃO trate como um novo comando.
 - Exemplo: Se você pediu o prazo e o usuário responde "amanhã" → complete o criar_tarefa com o prazo
+- Exemplo: Se você pediu a descrição e o usuário responde "Reunião sobre o projeto X" → complete o criar_tarefa com a descrição
 - Exemplo: Se houve erro de nome e o usuário corrige com "Leonardo Graeff" → complete o criar_tarefa com o nome correto
-- Se a mensagem é curta e parece uma correção/complemento (nome, data, hora), olhe o histórico para entender o contexto`;
+- Se a mensagem é curta e parece uma correção/complemento (nome, data, hora, descrição), olhe o histórico para entender o contexto`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -227,6 +229,26 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ ok: true, skipped: "group message" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // ─── Deduplication: ignore duplicate webhooks from Z-API ───
+    const messageId = body.messageId || body.id?.id || body.ids?.[0]?.id || null;
+    if (messageId) {
+      const cleanPhoneDedup = phone.replace(/\D/g, "");
+      const { data: existingMsg } = await supabase
+        .from("whatsapp_chat_history")
+        .select("id")
+        .eq("phone", cleanPhoneDedup)
+        .eq("content", messageText)
+        .eq("role", "user")
+        .gte("created_at", new Date(Date.now() - 30 * 1000).toISOString())
+        .limit(1);
+      if (existingMsg && existingMsg.length > 0) {
+        console.log("Duplicate webhook detected, skipping. messageId:", messageId);
+        return new Response(JSON.stringify({ ok: true, skipped: "duplicate" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     const cleanPhone = phone.replace(/\D/g, "");
@@ -618,6 +640,14 @@ async function handleCriarTarefa(supabase: any, profile: any, args: any, isAdmin
     let msg = `⚠️ *Prazo obrigatório!*\n\nPara criar a tarefa *"${titulo}"*`;
     if (targetProfile.user_id !== profile.user_id) msg += ` no quadro de *${targetProfile.name}*`;
     msg += `, informe o prazo.\n\n_Responda com: "criar tarefa ${titulo} para [data]"_\n_Ex: "para amanhã", "para sexta", "para dia 28"_`;
+    return msg;
+  }
+
+  // If no description provided, ask for it
+  if (!descricao || !descricao.trim()) {
+    let msg = `⚠️ *Descrição obrigatória!*\n\nPara criar a tarefa *"${titulo}"*`;
+    if (targetProfile.user_id !== profile.user_id) msg += ` no quadro de *${targetProfile.name}*`;
+    msg += `, informe uma descrição.\n\n_Responda com a descrição da tarefa._`;
     return msg;
   }
 
