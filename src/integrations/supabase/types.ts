@@ -493,6 +493,48 @@ export type Database = {
           },
         ]
       }
+      google_drive_config: {
+        Row: {
+          access_token: string | null
+          connected_by: string | null
+          connected_email: string | null
+          created_at: string | null
+          folder_mapping: Json | null
+          id: string
+          is_connected: boolean | null
+          refresh_token: string | null
+          root_folder_id: string | null
+          token_expires_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          access_token?: string | null
+          connected_by?: string | null
+          connected_email?: string | null
+          created_at?: string | null
+          folder_mapping?: Json | null
+          id?: string
+          is_connected?: boolean | null
+          refresh_token?: string | null
+          root_folder_id?: string | null
+          token_expires_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          access_token?: string | null
+          connected_by?: string | null
+          connected_email?: string | null
+          created_at?: string | null
+          folder_mapping?: Json | null
+          id?: string
+          is_connected?: boolean | null
+          refresh_token?: string | null
+          root_folder_id?: string | null
+          token_expires_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string
@@ -1027,6 +1069,7 @@ export type Database = {
           created_at: string
           created_by: string
           description: string | null
+          drive_folder_url: string | null
           due_date: string | null
           goal_id: string | null
           id: string
@@ -1045,6 +1088,7 @@ export type Database = {
           created_at?: string
           created_by: string
           description?: string | null
+          drive_folder_url?: string | null
           due_date?: string | null
           goal_id?: string | null
           id?: string
@@ -1063,6 +1107,7 @@ export type Database = {
           created_at?: string
           created_by?: string
           description?: string | null
+          drive_folder_url?: string | null
           due_date?: string | null
           goal_id?: string | null
           id?: string
