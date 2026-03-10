@@ -8,3 +8,9 @@ verify_jwt = false
 
 [functions.notify-end-of-day]
 verify_jwt = false
+
+[functions.google-drive-callback]
+verify_jwt = false
+
+[functions.google-drive-api]
+verify_jwt = false
