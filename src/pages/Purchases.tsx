@@ -302,13 +302,15 @@ export default function Purchases() {
           {isExpanded && (
             <div className="border rounded-md divide-y text-xs">
               {list.items.map((item, i) => (
-                <div key={item.id} className="px-3 py-2 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
+                <div key={item.id} className="px-3 py-2 flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-2 min-w-0">
                     {itemStatusIcon(item.status)}
                     <div className="min-w-0">
-                      <span className="font-medium">{i + 1}. {item.name}</span>
-                      <span className="text-muted-foreground ml-2">x{item.quantity} · {allCategoryLabels[item.category] || categoryLabels[item.category] || item.category}</span>
-                      {item.description && <span className="text-muted-foreground ml-1">· {item.description}</span>}
+                      <div>
+                        <span className="font-medium">{i + 1}. {item.name}</span>
+                        <span className="text-muted-foreground ml-2">x{item.quantity} · {allCategoryLabels[item.category] || categoryLabels[item.category] || item.category}</span>
+                      </div>
+                      {item.description && <p className="text-muted-foreground italic mt-0.5">📝 {item.description}</p>}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
