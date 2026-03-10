@@ -81,6 +81,7 @@ export function IntegrationsTab() {
 
   return (
     <div className="space-y-6">
+      <GoogleDriveIntegration />
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
