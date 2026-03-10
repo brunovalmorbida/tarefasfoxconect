@@ -569,64 +569,72 @@ export default function Purchases() {
                 </Button>
               </div>
               {editItems.map((item, i) => (
-                <div key={i} className="flex gap-2 items-start">
-                  <div className="flex-1 grid grid-cols-5 gap-2">
-                    <div className="col-span-2">
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button variant="outline" className="h-8 text-sm w-full justify-start font-normal truncate">
-                            {item.name || <span className="text-muted-foreground">Selecionar produto...</span>}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="p-0 w-[280px]" align="start">
-                          <Command>
-                            <CommandInput placeholder="Buscar produto..." />
-                            <CommandList>
-                              <CommandEmpty>Nenhum produto encontrado.</CommandEmpty>
-                              <CommandGroup heading="Catálogo">
-                                {productCatalog.map((p: any) => (
-                                  <CommandItem
-                                    key={p.id}
-                                    value={p.name}
-                                    onSelect={() => {
-                                      const catId = p.category_id || "other";
-                                      updateEditItem(i, "name", p.name);
-                                      updateEditItem(i, "category", catId);
-                                      if (p.default_estimated_value) {
-                                        updateEditItem(i, "estimated_value", String(p.default_estimated_value));
-                                      }
-                                    }}
-                                  >
-                                    <div className="flex flex-col">
-                                      <span>{p.name}</span>
-                                      <span className="text-xs text-muted-foreground">
-                                        {p.product_categories?.name || "Sem categoria"}
-                                        {p.default_estimated_value ? ` · R$ ${Number(p.default_estimated_value).toFixed(2)}` : ""}
-                                      </span>
-                                    </div>
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
+                <div key={i} className="space-y-1">
+                  <div className="flex gap-2 items-start">
+                    <div className="flex-1 grid grid-cols-5 gap-2">
+                      <div className="col-span-2">
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className="h-8 text-sm w-full justify-start font-normal truncate">
+                              {item.name || <span className="text-muted-foreground">Selecionar produto...</span>}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="p-0 w-[280px]" align="start">
+                            <Command>
+                              <CommandInput placeholder="Buscar produto..." />
+                              <CommandList>
+                                <CommandEmpty>Nenhum produto encontrado.</CommandEmpty>
+                                <CommandGroup heading="Catálogo">
+                                  {productCatalog.map((p: any) => (
+                                    <CommandItem
+                                      key={p.id}
+                                      value={p.name}
+                                      onSelect={() => {
+                                        const catId = p.category_id || "other";
+                                        updateEditItem(i, "name", p.name);
+                                        updateEditItem(i, "category", catId);
+                                        if (p.default_estimated_value) {
+                                          updateEditItem(i, "estimated_value", String(p.default_estimated_value));
+                                        }
+                                      }}
+                                    >
+                                      <div className="flex flex-col">
+                                        <span>{p.name}</span>
+                                        <span className="text-xs text-muted-foreground">
+                                          {p.product_categories?.name || "Sem categoria"}
+                                          {p.default_estimated_value ? ` · R$ ${Number(p.default_estimated_value).toFixed(2)}` : ""}
+                                        </span>
+                                      </div>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                      <Input type="number" min="1" value={item.quantity} onChange={(e) => updateEditItem(i, "quantity", e.target.value)} placeholder="Qtd" className="h-8 text-sm" />
+                      <Select value={item.category} onValueChange={(v) => updateEditItem(i, "category", v)}>
+                        <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(allCategoryLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <Input type="number" step="0.01" value={item.estimated_value} onChange={(e) => updateEditItem(i, "estimated_value", e.target.value)} placeholder="R$" className="h-8 text-sm" />
                     </div>
-                    <Input type="number" min="1" value={item.quantity} onChange={(e) => updateEditItem(i, "quantity", e.target.value)} placeholder="Qtd" className="h-8 text-sm" />
-                    <Select value={item.category} onValueChange={(v) => updateEditItem(i, "category", v)}>
-                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(allCategoryLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <Input type="number" step="0.01" value={item.estimated_value} onChange={(e) => updateEditItem(i, "estimated_value", e.target.value)} placeholder="R$" className="h-8 text-sm" />
+                    {editItems.length > 1 && (
+                      <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive shrink-0"
+                        onClick={() => setEditItems((p) => p.filter((_, idx) => idx !== i))}>
+                        <X className="h-3 w-3" />
+                      </Button>
+                    )}
                   </div>
-                  {editItems.length > 1 && (
-                    <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive shrink-0"
-                      onClick={() => setEditItems((p) => p.filter((_, idx) => idx !== i))}>
-                      <X className="h-3 w-3" />
-                    </Button>
-                  )}
+                  <Input
+                    value={item.description}
+                    onChange={(e) => updateEditItem(i, "description", e.target.value)}
+                    placeholder="Observação do item (opcional)"
+                    className="h-7 text-xs text-muted-foreground ml-0"
+                  />
                 </div>
               ))}
             </div>
