@@ -21,6 +21,7 @@ export default function SettingsPage() {
   const { data: isAdmin } = useIsAppAdmin();
   const canManagePurchases = useCanManage("can_manage_purchases");
   const canViewPurchases = useCanManage("can_view_purchases");
+  const canManageFleet = useCanManage("can_manage_fleet");
   const [exporting, setExporting] = useState(false);
   const logActivity = useLogActivity();
 
@@ -100,7 +101,7 @@ export default function SettingsPage() {
               Notificações
             </TabsTrigger>
           )}
-          {isAdmin && (
+          {(isAdmin || canManageFleet) && (
             <TabsTrigger value="fleet" className="gap-2">
               <Car className="h-4 w-4" />
               Frota
@@ -178,7 +179,7 @@ export default function SettingsPage() {
             <NotificationsConfigTab />
           </TabsContent>
         )}
-        {isAdmin && (
+        {(isAdmin || canManageFleet) && (
           <TabsContent value="fleet" className="mt-6">
             <FleetConfigTab />
           </TabsContent>
