@@ -190,7 +190,11 @@ Exemplos:
 - "Tarefas fixas pendentes" → listar_tarefas (filtro: "fixas")
 - "Tarefas atrasadas" → listar_tarefas (filtro: "atrasadas")
 - "O que falta fazer?" → listar_tarefas (filtro: "hoje")
-- "Concluir tarefa relatório" → concluir_tarefa
+- "Concluir tarefa relatório" → concluir_tarefa (tarefa kanban)
+- "Feita tarefa limpeza" ou "Concluir diária limpeza" → concluir_tarefa_fixa (tarefa fixa/recorrente)
+- "Tarefa fixa feita: organizar estoque" → concluir_tarefa_fixa
+- "Já fiz a tarefa X" (se X é uma tarefa fixa do contexto) → concluir_tarefa_fixa
+- Se o usuário responder "feita" ou "pronta" após receber notificação de tarefa fixa atrasada → concluir_tarefa_fixa
 - "Como tá meu dia?" → resumo_dia
 - "Meu resumo da semana" → resumo_completo (periodo: "semana")
 - "Resumo do dia do João" → resumo_completo (periodo: "dia", nome_usuario: "João")
