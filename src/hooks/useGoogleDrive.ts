@@ -24,7 +24,7 @@ export function useGoogleDriveStatus() {
         .limit(1)
         .maybeSingle();
       if (error) throw error;
-      return data as { is_connected: boolean; connected_email: string; root_folder_id: string; folder_mapping: Record<string, string> } | null;
+      return data as unknown as { is_connected: boolean; connected_email: string; root_folder_id: string; folder_mapping: Record<string, string> } | null;
     },
   });
 }
