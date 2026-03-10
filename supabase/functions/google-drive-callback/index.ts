@@ -50,6 +50,7 @@ Deno.serve(async (req) => {
     });
 
     const tokenData = await tokenRes.json();
+    console.log("Token exchange response status:", tokenRes.status);
     if (!tokenRes.ok) {
       throw new Error(`Token exchange failed: ${JSON.stringify(tokenData)}`);
     }
@@ -59,52 +60,29 @@ Deno.serve(async (req) => {
       headers: { Authorization: `Bearer ${tokenData.access_token}` },
     });
     const userInfo = await userInfoRes.json();
+    console.log("User info:", userInfo.email);
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-
     const expiresAt = new Date(Date.now() + tokenData.expires_in * 1000).toISOString();
 
     // Create or find the root folder for TaskFox
-    const folderRes = await fetch(
-      "https://www.googleapis.com/drive/v3/files?q=name='TaskFox Social Media' and mimeType='application/vnd.google-apps.folder' and trashed=false",
-      { headers: { Authorization: `Bearer ${tokenData.access_token}` } }
-    );
-    const folderData = await folderRes.json();
-
-    let rootFolderId: string;
-    if (folderData.files && folderData.files.length > 0) {
-      rootFolderId = folderData.files[0].id;
-    } else {
-      // Create root folder
-      const createRes = await fetch("https://www.googleapis.com/drive/v3/files", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${tokenData.access_token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: "TaskFox Social Media",
-          mimeType: "application/vnd.google-apps.folder",
-        }),
-      });
-      const created = await createRes.json();
-      rootFolderId = created.id;
-    }
-
-    // Create subfolders for pipeline stages
-    const stages = ["Ideias", "Gravando", "Editando", "Pronto para Postar", "Publicado"];
+    let rootFolderId: string | null = null;
     const folderMapping: Record<string, string> = {};
 
-    for (const stage of stages) {
-      const searchRes = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q=name='${stage}' and '${rootFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+    try {
+      const searchQuery = encodeURIComponent("name='TaskFox Social Media' and mimeType='application/vnd.google-apps.folder' and trashed=false");
+      const folderRes = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q=${searchQuery}`,
         { headers: { Authorization: `Bearer ${tokenData.access_token}` } }
       );
-      const searchData = await searchRes.json();
+      const folderData = await folderRes.json();
+      console.log("Root folder search result:", JSON.stringify(folderData));
 
-      if (searchData.files && searchData.files.length > 0) {
-        folderMapping[stage] = searchData.files[0].id;
+      if (folderData.files && folderData.files.length > 0) {
+        rootFolderId = folderData.files[0].id;
+        console.log("Found existing root folder:", rootFolderId);
       } else {
+        // Create root folder
         const createRes = await fetch("https://www.googleapis.com/drive/v3/files", {
           method: "POST",
           headers: {
@@ -112,17 +90,73 @@ Deno.serve(async (req) => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            name: stage,
+            name: "TaskFox Social Media",
             mimeType: "application/vnd.google-apps.folder",
-            parents: [rootFolderId],
           }),
         });
         const created = await createRes.json();
-        folderMapping[stage] = created.id;
+        console.log("Created root folder:", JSON.stringify(created));
+        rootFolderId = created.id;
       }
+
+      // Create subfolders for pipeline stages
+      if (rootFolderId) {
+        const stages = ["Ideias", "Gravando", "Editando", "Pronto para Postar", "Publicado"];
+
+        for (const stage of stages) {
+          try {
+            const stageQuery = encodeURIComponent(`name='${stage}' and '${rootFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+            const searchRes = await fetch(
+              `https://www.googleapis.com/drive/v3/files?q=${stageQuery}`,
+              { headers: { Authorization: `Bearer ${tokenData.access_token}` } }
+            );
+            const searchData = await searchRes.json();
+            console.log(`Stage '${stage}' search:`, JSON.stringify(searchData));
+
+            if (searchData.files && searchData.files.length > 0) {
+              folderMapping[stage] = searchData.files[0].id;
+            } else {
+              const createRes = await fetch("https://www.googleapis.com/drive/v3/files", {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${tokenData.access_token}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  name: stage,
+                  mimeType: "application/vnd.google-apps.folder",
+                  parents: [rootFolderId],
+                }),
+              });
+              const created = await createRes.json();
+              console.log(`Created stage folder '${stage}':`, JSON.stringify(created));
+              if (created.id) {
+                folderMapping[stage] = created.id;
+              }
+            }
+          } catch (stageErr) {
+            console.error(`Error creating stage folder '${stage}':`, stageErr);
+          }
+        }
+      }
+    } catch (folderErr) {
+      console.error("Error creating Drive folders:", folderErr);
     }
 
+    console.log("Final rootFolderId:", rootFolderId);
+    console.log("Final folderMapping:", JSON.stringify(folderMapping));
+
     // Upsert config
+    const configData = {
+      access_token: tokenData.access_token,
+      refresh_token: tokenData.refresh_token || null,
+      token_expires_at: expiresAt,
+      root_folder_id: rootFolderId,
+      folder_mapping: folderMapping,
+      is_connected: true,
+      connected_email: userInfo.email,
+    };
+
     const { data: existing } = await supabase
       .from("google_drive_config")
       .select("id")
@@ -130,28 +164,16 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (existing) {
-      await supabase
+      const { error: updateError } = await supabase
         .from("google_drive_config")
-        .update({
-          access_token: tokenData.access_token,
-          refresh_token: tokenData.refresh_token || null,
-          token_expires_at: expiresAt,
-          root_folder_id: rootFolderId,
-          folder_mapping: folderMapping,
-          is_connected: true,
-          connected_email: userInfo.email,
-        })
+        .update(configData)
         .eq("id", existing.id);
+      console.log("Update result error:", updateError);
     } else {
-      await supabase.from("google_drive_config").insert({
-        access_token: tokenData.access_token,
-        refresh_token: tokenData.refresh_token,
-        token_expires_at: expiresAt,
-        root_folder_id: rootFolderId,
-        folder_mapping: folderMapping,
-        is_connected: true,
-        connected_email: userInfo.email,
-      });
+      const { error: insertError } = await supabase
+        .from("google_drive_config")
+        .insert(configData);
+      console.log("Insert result error:", insertError);
     }
 
     return new Response(
