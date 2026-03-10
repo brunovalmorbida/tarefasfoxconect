@@ -110,6 +110,8 @@ export function PermissionsTab() {
       can_view_fleet: false,
       can_manage_fleet: false,
       is_driver: false,
+      can_view_social: false,
+      can_manage_social: false,
     };
   };
 
