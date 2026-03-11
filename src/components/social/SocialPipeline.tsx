@@ -45,7 +45,7 @@ export default function SocialPipeline({ tasks, categories, profiles, onUpdatePi
     if (!task || task.pipeline_status === newStatus) return;
 
     // If moving to published, require proof
-    if (newStatus === "published" && (!task.proofs || task.proofs.length === 0) && !task.post_link) {
+    if (newStatus === "published" && !task.post_link) {
       return; // silently prevent - the card will snap back
     }
     onUpdatePipeline(taskId, newStatus);
