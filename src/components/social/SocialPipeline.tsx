@@ -74,7 +74,7 @@ export default function SocialPipeline({ tasks, categories, profiles, onUpdatePi
                     const cat = categories.find(c => c.id === task.category_id);
                     const assignee = profiles.find(p => p.user_id === task.assigned_to);
                     const deadline = getDeadlineColor(task.due_date);
-                    const hasProof = (task.proofs && task.proofs.length > 0) || !!task.post_link;
+                    const hasLink = !!task.post_link;
                     const strategyLabel = CONTENT_STRATEGY_TYPES.find(s => s.value === task.content_strategy_type)?.label;
 
                     return (
