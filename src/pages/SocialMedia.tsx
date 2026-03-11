@@ -14,8 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import {
   Loader2, ChevronLeft, ChevronRight, Plus, Target, CheckCircle2,
-  ImagePlus, Trash2, Eye, Upload, LayoutDashboard, List, Columns3,
-  AlertCircle, Link as LinkIcon, Sparkles, Settings2
+  LayoutDashboard, List, Columns3, AlertCircle, Link as LinkIcon, Sparkles, Settings2
 } from "lucide-react";
 import { toast } from "sonner";
 import {
