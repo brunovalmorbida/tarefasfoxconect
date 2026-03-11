@@ -3,7 +3,7 @@ import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea
 import { Badge } from "@/components/ui/badge";
 import { PIPELINE_STATUSES, CONTENT_STRATEGY_TYPES, SocialTask, SocialCategory, PipelineStatus } from "@/hooks/useSocialMedia";
 import { format, isAfter, isSameDay, parseISO } from "date-fns";
-import { ImagePlus, Link as LinkIcon, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Link as LinkIcon, AlertCircle, CheckCircle2 } from "lucide-react";
 
 interface Props {
   tasks: SocialTask[];
@@ -45,7 +45,7 @@ export default function SocialPipeline({ tasks, categories, profiles, onUpdatePi
     if (!task || task.pipeline_status === newStatus) return;
 
     // If moving to published, require proof
-    if (newStatus === "published" && (!task.proofs || task.proofs.length === 0) && !task.post_link) {
+    if (newStatus === "published" && !task.post_link) {
       return; // silently prevent - the card will snap back
     }
     onUpdatePipeline(taskId, newStatus);
@@ -74,7 +74,7 @@ export default function SocialPipeline({ tasks, categories, profiles, onUpdatePi
                     const cat = categories.find(c => c.id === task.category_id);
                     const assignee = profiles.find(p => p.user_id === task.assigned_to);
                     const deadline = getDeadlineColor(task.due_date);
-                    const hasProof = (task.proofs && task.proofs.length > 0) || !!task.post_link;
+                    const hasLink = !!task.post_link;
                     const strategyLabel = CONTENT_STRATEGY_TYPES.find(s => s.value === task.content_strategy_type)?.label;
 
                     return (
@@ -113,7 +113,7 @@ export default function SocialPipeline({ tasks, categories, profiles, onUpdatePi
                               </div>
                               <div className="flex items-center gap-1.5">
                                 {task.post_link && <LinkIcon className="h-3 w-3 text-primary" />}
-                                {hasProof ? (
+                                {hasLink ? (
                                   <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
                                 ) : (
                                   <AlertCircle className="h-3.5 w-3.5 text-amber-500" />

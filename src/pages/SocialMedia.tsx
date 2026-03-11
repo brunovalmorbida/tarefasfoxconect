@@ -14,8 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import {
   Loader2, ChevronLeft, ChevronRight, Plus, Target, CheckCircle2,
-  ImagePlus, Trash2, Eye, Upload, LayoutDashboard, List, Columns3,
-  AlertCircle, Link as LinkIcon, Sparkles, Settings2
+  LayoutDashboard, List, Columns3, AlertCircle, Link as LinkIcon, Sparkles, Settings2
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -304,7 +303,7 @@ export default function SocialMedia() {
                 const cat = categories?.find(c => c.id === task.category_id);
                 const assignee = profiles?.find(p => p.user_id === task.assigned_to);
                 const deadline = getDeadlineInfo(task.due_date);
-                const hasProof = (task.proofs && task.proofs.length > 0) || !!task.post_link;
+                const hasLink = !!task.post_link;
                 const pipelineInfo = PIPELINE_STATUSES.find(p => p.value === task.pipeline_status);
                 const strategyLabel = CONTENT_STRATEGY_TYPES.find(s => s.value === task.content_strategy_type)?.label;
 
@@ -347,16 +346,15 @@ export default function SocialMedia() {
                           </span>
                         )}
                         {assignee && <span>→ {assignee.name}</span>}
-                        {hasProof ? (
+                        {hasLink ? (
                           <span className="flex items-center gap-1 text-green-500">
-                            <CheckCircle2 className="h-3 w-3" /> Prova
+                            <LinkIcon className="h-3 w-3" /> Link
                           </span>
                         ) : (
                           <span className="flex items-center gap-1 text-amber-500">
-                            <AlertCircle className="h-3 w-3" /> Pendente
+                            <AlertCircle className="h-3 w-3" /> Sem link
                           </span>
                         )}
-                        {task.post_link && <LinkIcon className="h-3 w-3 text-primary" />}
                       </div>
                     </div>
                     {task.status === "completed" && <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />}
