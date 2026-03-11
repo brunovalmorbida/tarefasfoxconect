@@ -63,8 +63,8 @@ export default function SocialTaskDialog({ task, open, onOpenChange, categories,
   const deadline = getDeadline();
 
   const handleComplete = () => {
-    if (!hasProof) {
-      toast.error("Anexe uma prova ou link antes de concluir");
+    if (!hasLink) {
+      toast.error("Adicione o link da publicação antes de concluir");
       return;
     }
     completeTask.mutate(task.id);
