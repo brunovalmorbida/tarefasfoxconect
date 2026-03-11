@@ -28,6 +28,7 @@ interface Props {
 
 export default function SocialTaskDialog({ task, open, onOpenChange, categories, profiles, isManager }: Props) {
   const { updateTask, completeTask, uncompleteTask, deleteTask } = useSocialMutations();
+  const { data: driveStatus } = useGoogleDriveStatus();
   const [editing, setEditing] = useState(false);
   const [editValues, setEditValues] = useState<Partial<SocialTask>>({});
   const [postLink, setPostLink] = useState("");
