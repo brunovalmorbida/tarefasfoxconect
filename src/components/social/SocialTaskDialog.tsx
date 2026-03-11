@@ -1,21 +1,18 @@
-import { useRef, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CheckCircle2, Trash2, Eye, Upload, ImagePlus, AlertCircle, Link as LinkIcon } from "lucide-react";
+import { CheckCircle2, Trash2, AlertCircle, Link as LinkIcon } from "lucide-react";
 import { format, parseISO, isSameDay, isAfter } from "date-fns";
 import { toast } from "sonner";
 import {
-  SocialTask, SocialCategory, SocialProof,
+  SocialTask, SocialCategory,
   PIPELINE_STATUSES, CONTENT_STRATEGY_TYPES, PipelineStatus,
   useSocialMutations
 } from "@/hooks/useSocialMedia";
-import { useGoogleDriveStatus } from "@/hooks/useGoogleDrive";
-import DriveFileBrowser from "./DriveFileBrowser";
 
 interface Props {
   task: SocialTask | null;
