@@ -192,6 +192,36 @@ export default function SocialTaskDialog({ task, open, onOpenChange, categories,
             </>
           )}
 
+          {/* Link da publicação - sempre visível */}
+          {!editing && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                <LinkIcon className="h-3.5 w-3.5" /> Link da publicação
+              </label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="https://instagram.com/p/..."
+                  value={postLink}
+                  onChange={e => setPostLink(e.target.value)}
+                  className="text-sm"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={postLink === (task.post_link || "") || updateTask.isPending}
+                  onClick={async () => {
+                    try {
+                      await updateTask.mutateAsync({ id: task.id, post_link: postLink || null } as any);
+                      toast.success("Link salvo!");
+                    } catch { toast.error("Erro ao salvar link"); }
+                  }}
+                >
+                  Salvar
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Google Drive Files */}
           {driveStatus?.is_connected && (
             <>
