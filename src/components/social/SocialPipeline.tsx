@@ -113,7 +113,7 @@ export default function SocialPipeline({ tasks, categories, profiles, onUpdatePi
                               </div>
                               <div className="flex items-center gap-1.5">
                                 {task.post_link && <LinkIcon className="h-3 w-3 text-primary" />}
-                                {hasProof ? (
+                                {hasLink ? (
                                   <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
                                 ) : (
                                   <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
