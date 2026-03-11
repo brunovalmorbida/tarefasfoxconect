@@ -192,6 +192,16 @@ export default function SocialTaskDialog({ task, open, onOpenChange, categories,
             </>
           )}
 
+          {/* Google Drive Files */}
+          {driveStatus?.is_connected && (
+            <>
+              <Separator />
+              <DriveFileBrowser
+                pipelineStatus={task.pipeline_status}
+                folderMapping={driveStatus.folder_mapping}
+              />
+            </>
+          )}
 
           <DialogFooter className="flex-col sm:flex-row gap-2">
             {editing ? (
