@@ -347,16 +347,15 @@ export default function SocialMedia() {
                           </span>
                         )}
                         {assignee && <span>→ {assignee.name}</span>}
-                        {hasProof ? (
+                        {hasLink ? (
                           <span className="flex items-center gap-1 text-green-500">
-                            <CheckCircle2 className="h-3 w-3" /> Prova
+                            <LinkIcon className="h-3 w-3" /> Link
                           </span>
                         ) : (
                           <span className="flex items-center gap-1 text-amber-500">
-                            <AlertCircle className="h-3 w-3" /> Pendente
+                            <AlertCircle className="h-3 w-3" /> Sem link
                           </span>
                         )}
-                        {task.post_link && <LinkIcon className="h-3 w-3 text-primary" />}
                       </div>
                     </div>
                     {task.status === "completed" && <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />}

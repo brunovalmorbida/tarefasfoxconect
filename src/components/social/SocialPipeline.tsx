@@ -3,7 +3,7 @@ import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea
 import { Badge } from "@/components/ui/badge";
 import { PIPELINE_STATUSES, CONTENT_STRATEGY_TYPES, SocialTask, SocialCategory, PipelineStatus } from "@/hooks/useSocialMedia";
 import { format, isAfter, isSameDay, parseISO } from "date-fns";
-import { ImagePlus, Link as LinkIcon, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Link as LinkIcon, AlertCircle, CheckCircle2 } from "lucide-react";
 
 interface Props {
   tasks: SocialTask[];
