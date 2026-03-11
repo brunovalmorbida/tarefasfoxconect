@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CheckCircle2, Trash2, AlertCircle, Link as LinkIcon } from "lucide-react";
 import { format, parseISO, isSameDay, isAfter } from "date-fns";
@@ -13,6 +14,8 @@ import {
   PIPELINE_STATUSES, CONTENT_STRATEGY_TYPES, PipelineStatus,
   useSocialMutations
 } from "@/hooks/useSocialMedia";
+import { useGoogleDriveStatus } from "@/hooks/useGoogleDrive";
+import DriveFileBrowser from "./DriveFileBrowser";
 
 interface Props {
   task: SocialTask | null;
@@ -25,6 +28,7 @@ interface Props {
 
 export default function SocialTaskDialog({ task, open, onOpenChange, categories, profiles, isManager }: Props) {
   const { updateTask, completeTask, uncompleteTask, deleteTask } = useSocialMutations();
+  const { data: driveStatus } = useGoogleDriveStatus();
   const [editing, setEditing] = useState(false);
   const [editValues, setEditValues] = useState<Partial<SocialTask>>({});
   const [postLink, setPostLink] = useState("");
@@ -188,6 +192,16 @@ export default function SocialTaskDialog({ task, open, onOpenChange, categories,
             </>
           )}
 
+          {/* Google Drive Files */}
+          {driveStatus?.is_connected && (
+            <>
+              <Separator />
+              <DriveFileBrowser
+                pipelineStatus={task.pipeline_status}
+                folderMapping={driveStatus.folder_mapping}
+              />
+            </>
+          )}
 
           <DialogFooter className="flex-col sm:flex-row gap-2">
             {editing ? (
