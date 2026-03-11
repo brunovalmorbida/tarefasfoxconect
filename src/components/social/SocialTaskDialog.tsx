@@ -119,13 +119,13 @@ export default function SocialTaskDialog({ task, open, onOpenChange, categories,
                 {deadline.label}
               </Badge>
             )}
-            {hasProof ? (
+            {hasLink ? (
               <Badge variant="outline" className="text-green-500 border-green-500/30">
-                <CheckCircle2 className="h-3 w-3 mr-1" /> Prova anexada
+                <LinkIcon className="h-3 w-3 mr-1" /> Link adicionado
               </Badge>
             ) : (
               <Badge variant="outline" className="text-amber-500 border-amber-500/30">
-                <AlertCircle className="h-3 w-3 mr-1" /> Prova pendente
+                <AlertCircle className="h-3 w-3 mr-1" /> Link pendente
               </Badge>
             )}
           </div>
