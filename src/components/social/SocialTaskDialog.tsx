@@ -86,13 +86,6 @@ export default function SocialTaskDialog({ task, open, onOpenChange, categories,
     }
   };
 
-  const handleUpload = async (file: File) => {
-    try {
-      await uploadProof.mutateAsync({ taskId: task.id, file });
-      toast.success("Prova enviada!");
-    } catch { toast.error("Erro ao enviar prova"); }
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
