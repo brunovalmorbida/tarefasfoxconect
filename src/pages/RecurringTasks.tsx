@@ -189,7 +189,7 @@ function BoardDetail({
             </Dialog>
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" /> Nova Tarefa</Button></DialogTrigger>
-              <DialogContent>
+              <DialogContent onInteractOutside={(e) => e.preventDefault()}>
                 <DialogHeader><DialogTitle>Nova Tarefa</DialogTitle></DialogHeader>
                 <div className="space-y-4">
                   <Input placeholder="Título da tarefa" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />
