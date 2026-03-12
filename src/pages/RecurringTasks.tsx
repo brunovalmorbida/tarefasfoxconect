@@ -173,7 +173,7 @@ function BoardDetail({
           <div className="flex items-center gap-2">
             <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
               <DialogTrigger asChild><Button variant="outline" size="icon"><Pencil className="h-4 w-4" /></Button></DialogTrigger>
-              <DialogContent>
+              <DialogContent onInteractOutside={(e) => e.preventDefault()}>
                 <DialogHeader><DialogTitle>Configurações do Quadro</DialogTitle></DialogHeader>
                 <div className="space-y-4">
                   <Select value={assignedUser || "none"} onValueChange={setAssignedUser}>
@@ -189,7 +189,7 @@ function BoardDetail({
             </Dialog>
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" /> Nova Tarefa</Button></DialogTrigger>
-              <DialogContent>
+              <DialogContent onInteractOutside={(e) => e.preventDefault()}>
                 <DialogHeader><DialogTitle>Nova Tarefa</DialogTitle></DialogHeader>
                 <div className="space-y-4">
                   <Input placeholder="Título da tarefa" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />
@@ -368,7 +368,7 @@ function BoardDetail({
 
       {/* Edit Task Dialog */}
       <Dialog open={!!editingTask} onOpenChange={(open) => !open && setEditingTask(null)}>
-        <DialogContent>
+        <DialogContent onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader><DialogTitle>Editar Tarefa</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <Input placeholder="Título da tarefa" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
