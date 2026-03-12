@@ -368,7 +368,7 @@ function BoardDetail({
 
       {/* Edit Task Dialog */}
       <Dialog open={!!editingTask} onOpenChange={(open) => !open && setEditingTask(null)}>
-        <DialogContent>
+        <DialogContent onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader><DialogTitle>Editar Tarefa</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <Input placeholder="Título da tarefa" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
