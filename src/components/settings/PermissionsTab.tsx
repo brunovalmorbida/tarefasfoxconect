@@ -6,16 +6,27 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Loader2, Shield, Eye, Settings2, ClipboardList, ShoppingCart, Car, Megaphone, UserCog, Check } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Loader2, Shield, Eye, Settings2, ClipboardList, ShoppingCart, Car, Megaphone, UserCog, Check, Search, Users } from "lucide-react";
 import { toast } from "sonner";
 
 interface Profile {
   user_id: string;
   name: string;
   job_title: string | null;
+}
+
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0].toUpperCase())
+    .join("");
 }
 
 // ── Permission keys ──
@@ -42,6 +53,8 @@ const MODULES = [
     id: "tasks",
     label: "Tarefas",
     icon: ClipboardList,
+    color: "text-blue-600 dark:text-blue-400",
+    bg: "bg-blue-500/10",
     permissions: [
       { key: "can_manage_boards" as PermissionKey, label: "Gerenciar Quadros", description: "Criar, editar e excluir quadros Kanban" },
       { key: "can_manage_columns" as PermissionKey, label: "Gerenciar Colunas", description: "Criar, editar e excluir colunas" },
@@ -53,6 +66,8 @@ const MODULES = [
     id: "purchases",
     label: "Compras",
     icon: ShoppingCart,
+    color: "text-emerald-600 dark:text-emerald-400",
+    bg: "bg-emerald-500/10",
     permissions: [
       { key: "can_view_purchases" as PermissionKey, label: "Visualizar Compras", description: "Acessar e visualizar listas de compras" },
       { key: "can_manage_purchases" as PermissionKey, label: "Gerenciar Compras", description: "Cadastrar e editar categorias e produtos" },
@@ -63,6 +78,8 @@ const MODULES = [
     id: "fleet",
     label: "Frota",
     icon: Car,
+    color: "text-orange-600 dark:text-orange-400",
+    bg: "bg-orange-500/10",
     permissions: [
       { key: "can_view_fleet" as PermissionKey, label: "Visualizar Frota", description: "Acessar e visualizar veículos e manutenções" },
       { key: "can_manage_fleet" as PermissionKey, label: "Gerenciar Frota", description: "Cadastrar e editar veículos, motoristas e manutenções" },
@@ -73,6 +90,8 @@ const MODULES = [
     id: "social",
     label: "Social Media",
     icon: Megaphone,
+    color: "text-purple-600 dark:text-purple-400",
+    bg: "bg-purple-500/10",
     permissions: [
       { key: "can_view_social" as PermissionKey, label: "Visualizar Social", description: "Acessar e visualizar tarefas de social media" },
       { key: "can_manage_social" as PermissionKey, label: "Gerenciar Social", description: "Criar, editar e excluir tarefas e metas" },
@@ -85,6 +104,7 @@ type ProfilePreset = {
   id: string;
   label: string;
   description: string;
+  color: string;
   permissions: Record<PermissionKey, boolean>;
 };
 
@@ -96,6 +116,7 @@ const PROFILE_PRESETS: ProfilePreset[] = [
     id: "gerente",
     label: "Gerente",
     description: "Acesso total a tarefas, compras e visualização de frota e social",
+    color: "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/20",
     permissions: {
       ...defaultPerms(),
       can_manage_boards: true,
@@ -113,6 +134,7 @@ const PROFILE_PRESETS: ProfilePreset[] = [
     id: "operador",
     label: "Operador",
     description: "Gerencia tarefas e visualiza compras",
+    color: "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/20",
     permissions: {
       ...defaultPerms(),
       can_manage_boards: true,
@@ -126,6 +148,7 @@ const PROFILE_PRESETS: ProfilePreset[] = [
     id: "financeiro",
     label: "Financeiro",
     description: "Acesso completo a compras e visualização de tarefas",
+    color: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
     permissions: {
       ...defaultPerms(),
       can_view_purchases: true,
@@ -137,6 +160,7 @@ const PROFILE_PRESETS: ProfilePreset[] = [
     id: "marketing",
     label: "Marketing",
     description: "Acesso completo ao social media e visualização de tarefas",
+    color: "bg-pink-500/15 text-pink-700 dark:text-pink-300 border-pink-500/20",
     permissions: {
       ...defaultPerms(),
       can_manage_tasks: true,
@@ -148,6 +172,7 @@ const PROFILE_PRESETS: ProfilePreset[] = [
     id: "motorista",
     label: "Motorista",
     description: "Acesso à frota como motorista",
+    color: "bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/20",
     permissions: {
       ...defaultPerms(),
       can_view_fleet: true,
@@ -158,6 +183,7 @@ const PROFILE_PRESETS: ProfilePreset[] = [
     id: "custom",
     label: "Personalizado",
     description: "Permissões definidas manualmente",
+    color: "bg-muted text-muted-foreground border-border",
     permissions: defaultPerms(),
   },
 ];
@@ -171,11 +197,23 @@ function detectProfile(perms: Record<PermissionKey, boolean>): string {
   return "custom";
 }
 
+function getPresetColor(presetId: string) {
+  return PROFILE_PRESETS.find((p) => p.id === presetId)?.color ?? "bg-muted text-muted-foreground";
+}
+
+function getExtraPermsCount(presetId: string, perms: Record<PermissionKey, boolean>): number {
+  if (presetId === "custom") return ALL_PERMISSION_KEYS.filter((k) => perms[k]).length;
+  const preset = PROFILE_PRESETS.find((p) => p.id === presetId);
+  if (!preset) return 0;
+  return ALL_PERMISSION_KEYS.filter((k) => perms[k] && !preset.permissions[k]).length;
+}
+
 export function PermissionsTab() {
   const queryClient = useQueryClient();
   const [editingUser, setEditingUser] = useState<Profile | null>(null);
   const [localPerms, setLocalPerms] = useState<Record<PermissionKey, boolean>>(defaultPerms());
   const [saving, setSaving] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const { data: profiles, isLoading: loadingProfiles } = useQuery({
     queryKey: ["admin-profiles"],
@@ -238,6 +276,13 @@ export function PermissionsTab() {
     adminRoles?.some((r) => r.user_id === userId && r.role === "admin") ?? false;
 
   const nonAdminProfiles = profiles?.filter((p) => !isAdmin(p.user_id)) ?? [];
+
+  const filteredProfiles = searchQuery.trim()
+    ? nonAdminProfiles.filter((p) => {
+        const q = searchQuery.toLowerCase();
+        return p.name.toLowerCase().includes(q) || (p.job_title?.toLowerCase().includes(q) ?? false);
+      })
+    : nonAdminProfiles;
 
   const getPermissions = (userId: string): Record<PermissionKey, boolean> => {
     const existing = allPermissions?.find((p: any) => p.user_id === userId);
@@ -340,70 +385,121 @@ export function PermissionsTab() {
 
   return (
     <div className="space-y-6">
-      {/* User Permissions List */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="h-5 w-5" />
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <Shield className="h-5 w-5 text-primary" />
             Permissões de Usuários
-          </CardTitle>
-          <CardDescription>
-            Gerencie as permissões de cada usuário. Administradores possuem todas as permissões automaticamente.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {nonAdminProfiles.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhum usuário não-admin encontrado.</p>
-          ) : (
-            <div className="space-y-2">
-              {nonAdminProfiles.map((profile) => {
-                const profileId = getActiveProfile(profile.user_id);
-                const preset = PROFILE_PRESETS.find((p) => p.id === profileId);
-                const permCount = getActivePermCount(profile.user_id);
-                return (
-                  <div
-                    key={profile.user_id}
-                    className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 transition-colors hover:bg-muted/50"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-sm">
-                        {profile.name.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-medium text-sm truncate">{profile.name}</p>
-                        {profile.job_title && (
-                          <p className="text-xs text-muted-foreground truncate">{profile.job_title}</p>
-                        )}
-                      </div>
+          </h3>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Gerencie as permissões de cada usuário. Administradores possuem acesso total.
+          </p>
+        </div>
+        <div className="relative w-full sm:w-[260px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Buscar usuário..."
+            className="pl-9"
+          />
+        </div>
+      </div>
+
+      {/* User Permissions Grid */}
+      {filteredProfiles.length === 0 ? (
+        <Card className="border-border/50 p-8">
+          <p className="text-sm text-muted-foreground text-center">Nenhum usuário não-admin encontrado.</p>
+        </Card>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {filteredProfiles.map((profile) => {
+            const profileId = getActiveProfile(profile.user_id);
+            const preset = PROFILE_PRESETS.find((p) => p.id === profileId);
+            const permCount = getActivePermCount(profile.user_id);
+            const perms = getPermissions(profile.user_id);
+            const extraPerms = getExtraPermsCount(profileId, perms);
+
+            return (
+              <Card
+                key={profile.user_id}
+                className="border-border/50 transition-all hover:shadow-md hover:border-border group cursor-pointer"
+                onClick={() => openEditor(profile)}
+              >
+                <CardContent className="p-5">
+                  <div className="flex items-start gap-3.5">
+                    <Avatar className="h-11 w-11">
+                      <AvatarFallback className="bg-primary/10 text-primary text-sm font-semibold">
+                        {getInitials(profile.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm truncate">{profile.name}</p>
+                      {profile.job_title && (
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">{profile.job_title}</p>
+                      )}
                     </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <div className="hidden sm:flex items-center gap-2">
-                        <Badge variant={profileId === "custom" ? "outline" : "secondary"} className="text-xs whitespace-nowrap">
-                          {preset?.label ?? "Personalizado"}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">
-                          {permCount} permissão{permCount !== 1 ? "ões" : ""}
-                        </span>
-                      </div>
-                      <Button variant="outline" size="sm" onClick={() => openEditor(profile)} className="gap-1.5">
-                        <Settings2 className="h-3.5 w-3.5" />
-                        <span className="hidden sm:inline">Editar</span>
-                      </Button>
-                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={(e) => { e.stopPropagation(); openEditor(profile); }}
+                    >
+                      <Settings2 className="h-4 w-4" />
+                    </Button>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+
+                  <Separator className="my-3" />
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant="outline"
+                        className={`text-[11px] px-2 py-0.5 font-medium border ${preset?.color ?? ""}`}
+                      >
+                        {preset?.label ?? "Personalizado"}
+                      </Badge>
+                      {extraPerms > 0 && profileId !== "custom" && (
+                        <span className="text-[10px] text-muted-foreground">+{extraPerms} extras</span>
+                      )}
+                    </div>
+                    <span className="text-xs text-muted-foreground font-medium">
+                      {permCount}/{ALL_PERMISSION_KEYS.length}
+                    </span>
+                  </div>
+
+                  {/* Module dots */}
+                  <div className="flex items-center gap-3 mt-3">
+                    {MODULES.map((mod) => {
+                      const Icon = mod.icon;
+                      const active = mod.permissions.some((p) => perms[p.key]);
+                      return (
+                        <div
+                          key={mod.id}
+                          className={`flex items-center gap-1 text-[10px] font-medium ${
+                            active ? mod.color : "text-muted-foreground/40"
+                          }`}
+                          title={mod.label}
+                        >
+                          <Icon className="h-3.5 w-3.5" />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
 
       {/* Team Visibility */}
       {teams && teams.length > 0 && (
-        <Card>
+        <Card className="border-border/50">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Eye className="h-5 w-5" />
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Eye className="h-5 w-5 text-primary" />
               Visibilidade de Quadros por Equipe
             </CardTitle>
             <CardDescription>
@@ -416,9 +512,14 @@ export function PermissionsTab() {
             ) : (
               <div className="space-y-3">
                 {nonAdminProfiles.map((profile) => (
-                  <div key={profile.user_id} className="rounded-lg border border-border p-4">
-                    <p className="font-medium text-sm mb-3">{profile.name}</p>
-                    <div className="flex flex-wrap gap-3">
+                  <div key={profile.user_id} className="flex items-center gap-4 rounded-lg border border-border/50 p-3.5 hover:bg-muted/30 transition-colors">
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback className="bg-muted text-muted-foreground text-xs font-semibold">
+                        {getInitials(profile.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <p className="font-medium text-sm min-w-[120px] truncate">{profile.name}</p>
+                    <div className="flex flex-wrap gap-3 ml-auto">
                       {teams.map((team) => {
                         const visible = hasTeamVisibility(profile.user_id, team.id);
                         return (
@@ -487,18 +588,22 @@ export function PermissionsTab() {
               const activeCount = mod.permissions.filter((p) => localPerms[p.key]).length;
               return (
                 <div key={mod.id} className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Icon className="h-4 w-4 text-primary" />
+                  <div className="flex items-center gap-2.5">
+                    <div className={`flex h-7 w-7 items-center justify-center rounded-lg ${mod.bg} ${mod.color}`}>
+                      <Icon className="h-4 w-4" />
+                    </div>
                     <h4 className="text-sm font-semibold">{mod.label}</h4>
                     <Badge variant="secondary" className="text-xs ml-auto">
                       {activeCount}/{mod.permissions.length}
                     </Badge>
                   </div>
-                  <div className="space-y-2 pl-6">
+                  <div className="space-y-2 pl-9">
                     {mod.permissions.map((perm) => (
                       <div
                         key={perm.key}
-                        className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2.5 transition-colors hover:bg-muted/30"
+                        className={`flex items-center justify-between gap-3 rounded-lg border px-3.5 py-3 transition-colors hover:bg-muted/30 ${
+                          localPerms[perm.key] ? "border-primary/20 bg-primary/5" : "border-border/50"
+                        }`}
                       >
                         <div className="min-w-0">
                           <p className="text-sm font-medium">{perm.label}</p>
