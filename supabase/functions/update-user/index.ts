@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
 
     if (!role) throw new Error("Sem permissão de administrador");
 
-    const { userId, name, jobTitle, whatsappNumber, password, teamIds, isAdmin, email } = await req.json();
+    const { userId, name, jobTitle, whatsappNumber, password, teamIds, isAdmin, email, isActive } = await req.json();
     if (!userId) throw new Error("userId é obrigatório");
 
     // Update email if provided
