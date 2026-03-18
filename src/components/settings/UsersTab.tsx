@@ -674,8 +674,8 @@ export function UsersTab() {
                             Resetar senha
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => {
-                            const permTab = document.querySelector('[value="permissions"]') as HTMLElement;
-                            permTab?.click();
+                            const permTab = document.querySelector('button[value="permissions"]') as HTMLElement;
+                            if (permTab) permTab.click();
                           }}>
                             <Shield className="mr-2 h-4 w-4" />
                             Alterar permissões
