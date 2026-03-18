@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
 
     if (!role) throw new Error("Sem permissão de administrador");
 
-    const { name, email, password, whatsappNumber, teamIds } = await req.json();
+    const { name, email, password, whatsappNumber, jobTitle, teamIds } = await req.json();
 
     // Validate inputs
     if (!name || typeof name !== "string" || name.trim().length === 0) {
