@@ -649,8 +649,8 @@ export function UsersTab() {
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
                       <Button variant="ghost" size="icon" className="h-7 w-7" title="Permissões" onClick={() => {
-                        const permTab = document.querySelector('[value="permissions"]') as HTMLElement;
-                        permTab?.click();
+                        const permTab = document.querySelector('[data-value="permissions"]') as HTMLElement;
+                        if (permTab) permTab.click();
                       }}>
                         <Shield className="h-3.5 w-3.5" />
                       </Button>
@@ -674,15 +674,15 @@ export function UsersTab() {
                             Resetar senha
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => {
-                            const permTab = document.querySelector('[value="permissions"]') as HTMLElement;
-                            permTab?.click();
+                            const permTab = document.querySelector('[data-value="permissions"]') as HTMLElement;
+                            if (permTab) permTab.click();
                           }}>
                             <Shield className="mr-2 h-4 w-4" />
                             Alterar permissões
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => {
-                            const logTab = document.querySelector('[value="log"]') as HTMLElement;
-                            logTab?.click();
+                            const logTab = document.querySelector('[data-value="log"]') as HTMLElement;
+                            if (logTab) logTab.click();
                           }}>
                             <ScrollText className="mr-2 h-4 w-4" />
                             Ver histórico
@@ -860,8 +860,10 @@ export function UsersTab() {
                     </Button>
                     <Button variant="outline" size="sm" className="flex-1 gap-1.5" onClick={() => {
                       setDetailProfile(null);
-                      const permTab = document.querySelector('[value="permissions"]') as HTMLElement;
-                      permTab?.click();
+                      setTimeout(() => {
+                        const permTab = document.querySelector('[data-value="permissions"]') as HTMLElement;
+                        if (permTab) permTab.click();
+                      }, 100);
                     }}>
                       <Shield className="h-3.5 w-3.5" />
                       Permissões
