@@ -11,9 +11,13 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Loader2, Plus, Search, Users, ShieldCheck, UserCheck, UserX,
   MoreHorizontal, Pencil, KeyRound, Shield, ScrollText, UserMinus,
+  ArrowUpDown, CheckCircle2, Clock, ListTodo, Eye, Activity,
+  ChevronDown, Filter, User,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -21,13 +25,16 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 
 interface Profile {
   id: string;
@@ -48,14 +55,25 @@ function getInitials(name: string) {
     .join("");
 }
 
-function getActivityStatus(lastAccess: string | undefined): { color: string; label: string } {
-  if (!lastAccess) return { color: "bg-muted-foreground/40", label: "Nunca acessou" };
+function getActivityInfo(lastAccess: string | undefined): { color: string; label: string; status: "active" | "recent" | "inactive" | "never" } {
+  if (!lastAccess) return { color: "bg-muted-foreground/40", label: "Nunca acessou", status: "never" };
   const diff = Date.now() - new Date(lastAccess).getTime();
   const days = diff / (1000 * 60 * 60 * 24);
-  if (days < 1) return { color: "bg-green-500", label: "Ativo hoje" };
-  if (days <= 7) return { color: "bg-yellow-500", label: `Ativo há ${Math.floor(days)}d` };
-  return { color: "bg-red-500", label: `Inativo há ${Math.floor(days)}d` };
+  const hours = diff / (1000 * 60 * 60);
+  const minutes = diff / (1000 * 60);
+
+  if (days < 1) {
+    const date = new Date(lastAccess);
+    const time = date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    return { color: "bg-green-500", label: `Hoje às ${time}`, status: "active" };
+  }
+  if (days < 2) return { color: "bg-yellow-500", label: "Ativo há 1 dia", status: "recent" };
+  if (days <= 7) return { color: "bg-yellow-500", label: `Ativo há ${Math.floor(days)} dias`, status: "recent" };
+  return { color: "bg-red-500", label: `Inativo há ${Math.floor(days)} dias`, status: "inactive" };
 }
+
+type SortOption = "name" | "most-active" | "least-active" | "most-tasks" | "least-tasks" | "team";
+type ActivityFilter = "all" | "active" | "recent" | "inactive";
 
 export function UsersTab() {
   const { user } = useAuth();
@@ -65,8 +83,11 @@ export function UsersTab() {
   // State
   const [searchQuery, setSearchQuery] = useState("");
   const [teamFilter, setTeamFilter] = useState<string>("all");
+  const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
+  const [sortBy, setSortBy] = useState<SortOption>("name");
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [detailProfile, setDetailProfile] = useState<Profile | null>(null);
   const [deactivateDialog, setDeactivateDialog] = useState<Profile | null>(null);
   const [resetPasswordDialog, setResetPasswordDialog] = useState<Profile | null>(null);
   const [resetPassword, setResetPassword] = useState("");
@@ -171,6 +192,59 @@ export function UsersTab() {
     },
   });
 
+  // Query for completed tasks (tasks in last column of each board)
+  const { data: completedTaskCounts } = useQuery({
+    queryKey: ["admin-completed-tasks"],
+    queryFn: async () => {
+      // Get all board columns to find "done" columns (last position per board)
+      const { data: columns, error: colError } = await supabase
+        .from("board_columns")
+        .select("id, board_id, position")
+        .order("position", { ascending: false });
+      if (colError) throw colError;
+
+      // Get last column per board
+      const lastCols = new Map<string, string>();
+      for (const col of columns ?? []) {
+        if (!lastCols.has(col.board_id)) lastCols.set(col.board_id, col.id);
+      }
+      const doneColumnIds = Array.from(lastCols.values());
+
+      if (doneColumnIds.length === 0) return {} as Record<string, number>;
+
+      const { data: tasks, error } = await supabase
+        .from("tasks")
+        .select("assignee_id")
+        .in("column_id", doneColumnIds);
+      if (error) throw error;
+
+      const counts: Record<string, number> = {};
+      for (const row of tasks ?? []) {
+        if (row.assignee_id) {
+          counts[row.assignee_id] = (counts[row.assignee_id] || 0) + 1;
+        }
+      }
+      return counts;
+    },
+  });
+
+  // Activity log for user detail
+  const { data: detailActivityLog } = useQuery({
+    queryKey: ["user-detail-activity", detailProfile?.user_id],
+    queryFn: async () => {
+      if (!detailProfile) return [];
+      const { data, error } = await supabase
+        .from("activity_log")
+        .select("action, created_at")
+        .eq("user_id", detailProfile.user_id)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!detailProfile,
+  });
+
   // Helpers
   const getRoleForUser = (userId: string) =>
     adminRoles?.find((r) => r.user_id === userId)?.role === "admin" ? "Admin" : "Membro";
@@ -226,13 +300,43 @@ export function UsersTab() {
     if (teamFilter !== "all") {
       result = result.filter((p) => getTeamIdsForUser(p.user_id).includes(teamFilter));
     }
-    // Sort: active first, then by name
+    // Activity filter
+    if (activityFilter !== "all") {
+      result = result.filter((p) => {
+        const info = getActivityInfo(lastActivity?.[p.user_id]);
+        return info.status === activityFilter;
+      });
+    }
+    // Sort
     result.sort((a, b) => {
+      // Always: active first
       if (a.is_active !== b.is_active) return a.is_active ? -1 : 1;
-      return a.name.localeCompare(b.name);
+      switch (sortBy) {
+        case "most-active": {
+          const aTime = lastActivity?.[a.user_id] ? new Date(lastActivity[a.user_id]).getTime() : 0;
+          const bTime = lastActivity?.[b.user_id] ? new Date(lastActivity[b.user_id]).getTime() : 0;
+          return bTime - aTime;
+        }
+        case "least-active": {
+          const aTime = lastActivity?.[a.user_id] ? new Date(lastActivity[a.user_id]).getTime() : 0;
+          const bTime = lastActivity?.[b.user_id] ? new Date(lastActivity[b.user_id]).getTime() : 0;
+          return aTime - bTime;
+        }
+        case "most-tasks":
+          return (openTaskCounts?.[b.user_id] ?? 0) - (openTaskCounts?.[a.user_id] ?? 0);
+        case "least-tasks":
+          return (openTaskCounts?.[a.user_id] ?? 0) - (openTaskCounts?.[b.user_id] ?? 0);
+        case "team": {
+          const aTeam = getTeamsForUser(a.user_id)[0]?.name ?? "zzz";
+          const bTeam = getTeamsForUser(b.user_id)[0]?.name ?? "zzz";
+          return aTeam.localeCompare(bTeam);
+        }
+        default:
+          return a.name.localeCompare(b.name);
+      }
     });
     return result;
-  }, [profiles, searchQuery, teamFilter, teamMembers, teams, adminRoles]);
+  }, [profiles, searchQuery, teamFilter, activityFilter, sortBy, teamMembers, teams, adminRoles, lastActivity, openTaskCounts]);
 
   // Sync editEmail
   useEffect(() => {
@@ -373,192 +477,411 @@ export function UsersTab() {
       {/* Metrics bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Total", value: metrics.total, icon: Users, color: "text-primary" },
-          { label: "Admins", value: metrics.admins, icon: ShieldCheck, color: "text-amber-500" },
-          { label: "Membros", value: metrics.members, icon: UserCheck, color: "text-blue-500" },
-          { label: "Ativos Hoje", value: metrics.activeToday, icon: UserCheck, color: "text-green-500" },
+          { label: "Total de Usuários", value: metrics.total, icon: Users, color: "text-primary", bg: "bg-primary/10" },
+          { label: "Administradores", value: metrics.admins, icon: ShieldCheck, color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10" },
+          { label: "Membros", value: metrics.members, icon: UserCheck, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-500/10" },
+          { label: "Ativos Hoje", value: metrics.activeToday, icon: Activity, color: "text-green-600 dark:text-green-400", bg: "bg-green-500/10" },
         ].map((m) => (
-          <Card key={m.label} className="p-4">
-            <div className="flex items-center gap-3">
-              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted ${m.color}`}>
-                <m.icon className="h-5 w-5" />
+          <Card key={m.label} className="border-border/50">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${m.bg} ${m.color}`}>
+                  <m.icon className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold tracking-tight">{m.value}</p>
+                  <p className="text-[11px] text-muted-foreground font-medium">{m.label}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-2xl font-bold">{m.value}</p>
-                <p className="text-xs text-muted-foreground">{m.label}</p>
-              </div>
-            </div>
+            </CardContent>
           </Card>
         ))}
       </div>
 
-      {/* Search & Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Buscar por nome, cargo, equipe ou papel..."
-            className="pl-9"
-          />
+      {/* Search, Filters & Sort */}
+      <div className="space-y-3">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Buscar por nome, cargo, equipe ou papel..."
+              className="pl-9"
+            />
+          </div>
+          <div className="flex gap-2">
+            <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+              <SelectTrigger className="w-[160px]">
+                <ArrowUpDown className="h-3.5 w-3.5 mr-1.5 shrink-0" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name">Nome</SelectItem>
+                <SelectItem value="most-active">Mais ativos</SelectItem>
+                <SelectItem value="least-active">Menos ativos</SelectItem>
+                <SelectItem value="most-tasks">Mais tarefas</SelectItem>
+                <SelectItem value="least-tasks">Menos tarefas</SelectItem>
+                <SelectItem value="team">Equipe</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button onClick={() => setCreateOpen(true)} className="gap-1.5 shrink-0">
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Novo Usuário</span>
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-2 flex-wrap">
+
+        {/* Filter chips */}
+        <div className="flex gap-2 flex-wrap items-center">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium mr-1">
+            <Filter className="h-3.5 w-3.5" />
+            Filtros:
+          </div>
+          {/* Team filters */}
           <Button
             variant={teamFilter === "all" ? "default" : "outline"}
             size="sm"
+            className="h-7 text-xs rounded-full px-3"
             onClick={() => setTeamFilter("all")}
           >
-            Todos
+            Todas equipes
           </Button>
           {teams?.map((team) => (
             <Button
               key={team.id}
               variant={teamFilter === team.id ? "default" : "outline"}
               size="sm"
+              className="h-7 text-xs rounded-full px-3"
               onClick={() => setTeamFilter(team.id)}
             >
               {team.name}
             </Button>
           ))}
+          <Separator orientation="vertical" className="h-5 mx-1" />
+          {/* Activity filters */}
+          {[
+            { value: "all" as ActivityFilter, label: "Todos" },
+            { value: "active" as ActivityFilter, label: "Ativos hoje" },
+            { value: "recent" as ActivityFilter, label: "Recentes" },
+            { value: "inactive" as ActivityFilter, label: "Inativos" },
+          ].map((f) => (
+            <Button
+              key={f.value}
+              variant={activityFilter === f.value ? "default" : "outline"}
+              size="sm"
+              className="h-7 text-xs rounded-full px-3"
+              onClick={() => setActivityFilter(f.value)}
+            >
+              {f.label}
+            </Button>
+          ))}
         </div>
-        <Button onClick={() => setCreateOpen(true)} className="gap-1.5 shrink-0">
-          <Plus className="h-4 w-4" />
-          Novo Usuário
-        </Button>
       </div>
 
       {/* User list */}
-      <div className="space-y-2">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {filteredProfiles.length === 0 ? (
-          <Card className="p-8">
+          <Card className="sm:col-span-2 lg:col-span-3 p-8">
             <p className="text-center text-sm text-muted-foreground">Nenhum usuário encontrado.</p>
           </Card>
         ) : (
           filteredProfiles.map((profile) => {
             const isAdmin = getRoleForUser(profile.user_id) === "Admin";
             const userTeams = getTeamsForUser(profile.user_id);
-            const activity = getActivityStatus(lastActivity?.[profile.user_id]);
-            const taskCount = openTaskCounts?.[profile.user_id] ?? 0;
+            const activity = getActivityInfo(lastActivity?.[profile.user_id]);
+            const openTasks = openTaskCounts?.[profile.user_id] ?? 0;
+            const completedTasks = completedTaskCounts?.[profile.user_id] ?? 0;
             const inactive = profile.is_active === false;
 
             return (
               <Card
                 key={profile.id}
-                className={`p-4 transition-colors hover:bg-muted/30 ${inactive ? "opacity-60" : ""}`}
+                className={`group relative border-border/50 transition-all hover:shadow-md hover:border-border cursor-pointer ${inactive ? "opacity-50" : ""}`}
+                onClick={() => setDetailProfile(profile)}
               >
-                <div className="flex items-center gap-4">
-                  {/* Avatar */}
-                  <div className="relative shrink-0">
-                    <div className={`flex h-11 w-11 items-center justify-center rounded-full font-semibold text-sm ${
-                      isAdmin ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
-                    }`}>
-                      {getInitials(profile.name)}
+                <CardContent className="p-5">
+                  {/* Top row: avatar + info + actions */}
+                  <div className="flex items-start gap-3.5">
+                    {/* Avatar */}
+                    <div className="relative shrink-0">
+                      <Avatar className={`h-12 w-12 ${isAdmin ? "ring-2 ring-primary/30" : ""}`}>
+                        <AvatarFallback className={`text-sm font-semibold ${
+                          isAdmin ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
+                        }`}>
+                          {getInitials(profile.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span
+                        className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-card ${activity.color}`}
+                        title={activity.label}
+                      />
                     </div>
-                    <span
-                      className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-background ${activity.color}`}
-                      title={activity.label}
-                    />
-                  </div>
 
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium text-sm truncate">{profile.name}</span>
-                      <Badge variant={isAdmin ? "default" : "secondary"} className="text-xs">
-                        {isAdmin ? "Admin" : "Membro"}
-                      </Badge>
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-sm truncate">{profile.name}</span>
+                        <Badge
+                          variant={isAdmin ? "default" : "secondary"}
+                          className={`text-[10px] px-1.5 py-0 shrink-0 ${
+                            isAdmin ? "bg-blue-600 hover:bg-blue-700 text-white" : ""
+                          }`}
+                        >
+                          {isAdmin ? "Admin" : "Membro"}
+                        </Badge>
+                      </div>
+                      {profile.job_title && (
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{profile.job_title}</p>
+                      )}
                       {inactive && (
-                        <Badge variant="outline" className="text-xs text-destructive border-destructive/30">
+                        <Badge variant="outline" className="text-[10px] mt-1 text-destructive border-destructive/30">
                           Inativo
                         </Badge>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                      {profile.job_title && (
-                        <span className="text-xs text-muted-foreground">{profile.job_title}</span>
-                      )}
-                      {userTeams.length > 0 && (
-                        <div className="flex gap-1 flex-wrap">
-                          {userTeams.map((t) => (
-                            <Badge key={t.id} variant="outline" className="text-[10px] px-1.5 py-0">
-                              {t.name}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
 
-                  {/* Stats */}
-                  <div className="hidden md:flex items-center gap-4 shrink-0">
-                    <div className="text-center">
-                      <p className="text-sm font-semibold">{taskCount}</p>
-                      <p className="text-[10px] text-muted-foreground">Tarefas</p>
-                    </div>
-                    <Separator orientation="vertical" className="h-8" />
-                    <div className="text-center min-w-[80px]">
-                      <p className="text-xs text-muted-foreground">{activity.label}</p>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="shrink-0">
-                        <MoreHorizontal className="h-4 w-4" />
+                    {/* Quick actions */}
+                    <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Editar" onClick={() => openEditDialog(profile)}>
+                        <Pencil className="h-3.5 w-3.5" />
                       </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48">
-                      <DropdownMenuItem onClick={() => openEditDialog(profile)}>
-                        <Pencil className="mr-2 h-4 w-4" />
-                        Editar usuário
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => { setResetPasswordDialog(profile); setResetPassword(""); }}>
-                        <KeyRound className="mr-2 h-4 w-4" />
-                        Resetar senha
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => {
-                        // Navigate to permissions tab - we dispatch a custom approach
+                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Permissões" onClick={() => {
                         const permTab = document.querySelector('[value="permissions"]') as HTMLElement;
                         permTab?.click();
                       }}>
-                        <Shield className="mr-2 h-4 w-4" />
-                        Alterar permissões
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => {
-                        const logTab = document.querySelector('[value="log"]') as HTMLElement;
-                        logTab?.click();
-                      }}>
-                        <ScrollText className="mr-2 h-4 w-4" />
-                        Ver histórico
-                      </DropdownMenuItem>
-                      {!isAdmin && (
-                        <>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={() => setDeactivateDialog(profile)}
-                            className={inactive ? "text-green-600" : "text-destructive"}
-                          >
-                            <UserMinus className="mr-2 h-4 w-4" />
-                            {inactive ? "Reativar usuário" : "Desativar usuário"}
+                        <Shield className="h-3.5 w-3.5" />
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-7 w-7">
+                            <MoreHorizontal className="h-3.5 w-3.5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          <DropdownMenuItem onClick={() => setDetailProfile(profile)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            Ver perfil
                           </DropdownMenuItem>
-                        </>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+                          <DropdownMenuItem onClick={() => openEditDialog(profile)}>
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Editar usuário
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => { setResetPasswordDialog(profile); setResetPassword(""); }}>
+                            <KeyRound className="mr-2 h-4 w-4" />
+                            Resetar senha
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => {
+                            const permTab = document.querySelector('[value="permissions"]') as HTMLElement;
+                            permTab?.click();
+                          }}>
+                            <Shield className="mr-2 h-4 w-4" />
+                            Alterar permissões
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => {
+                            const logTab = document.querySelector('[value="log"]') as HTMLElement;
+                            logTab?.click();
+                          }}>
+                            <ScrollText className="mr-2 h-4 w-4" />
+                            Ver histórico
+                          </DropdownMenuItem>
+                          {!isAdmin && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => setDeactivateDialog(profile)}
+                                className={inactive ? "text-green-600" : "text-destructive"}
+                              >
+                                <UserMinus className="mr-2 h-4 w-4" />
+                                {inactive ? "Reativar usuário" : "Desativar usuário"}
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+
+                  {/* Teams */}
+                  {userTeams.length > 0 && (
+                    <div className="flex gap-1.5 flex-wrap mt-3">
+                      {userTeams.map((t) => (
+                        <Badge key={t.id} variant="outline" className="text-[10px] px-2 py-0.5 bg-muted/50">
+                          {t.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Divider */}
+                  <Separator className="my-3" />
+
+                  {/* Bottom stats */}
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <ListTodo className="h-3.5 w-3.5" />
+                        <span className="font-medium text-foreground">{openTasks}</span>
+                        <span>abertas</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        <span className="font-medium text-foreground">{completedTasks}</span>
+                        <span>concluídas</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <Clock className="h-3 w-3" />
+                      <span className="text-[11px]">{activity.label}</span>
+                    </div>
+                  </div>
+                </CardContent>
               </Card>
             );
           })
         )}
       </div>
 
+      {/* User Detail Modal */}
+      <Dialog open={!!detailProfile} onOpenChange={(open) => !open && setDetailProfile(null)}>
+        <DialogContent className="sm:max-w-lg" onInteractOutside={(e) => e.preventDefault()}>
+          {detailProfile && (() => {
+            const isAdmin = getRoleForUser(detailProfile.user_id) === "Admin";
+            const userTeams = getTeamsForUser(detailProfile.user_id);
+            const activity = getActivityInfo(lastActivity?.[detailProfile.user_id]);
+            const openTasks = openTaskCounts?.[detailProfile.user_id] ?? 0;
+            const completedTasks = completedTaskCounts?.[detailProfile.user_id] ?? 0;
+            const email = userEmails?.[detailProfile.user_id];
+
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="sr-only">Perfil do Usuário</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-5">
+                  {/* Header */}
+                  <div className="flex items-center gap-4">
+                    <Avatar className={`h-16 w-16 ${isAdmin ? "ring-2 ring-primary/30" : ""}`}>
+                      <AvatarFallback className={`text-lg font-bold ${
+                        isAdmin ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
+                      }`}>
+                        {getInitials(detailProfile.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-lg truncate">{detailProfile.name}</h3>
+                        <Badge variant={isAdmin ? "default" : "secondary"} className={`text-xs shrink-0 ${isAdmin ? "bg-blue-600 text-white" : ""}`}>
+                          {isAdmin ? "Admin" : "Membro"}
+                        </Badge>
+                      </div>
+                      {detailProfile.job_title && (
+                        <p className="text-sm text-muted-foreground">{detailProfile.job_title}</p>
+                      )}
+                      {email && <p className="text-xs text-muted-foreground mt-0.5">{email}</p>}
+                    </div>
+                  </div>
+
+                  {/* Status */}
+                  <div className="flex items-center gap-2">
+                    <span className={`h-2.5 w-2.5 rounded-full ${activity.color}`} />
+                    <span className="text-sm text-muted-foreground">{activity.label}</span>
+                    {detailProfile.is_active === false && (
+                      <Badge variant="outline" className="text-xs text-destructive border-destructive/30 ml-auto">Conta Inativa</Badge>
+                    )}
+                  </div>
+
+                  {/* Teams */}
+                  {userTeams.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Equipes</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {userTeams.map((t) => (
+                          <Badge key={t.id} variant="outline" className="text-xs">{t.name}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Task stats */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <Card className="border-border/50">
+                      <CardContent className="p-4 flex items-center gap-3">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-500/10 text-orange-600 dark:text-orange-400">
+                          <ListTodo className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <p className="text-xl font-bold">{openTasks}</p>
+                          <p className="text-[11px] text-muted-foreground">Tarefas Abertas</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card className="border-border/50">
+                      <CardContent className="p-4 flex items-center gap-3">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-green-500/10 text-green-600 dark:text-green-400">
+                          <CheckCircle2 className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <p className="text-xl font-bold">{completedTasks}</p>
+                          <p className="text-[11px] text-muted-foreground">Concluídas</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Recent activity */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Atividade Recente</p>
+                    {detailActivityLog && detailActivityLog.length > 0 ? (
+                      <div className="space-y-1.5 max-h-[200px] overflow-y-auto">
+                        {detailActivityLog.map((log, i) => (
+                          <div key={i} className="flex items-center justify-between gap-3 text-sm px-3 py-2 rounded-md bg-muted/30">
+                            <span className="truncate">{log.action}</span>
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">
+                              {new Date(log.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+                              {" "}
+                              {new Date(log.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground py-3 text-center">Nenhuma atividade registrada.</p>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" className="flex-1 gap-1.5" onClick={() => { setDetailProfile(null); openEditDialog(detailProfile); }}>
+                      <Pencil className="h-3.5 w-3.5" />
+                      Editar
+                    </Button>
+                    <Button variant="outline" size="sm" className="flex-1 gap-1.5" onClick={() => {
+                      setDetailProfile(null);
+                      const permTab = document.querySelector('[value="permissions"]') as HTMLElement;
+                      permTab?.click();
+                    }}>
+                      <Shield className="h-3.5 w-3.5" />
+                      Permissões
+                    </Button>
+                    <Button variant="outline" size="sm" className="flex-1 gap-1.5" onClick={() => { setDetailProfile(null); setResetPasswordDialog(detailProfile); setResetPassword(""); }}>
+                      <KeyRound className="h-3.5 w-3.5" />
+                      Senha
+                    </Button>
+                  </div>
+                </div>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
       {/* Create User Dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>Criar Novo Usuário</DialogTitle>
+            <DialogDescription>Preencha os dados do novo membro da equipe.</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreate} className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
