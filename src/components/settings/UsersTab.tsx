@@ -621,7 +621,7 @@ export function UsersTab() {
                     {/* Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold text-sm truncate">{profile.name}</span>
+                        <span className="font-semibold text-sm">{profile.name}</span>
                         <Badge
                           variant={isAdmin ? "default" : "secondary"}
                           className={`text-[10px] px-1.5 py-0 shrink-0 ${
