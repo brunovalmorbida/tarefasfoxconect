@@ -600,45 +600,47 @@ export function UsersTab() {
                 className={`group relative border-border/50 transition-all hover:shadow-md hover:border-border cursor-pointer ${inactive ? "opacity-50" : ""}`}
                 onClick={() => setDetailProfile(profile)}
               >
-                <CardContent className="p-5">
+                <CardContent className="p-4">
                   {/* Top row: avatar + info + actions */}
-                  <div className="flex items-start gap-3.5">
+                  <div className="flex items-start gap-3">
                     {/* Avatar */}
                     <div className="relative shrink-0">
-                      <Avatar className={`h-12 w-12 ${isAdmin ? "ring-2 ring-primary/30" : ""}`}>
-                        <AvatarFallback className={`text-sm font-semibold ${
+                      <Avatar className={`h-10 w-10 ${isAdmin ? "ring-2 ring-primary/30" : ""}`}>
+                        <AvatarFallback className={`text-xs font-semibold ${
                           isAdmin ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
                         }`}>
                           {getInitials(profile.name)}
                         </AvatarFallback>
                       </Avatar>
                       <span
-                        className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-card ${activity.color}`}
+                        className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card ${activity.color}`}
                         title={activity.label}
                       />
                     </div>
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
                         <span className="font-semibold text-sm">{profile.name}</span>
-                        <Badge
-                          variant={isAdmin ? "default" : "secondary"}
-                          className={`text-[10px] px-1.5 py-0 shrink-0 ${
-                            isAdmin ? "bg-blue-600 hover:bg-blue-700 text-white" : ""
-                          }`}
-                        >
-                          {isAdmin ? "Admin" : "Membro"}
-                        </Badge>
+                        {isAdmin && (
+                          <Badge
+                            variant="default"
+                            className="text-[9px] px-1 py-0 h-4 shrink-0 bg-blue-600 hover:bg-blue-700 text-white"
+                          >
+                            Admin
+                          </Badge>
+                        )}
                       </div>
-                      {profile.job_title && (
-                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{profile.job_title}</p>
-                      )}
-                      {inactive && (
-                        <Badge variant="outline" className="text-[10px] mt-1 text-destructive border-destructive/30">
-                          Inativo
-                        </Badge>
-                      )}
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        {profile.job_title && (
+                          <p className="text-[11px] text-muted-foreground truncate">{profile.job_title}</p>
+                        )}
+                        {inactive && (
+                          <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 text-destructive border-destructive/30">
+                            Inativo
+                          </Badge>
+                        )}
+                      </div>
                     </div>
 
                     {/* Quick actions */}
