@@ -649,8 +649,8 @@ export function UsersTab() {
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
                       <Button variant="ghost" size="icon" className="h-7 w-7" title="Permissões" onClick={() => {
-                        const permTab = document.querySelector('[value="permissions"]') as HTMLElement;
-                        permTab?.click();
+                        const permTab = document.querySelector('button[value="permissions"]') as HTMLElement;
+                        if (permTab) permTab.click();
                       }}>
                         <Shield className="h-3.5 w-3.5" />
                       </Button>
