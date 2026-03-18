@@ -18,7 +18,8 @@ import { toast } from "sonner";
 
 const DOC_TYPES: Record<string, string> = {
   invoice: "Nota Fiscal", warranty: "Garantia", quote: "Orçamento",
-  receipt: "Comprovante", photo: "Foto", other: "Outro",
+  receipt: "Comprovante", photo: "Foto", ipva: "IPVA",
+  insurance: "Seguro", licensing: "Licenciamento", other: "Outro",
 };
 
 export default function FleetDocuments() {

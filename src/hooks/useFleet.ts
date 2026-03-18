@@ -69,7 +69,7 @@ export interface FleetDocument {
   id: string;
   vehicle_id: string;
   maintenance_id: string | null;
-  document_type: "invoice" | "warranty" | "quote" | "receipt" | "photo" | "other";
+  document_type: "invoice" | "warranty" | "quote" | "receipt" | "photo" | "ipva" | "insurance" | "licensing" | "other";
   title: string;
   supplier: string | null;
   document_date: string | null;

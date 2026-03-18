@@ -10,13 +10,13 @@ import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import Boards from "./pages/Boards";
-// Teams page removed - now inside Settings
 import Notifications from "./pages/Notifications";
 import SettingsPage from "./pages/SettingsPage";
 import RecurringTasks from "./pages/RecurringTasks";
 import Purchases from "./pages/Purchases";
 import ProfilePage from "./pages/ProfilePage";
 import Fleet from "./pages/Fleet";
+import VehicleDetail from "./pages/fleet/VehicleDetail";
 import SocialMedia from "./pages/SocialMedia";
 import NotFound from "./pages/NotFound";
 
@@ -39,8 +39,8 @@ const App = () => (
                 <Route path="/recurring-tasks" element={<RecurringTasks />} />
                 <Route path="/purchases" element={<Purchases />} />
                 <Route path="/fleet" element={<Fleet />} />
+                <Route path="/fleet/vehicle/:vehicleId" element={<VehicleDetail />} />
                 <Route path="/social-media" element={<SocialMedia />} />
-                {/* Teams moved to Settings */}
                 <Route path="/notifications" element={<Notifications />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
