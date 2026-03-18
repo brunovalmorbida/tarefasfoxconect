@@ -861,7 +861,7 @@ export function UsersTab() {
                     <Button variant="outline" size="sm" className="flex-1 gap-1.5" onClick={() => {
                       setDetailProfile(null);
                       setTimeout(() => {
-                        const permTab = document.querySelector('button[value="permissions"]') as HTMLElement;
+                        const permTab = document.querySelector('[data-value="permissions"]') as HTMLElement;
                         if (permTab) permTab.click();
                       }, 100);
                     }}>
