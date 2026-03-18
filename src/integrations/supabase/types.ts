@@ -623,6 +623,7 @@ export type Database = {
           avatar_url: string | null
           created_at: string
           id: string
+          is_active: boolean
           job_title: string | null
           name: string
           updated_at: string
@@ -633,6 +634,7 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           id?: string
+          is_active?: boolean
           job_title?: string | null
           name?: string
           updated_at?: string
@@ -643,6 +645,7 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           id?: string
+          is_active?: boolean
           job_title?: string | null
           name?: string
           updated_at?: string
