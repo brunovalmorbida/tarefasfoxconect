@@ -48,6 +48,7 @@ Deno.serve(async (req) => {
     if (name !== undefined) profileUpdates.name = name.trim();
     if (jobTitle !== undefined) profileUpdates.job_title = jobTitle.trim() || null;
     if (whatsappNumber !== undefined) profileUpdates.whatsapp_number = whatsappNumber || null;
+    if (isActive !== undefined) profileUpdates.is_active = isActive;
 
     if (Object.keys(profileUpdates).length > 0) {
       const { error: profileError } = await adminClient
