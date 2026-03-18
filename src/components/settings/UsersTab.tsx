@@ -681,7 +681,7 @@ export function UsersTab() {
                             Alterar permissões
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => {
-                            const logTab = document.querySelector('button[value="log"]') as HTMLElement;
+                            const logTab = document.querySelector('[data-value="log"]') as HTMLElement;
                             if (logTab) logTab.click();
                           }}>
                             <ScrollText className="mr-2 h-4 w-4" />
