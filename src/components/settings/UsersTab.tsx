@@ -320,11 +320,11 @@ export function UsersTab() {
   const handleToggleActive = async (profile: Profile) => {
     const newStatus = !profile.is_active;
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ is_active: newStatus })
-        .eq("user_id", profile.user_id);
+      const { data, error } = await supabase.functions.invoke("update-user", {
+        body: { userId: profile.user_id, isActive: newStatus },
+      });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       toast.success(newStatus ? "Usuário reativado!" : "Usuário desativado!");
       await logActivity(newStatus ? "Reativou um usuário" : "Desativou um usuário", { user_name: profile.name });
       queryClient.invalidateQueries({ queryKey: ["admin-profiles"] });
