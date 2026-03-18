@@ -59,11 +59,18 @@ Deno.serve(async (req) => {
 
     const userId = newUser.user.id;
 
-    // Update whatsapp number if provided
+    // Update profile fields if provided
+    const profileUpdates: Record<string, any> = {};
     if (whatsappNumber && typeof whatsappNumber === "string" && whatsappNumber.trim()) {
+      profileUpdates.whatsapp_number = whatsappNumber.trim();
+    }
+    if (jobTitle && typeof jobTitle === "string" && jobTitle.trim()) {
+      profileUpdates.job_title = jobTitle.trim();
+    }
+    if (Object.keys(profileUpdates).length > 0) {
       await adminClient
         .from("profiles")
-        .update({ whatsapp_number: whatsappNumber.trim() })
+        .update(profileUpdates)
         .eq("user_id", userId);
     }
 
