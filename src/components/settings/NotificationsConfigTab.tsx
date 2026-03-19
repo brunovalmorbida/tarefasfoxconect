@@ -442,6 +442,33 @@ export function NotificationsConfigTab() {
                 </div>
               )}
             </div>
+
+            <Separator />
+
+            {/* Check-in da Frota */}
+            <div className="space-y-2">
+              <Button
+                variant="outline"
+                onClick={handleSendFleetCheckin}
+                disabled={sendingFleetCheckin}
+                className="w-full justify-start"
+              >
+                {sendingFleetCheckin ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Car className="h-4 w-4 mr-2 text-blue-600" />
+                )}
+                {sendingFleetCheckin ? "Enviando..." : "🚗 Enviar Check-in da Frota (Motoristas)"}
+              </Button>
+              {fleetCheckinResult && (
+                <div className="text-xs text-muted-foreground rounded-md border p-3 space-y-1">
+                  <p>🚗 Veículos: <strong>{fleetCheckinResult.total_vehicles}</strong></p>
+                  <p>✅ Enviadas: <strong>{fleetCheckinResult.sent}</strong></p>
+                  {fleetCheckinResult.errors > 0 && <p>❌ Erros: <strong>{fleetCheckinResult.errors}</strong></p>}
+                  {fleetCheckinResult.skipped > 0 && <p>⏭️ Sem WhatsApp: <strong>{fleetCheckinResult.skipped}</strong></p>}
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}
