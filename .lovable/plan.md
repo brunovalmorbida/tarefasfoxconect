@@ -1,122 +1,81 @@
 
-# TaskFox - Sistema de Gestão de Tarefas
 
-## 🏁 Marco: Versão V2.0 (09/03/2026)
-> Consolidação completa do TaskFox sobre a base V1.3:
-> - **Documentação técnica completa** do sistema exportável em formato público (.txt) para análise por IAs externas
-> - **Busca global** (Ctrl+K) em tarefas, quadros e compras
-> - **Subtarefas/Checklist** com barra de progresso nos cards Kanban
-> - **Comentários** em tarefas com controle de autoria
-> - **Perfis de usuário** editáveis (nome, avatar, cargo, WhatsApp)
-> - **Edição de listas de compras** pendentes (título, urgência, comprador, itens)
-> - **WhatsApp Bot com IA** (Gemini): comandos por linguagem natural, memória conversacional (10 msgs / 30min), roteamento por permissão
-> - **Automações avançadas**: 8 Edge Functions de notificação com controle de horário comercial (BRT)
-> - **Permissões granulares**: 7 permissões independentes + visibilidade de equipes por usuário
-> - Todas funcionalidades das versões anteriores mantidas
->
-> **Para restaurar esta versão:** Use o Histórico de edições do Lovable e encontre esta mensagem.
+# Fix: Check-in Multi-Message Flow with Context Awareness
 
-## 🏁 Marco: Versão V1.2 (19/02/2026)
-> Melhorias de UX e interação sobre a base V1.1:
-> - **Dashboard Premium**: refatoração completa das 3 dashboards (Kanban, Tarefas Fixas, Compras) com hierarquia visual aprimorada, cards expressivos, barras de progresso com gradiente, feed de atividades, skeleton loading e microinterações
-> - **Kanban Cards**: arrasto pelo card inteiro (sem grip handle), cursor grab/grabbing, elevação ao arrastar
-> - Todas funcionalidades anteriores mantidas sem alteração de backend
->
-> **Para restaurar esta versão:** Use o Histórico de edições do Lovable e encontre esta mensagem.
+## Problem
 
-## 🏁 Marco: Versão V1.1 (19/02/2026)
-> Refatoração completa de UI/UX para experiência SaaS premium sobre a base V1.0:
-> - **Design System**: bordas 12px, sombras suaves, tokens semânticos de prioridade, animações (fade-in, scale-in, slide-up, check-strike, progress-fill)
-> - **Quadros Kanban**: cards premium com avatar, barra de progresso colorida (verde/amarelo/vermelho), hover com elevação e botão editar
-> - **Kanban interno**: bordas laterais de prioridade, datas inteligentes (atrasadas em vermelho com alerta), badges sólidos nas colunas, hover com ações rápidas
-> - **Tarefas Fixas**: layout em blocos visuais por frequência, barra de progresso do dia animada, animação ao concluir (riscar + opacidade)
-> - **Dashboard**: saudação personalizada, abas Kanban/Recorrentes/Compras, score de produtividade, resumo financeiro de compras
-> - **Tema claro/escuro**: toggle na sidebar com persistência em localStorage
-> - Todas funcionalidades da V1.0 mantidas sem alteração de backend
->
-> **Para restaurar esta versão:** Use o Histórico de edições do Lovable e encontre esta mensagem.
+When a driver sends a KM photo first and then text responses separately, the system fails because:
 
-## 🏁 Marco: Versão V1.0 (19/02/2026)
-> Estado estável do sistema com todas as funcionalidades base implementadas:
-> - Autenticação (login, cadastro, recuperação de senha)
-> - Dashboard com abas (Kanban, Tarefas Recorrentes, Compras)
-> - Quadros Kanban com drag & drop, colunas, tarefas, etiquetas, prioridades
-> - Gestão de Equipes (criar, convidar membros, papéis admin/membro)
-> - Tarefas Recorrentes (diárias, semanais, mensais, por dia da semana)
-> - Compras (listas, itens, catálogo de produtos, categorias, fluxo pendente→comprado→recebido)
-> - Notificações internas e via WhatsApp (Z-API)
-> - Configurações (usuários, permissões, integrações, log de atividades, backup)
-> - Controle de permissões granular por usuário
-> - Sistema de roles (admin/user)
->
-> **Para restaurar esta versão:** Use o Histórico de edições do Lovable e encontre esta mensagem.
+1. **Photo sets status to "answered"** -- subsequent text queries only look for "pending" check-ins, so they miss it
+2. **Free-form text** (e.g., "Barulho na suspensão dianteira") doesn't match `KM:` or `Manutenção:` regex patterns, so it falls through to the general AI which interprets it as a task creation command
+3. **No partial completion tracking** -- the system can't tell which parts of the checklist are already filled in
 
-## Visão Geral
-Sistema completo de gestão de tarefas estilo Trello com Kanban, gestão de equipes, dashboard analítico, autenticação por email/senha e notificações via WhatsApp (Z-API). Design clean e minimalista.
+## Solution
 
----
+### 1. Add `tools_ok` column to `fleet_checkins` table
 
-## Fase 1 - Base do Sistema
+Track which fields have been answered so the bot knows what's still missing.
 
-### 1. Autenticação
-- Cadastro e login com email e senha
-- Recuperação de senha
-- Perfil do usuário (nome, avatar, cargo)
+```sql
+ALTER TABLE fleet_checkins ADD COLUMN tools_ok boolean DEFAULT NULL;
+ALTER TABLE fleet_checkins ADD COLUMN tools_description text DEFAULT NULL;
+```
 
-### 2. Layout e Navegação
-- Sidebar com menu: Dashboard, Quadros, Equipes, Notificações, Configurações
-- Layout responsivo, clean e minimalista com cores neutras
+### 2. Change KM photo handler to NOT set status to "answered"
 
-### 3. Gestão de Equipes
-- Criar equipes e convidar membros por email
-- Papéis: Admin e Membro
-- Cada equipe com seus próprios quadros
+Keep status as "pending" when only the KM photo was submitted. The check-in is only "answered" when all required fields (KM + maintenance + tools) are filled.
 
----
+### 3. Add `responder_checkin_frota` tool to the AI
 
-## Fase 2 - Kanban e Tarefas
+A new tool in the TOOLS array that the AI can call when it recognizes the user is answering check-in questions:
 
-### 4. Quadro Kanban
-- Colunas: A Fazer, Em Andamento, Em Revisão, Concluído
-- Drag and drop para mover tarefas entre colunas
-- Cards com título, responsável, prazo, etiquetas e prioridade
+```text
+responder_checkin_frota(
+  km: number | null,
+  manutencao: boolean | null,
+  descricao_manutencao: string | null,
+  ferramentas_ok: boolean | null,
+  observacao_ferramentas: string | null
+)
+```
 
-### 5. Gestão de Tarefas
-- Criar, editar e excluir tarefas
-- Atribuir membros, definir prazos, etiquetas coloridas
-- Comentários em cada tarefa
-- Notificações internas (atribuição, comentários, prazos)
+### 4. Inject check-in context into the AI system prompt
 
----
+Before calling the AI, check if the user has a recent check-in (pending or answered today). If so, prepend context to the system prompt:
 
-## Fase 3 - Dashboard
+- Which vehicle the check-in is for
+- Which fields are already filled (KM, maintenance, tools)
+- Which fields are still missing
+- Instruct the AI to use `responder_checkin_frota` for any check-in-related responses
 
-### 6. Dashboard de Acompanhamento
-- **Cards de resumo**: total de tarefas por status (a fazer, em andamento, concluídas, atrasadas)
-- **Gráficos de progresso**: barras e pizza com distribuição por status e por equipe
-- **Tarefas atrasadas**: lista destacada com indicadores visuais de urgência
-- **Atividade recente**: timeline das últimas ações (criação, movimentação, conclusão)
+### 5. Unified handler `handleResponderCheckinFrota`
 
----
+Processes AI-parsed check-in data:
+- Merges new data with existing check-in record (partial updates)
+- Only marks status as "answered" when all 3 fields are complete (KM + maintenance + tools)
+- Sends confirmation listing completed/pending items
+- Creates maintenance task if needed (when maintenance = true)
 
-## Fase 4 - Integração WhatsApp (Z-API)
+### 6. Broaden regex detection block
 
-### 7. Notificações via WhatsApp
-- Configuração da conexão Z-API nas configurações do sistema (instância, token)
-- Cada usuário pode cadastrar seu número de WhatsApp no perfil
-- **Notificações automáticas** enviadas via WhatsApp:
-  - Tarefas que passaram do prazo (alerta de atraso)
-  - Atribuição de nova tarefa
-  - Lembrete de prazo próximo (ex: 24h antes)
-- Edge function no Supabase para envio das mensagens via Z-API
-- Painel de configuração para ativar/desativar tipos de notificação por usuário
-- Log de mensagens enviadas para acompanhamento
+Change the existing text detection (line 531-538) to also match check-ins with status "answered" from today, as a fallback before the AI path.
 
----
+## Flow Example
 
-## Backend (Supabase)
-- Tabelas: profiles, teams, team_members, boards, columns, tasks, task_labels, comments, activity_log, notifications, whatsapp_settings
-- Row Level Security (RLS) para acesso seguro por equipe
-- Edge functions para integração Z-API e verificação de prazos (cron job)
-- Autenticação via Supabase Auth
+```text
+Bot: "Check-in semanal do veículo Strada..."
+Driver: [sends photo of dashboard]
+Bot: "KM: 45.230 ✅ Agora responda: Manutenção? Ferramentas?"
+Driver: "Barulho na suspensão dianteira"
+Bot: (AI sees check-in context → uses responder_checkin_frota)
+     "✅ Manutenção: Sim - Barulho na suspensão dianteira
+      Falta: Ferramentas (sim/não)"
+Driver: "Sim"
+Bot: "✅ Check-in completo! KM: 45.230 | Manutenção: Sim | Ferramentas: OK"
+```
+
+## Files Changed
+
+- **`supabase/functions/whatsapp-webhook/index.ts`**: Add tool, context injection, handler, fix status logic
+- **Database migration**: Add `tools_ok` and `tools_description` columns to `fleet_checkins`
 
