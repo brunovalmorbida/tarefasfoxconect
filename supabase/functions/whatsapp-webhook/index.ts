@@ -519,6 +519,152 @@ Não inclua nenhum texto fora do JSON.`,
     // Use messageText or imageCaption for AI processing
     const textForAI = messageText || imageCaption;
 
+    // ─── CHECK-IN TEXT RESPONSE DETECTION ───
+    // Detect if the message looks like a check-in response (KM:, Manutenção:, Ferramentas:)
+    if (textForAI) {
+      const hasKM = /km\s*[:=]\s*[\d.]+/i.test(textForAI);
+      const hasManutencao = /manuten[cç][aã]o\s*[:=]/i.test(textForAI);
+
+      // If at least KM or Manutenção is present, treat as check-in response
+      if (hasKM || hasManutencao) {
+        // Check if user has a pending fleet check-in
+        const { data: pendingCheckin } = await supabase
+          .from("fleet_checkins")
+          .select("id, vehicle_id")
+          .eq("driver_user_id", userProfile.user_id)
+          .eq("status", "pending")
+          .order("checkin_date", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (pendingCheckin) {
+          // Parse the check-in fields
+          const kmMatch = textForAI.match(/km\s*[:=]\s*([\d.]+)/i);
+          const manutencaoMatch = textForAI.match(/manuten[cç][aã]o\s*[:=]\s*(sim|n[aã]o|s|n)/i);
+          const descricaoMatch = textForAI.match(/descri[cç][aã]o\s*[:=]\s*(.+?)(?:\n|$)/i);
+          const ferramentasMatch = textForAI.match(/ferramenta[s]?\s*[:=]\s*(sim|n[aã]o|s|n|ok|completa[s]?)/i);
+          const obsFerramentasMatch = textForAI.match(/observa[cç][aã]o\s*ferramenta[s]?\s*[:=]\s*(.+?)(?:\n|$)/i);
+
+          const kmValue = kmMatch ? Math.round(Number(kmMatch[1].replace(/\./g, ""))) : null;
+          const needsMaintenance = manutencaoMatch ? /^(sim|s)$/i.test(manutencaoMatch[1]) : false;
+          const description = descricaoMatch ? descricaoMatch[1].trim() : null;
+          const toolsOk = ferramentasMatch ? /^(sim|s|ok|completa[s]?)$/i.test(ferramentasMatch[1]) : null;
+          const toolsObs = obsFerramentasMatch ? obsFerramentasMatch[1].trim() : null;
+
+          // Build description combining maintenance + tools info
+          let fullDescription = "";
+          if (description && description !== "_" && description !== "-") {
+            fullDescription += `Manutenção: ${description}`;
+          }
+          if (toolsOk === false || (toolsObs && toolsObs !== "_" && toolsObs !== "-")) {
+            if (fullDescription) fullDescription += "\n";
+            fullDescription += `Ferramentas: ${toolsOk === false ? "Incompletas" : "OK"}`;
+            if (toolsObs) fullDescription += ` - ${toolsObs}`;
+          } else if (toolsOk === true) {
+            if (fullDescription) fullDescription += "\n";
+            fullDescription += "Ferramentas: OK";
+          }
+
+          // Update the check-in record
+          const updateData: any = { status: "answered" };
+          if (kmValue) updateData.km_reported = kmValue;
+          updateData.needs_maintenance = needsMaintenance;
+          if (fullDescription) updateData.description = fullDescription;
+
+          await supabase
+            .from("fleet_checkins")
+            .update(updateData)
+            .eq("id", pendingCheckin.id);
+
+          // Update vehicle KM if provided
+          if (kmValue) {
+            await supabase
+              .from("fleet_vehicles")
+              .update({ current_km: kmValue } as any)
+              .eq("id", pendingCheckin.vehicle_id);
+          }
+
+          // Build response message
+          let responseMsg = "✅ *Check-in registrado com sucesso!*\n\n";
+          if (kmValue) responseMsg += `🔢 *KM:* ${kmValue.toLocaleString("pt-BR")} km\n`;
+          responseMsg += `🔧 *Manutenção:* ${needsMaintenance ? "Sim ⚠️" : "Não ✅"}\n`;
+          if (description && description !== "_" && description !== "-") {
+            responseMsg += `📝 *Descrição:* ${description}\n`;
+          }
+          if (toolsOk !== null) {
+            responseMsg += `🧰 *Ferramentas:* ${toolsOk ? "Completas ✅" : "Incompletas ⚠️"}\n`;
+          }
+          if (toolsObs && toolsObs !== "_" && toolsObs !== "-") {
+            responseMsg += `📋 *Obs. ferramentas:* ${toolsObs}\n`;
+          }
+          responseMsg += "\nObrigado pelo retorno! 👍";
+
+          // If needs maintenance, create a task automatically
+          if (needsMaintenance) {
+            try {
+              const { data: fleetSettings } = await supabase
+                .from("fleet_settings")
+                .select("default_board_id, default_assignee_id, default_task_deadline_days")
+                .limit(1)
+                .maybeSingle();
+
+              if (fleetSettings?.default_board_id) {
+                const { data: firstCol } = await supabase
+                  .from("board_columns")
+                  .select("id")
+                  .eq("board_id", fleetSettings.default_board_id)
+                  .order("position", { ascending: true })
+                  .limit(1)
+                  .maybeSingle();
+
+                if (firstCol) {
+                  const { data: vehicle } = await supabase
+                    .from("fleet_vehicles")
+                    .select("name, plate")
+                    .eq("id", pendingCheckin.vehicle_id)
+                    .maybeSingle();
+
+                  const deadlineDays = fleetSettings.default_task_deadline_days || 3;
+                  const dueDate = new Date();
+                  dueDate.setDate(dueDate.getDate() + deadlineDays);
+
+                  const taskTitle = `Manutenção - ${vehicle?.name || "Veículo"} (${vehicle?.plate || ""})`;
+                  const taskDesc = description || "Motorista reportou necessidade de manutenção no check-in semanal.";
+
+                  await supabase.from("tasks").insert({
+                    column_id: firstCol.id,
+                    title: taskTitle,
+                    description: taskDesc,
+                    priority: "medium",
+                    due_date: dueDate.toISOString(),
+                    assignee_id: fleetSettings.default_assignee_id || userProfile.user_id,
+                    created_by: userProfile.user_id,
+                  } as any);
+
+                  responseMsg += `\n📋 *Tarefa de manutenção criada automaticamente!*`;
+                }
+              }
+            } catch (taskErr: any) {
+              console.error("Error creating maintenance task:", taskErr);
+            }
+          }
+
+          await sendWhatsApp(supabase, cleanPhone, responseMsg);
+
+          await supabase.from("whatsapp_chat_history").insert({
+            user_id: userProfile.user_id,
+            phone: cleanPhone,
+            role: "assistant",
+            content: responseMsg,
+          });
+
+          return new Response(JSON.stringify({ ok: true, action: "checkin_response", km: kmValue }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+    }
+
     // Call Lovable AI to interpret the command
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
