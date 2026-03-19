@@ -736,6 +736,13 @@ IMPORTANTE: NÃO crie tarefas Kanban com o conteúdo do check-in!`;
           responseMessage = await handleTarefasDiariasUsuario(supabase, profiles || [], args);
         }
         break;
+      case "responder_checkin_frota":
+        if (recentCheckin) {
+          responseMessage = await handleCheckinUpdate(supabase, userProfile, recentCheckin, args);
+        } else {
+          responseMessage = "📋 Nenhum check-in pendente encontrado para hoje. Se precisar, peça ao administrador para enviar o check-in.";
+        }
+        break;
       case "ajuda":
         responseMessage = handleAjuda(userProfile.name, isAdmin);
         break;
