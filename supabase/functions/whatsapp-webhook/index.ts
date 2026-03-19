@@ -171,6 +171,24 @@ const TOOLS = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "responder_checkin_frota",
+      description: "Responde ao check-in semanal da frota. Use SEMPRE que o usuário estiver respondendo perguntas do check-in de veículo (KM, manutenção, ferramentas). Pode receber dados parciais — o sistema vai acumulando até completar.",
+      parameters: {
+        type: "object",
+        properties: {
+          km: { type: "number", description: "Quilometragem atual do veículo (apenas número)" },
+          manutencao: { type: "boolean", description: "Se o veículo precisa de manutenção. true se o motorista descrever qualquer problema, false se disser que está tudo ok" },
+          descricao_manutencao: { type: "string", description: "Descrição do problema de manutenção, se houver" },
+          ferramentas_ok: { type: "boolean", description: "Se todas as ferramentas estão completas. true = tudo ok, false = falta algo" },
+          observacao_ferramentas: { type: "string", description: "Descrição do que está faltando nas ferramentas, se aplicável" },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
 ];
 
 const SYSTEM_PROMPT = `Você é o assistente TaskFox, um bot de gestão de tarefas via WhatsApp.
