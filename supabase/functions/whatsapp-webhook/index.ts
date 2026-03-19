@@ -808,6 +808,136 @@ async function sendWhatsApp(supabase: any, phone: string, message: string) {
   }
 }
 
+// ─── HANDLER: Unified Check-in Update ──────────────────────
+async function handleCheckinUpdate(
+  supabase: any,
+  userProfile: any,
+  checkin: any,
+  args: { km?: number | null; manutencao?: boolean | null; descricao_manutencao?: string | null; ferramentas_ok?: boolean | null; observacao_ferramentas?: string | null }
+): Promise<string> {
+  const updateData: any = {};
+
+  // Merge new data with existing check-in (partial updates)
+  const newKm = args.km != null ? Math.round(args.km) : checkin.km_reported;
+  const newMaintenance = args.manutencao != null ? args.manutencao : checkin.needs_maintenance;
+  const newDescription = args.descricao_manutencao || checkin.description || null;
+  const newToolsOk = args.ferramentas_ok != null ? args.ferramentas_ok : checkin.tools_ok;
+  const newToolsDesc = args.observacao_ferramentas || checkin.tools_description || null;
+
+  if (args.km != null) {
+    updateData.km_reported = Math.round(args.km);
+    // Also update vehicle KM
+    await supabase.from("fleet_vehicles").update({ current_km: updateData.km_reported } as any).eq("id", checkin.vehicle_id);
+  }
+  if (args.manutencao != null) {
+    updateData.needs_maintenance = args.manutencao;
+  }
+  if (args.descricao_manutencao) {
+    updateData.description = args.descricao_manutencao;
+  }
+  if (args.ferramentas_ok != null) {
+    updateData.tools_ok = args.ferramentas_ok;
+  }
+  if (args.observacao_ferramentas) {
+    updateData.tools_description = args.observacao_ferramentas;
+  }
+
+  // Determine if check-in is complete (all 3 fields filled)
+  const isComplete = newKm != null && newMaintenance != null && newToolsOk != null;
+  updateData.status = isComplete ? "answered" : "pending";
+
+  await supabase.from("fleet_checkins").update(updateData).eq("id", checkin.id);
+
+  // Get vehicle info for response
+  const { data: vehicle } = await supabase
+    .from("fleet_vehicles")
+    .select("name, plate")
+    .eq("id", checkin.vehicle_id)
+    .maybeSingle();
+  const vehicleName = vehicle ? `${vehicle.name} (${vehicle.plate})` : "Veículo";
+
+  // Build response
+  let responseMsg = "";
+
+  if (isComplete) {
+    responseMsg = `✅ *Check-in completo para ${vehicleName}!*\n\n`;
+    responseMsg += `🔢 *KM:* ${newKm!.toLocaleString("pt-BR")} km\n`;
+    responseMsg += `🔧 *Manutenção:* ${newMaintenance ? "Sim ⚠️" : "Não ✅"}\n`;
+    if (newDescription) responseMsg += `📝 *Descrição:* ${newDescription}\n`;
+    responseMsg += `🧰 *Ferramentas:* ${newToolsOk ? "Completas ✅" : "Incompletas ⚠️"}\n`;
+    if (newToolsDesc) responseMsg += `📝 *Obs ferramentas:* ${newToolsDesc}\n`;
+    responseMsg += "\nObrigado pelo retorno! 👍";
+
+    // Create maintenance task if needed
+    if (newMaintenance) {
+      try {
+        const { data: fleetSettings } = await supabase
+          .from("fleet_settings")
+          .select("default_board_id, default_assignee_id, default_task_deadline_days")
+          .limit(1)
+          .maybeSingle();
+
+        if (fleetSettings?.default_board_id) {
+          const { data: firstCol } = await supabase
+            .from("board_columns")
+            .select("id")
+            .eq("board_id", fleetSettings.default_board_id)
+            .order("position", { ascending: true })
+            .limit(1)
+            .maybeSingle();
+
+          if (firstCol) {
+            const deadlineDays = fleetSettings.default_task_deadline_days || 3;
+            const dueDate = new Date();
+            dueDate.setDate(dueDate.getDate() + deadlineDays);
+
+            const taskTitle = `Manutenção - ${vehicle?.name || "Veículo"} (${vehicle?.plate || ""})`;
+            const taskDesc = newDescription || "Motorista reportou necessidade de manutenção no check-in semanal.";
+
+            await supabase.from("tasks").insert({
+              column_id: firstCol.id,
+              title: taskTitle,
+              description: taskDesc,
+              priority: "medium",
+              due_date: dueDate.toISOString(),
+              assignee_id: fleetSettings.default_assignee_id || userProfile.user_id,
+              created_by: userProfile.user_id,
+            } as any);
+
+            responseMsg += `\n📋 *Tarefa de manutenção criada automaticamente!*`;
+          }
+        }
+      } catch (taskErr: any) {
+        console.error("Error creating maintenance task:", taskErr);
+      }
+    }
+  } else {
+    // Partial update — tell the driver what's done and what's missing
+    responseMsg = `📋 *Check-in ${vehicleName} — atualizado*\n\n`;
+
+    if (newKm != null) responseMsg += `✅ KM: ${newKm.toLocaleString("pt-BR")} km\n`;
+    else responseMsg += `⏳ KM: _aguardando_ (envie foto do painel ou digite)\n`;
+
+    if (newMaintenance != null) {
+      responseMsg += `✅ Manutenção: ${newMaintenance ? "Sim" : "Não"}\n`;
+      if (newDescription) responseMsg += `   📝 ${newDescription}\n`;
+    } else {
+      responseMsg += `⏳ Manutenção: _aguardando_ (precisa de manutenção? sim/não)\n`;
+    }
+
+    if (newToolsOk != null) {
+      responseMsg += `✅ Ferramentas: ${newToolsOk ? "Completas" : "Incompletas"}\n`;
+      if (newToolsDesc) responseMsg += `   📝 ${newToolsDesc}\n`;
+    } else {
+      responseMsg += `⏳ Ferramentas: _aguardando_ (todas completas? sim/não)\n`;
+    }
+
+    responseMsg += "\nResponda o que falta para completar o check-in! 👆";
+  }
+
+  return responseMsg;
+}
+
 // ─── HELPER: Find profile by name ──────────────────────────
 function findProfileByName(profiles: any[], nome: string) {
   const lower = nome.toLowerCase().trim();
