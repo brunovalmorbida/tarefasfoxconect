@@ -266,7 +266,6 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ ok: true, skipped: "no message" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
-      });
     }
 
     // Ignore group messages
