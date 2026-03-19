@@ -535,173 +535,57 @@ Não inclua nenhum texto fora do JSON.`,
     // Use messageText or imageCaption for AI processing
     const textForAI = messageText || imageCaption;
 
-    // ─── CHECK-IN TEXT RESPONSE DETECTION ───
-    // Detect if the message looks like a check-in response (KM:, Manutenção:, Ferramentas:)
+    // ─── CHECK-IN TEXT RESPONSE DETECTION (structured format) ───
+    // Detect if the message looks like a check-in response with explicit KM: or Manutenção: fields
+    const todayStr = new Date().toISOString().slice(0, 10);
     if (textForAI) {
       const hasKM = /km\s*[:=]\s*[\d.]+/i.test(textForAI);
       const hasManutencao = /manuten[cç][aã]o\s*[:=]/i.test(textForAI);
 
-      // If at least KM or Manutenção is present, treat as check-in response
+      // If at least KM or Manutenção is present, treat as structured check-in response
       if (hasKM || hasManutencao) {
-        // Check if user has a pending fleet check-in
+        // Check for pending or today's check-in (broadened query)
         const { data: pendingCheckin } = await supabase
           .from("fleet_checkins")
-          .select("id, vehicle_id")
+          .select("id, vehicle_id, km_reported, needs_maintenance, description, tools_ok, tools_description, status")
           .eq("driver_user_id", userProfile.user_id)
-          .eq("status", "pending")
+          .in("status", ["pending", "answered"])
+          .gte("checkin_date", todayStr)
           .order("checkin_date", { ascending: false })
           .limit(1)
           .maybeSingle();
 
         if (pendingCheckin) {
-          // Parse the check-in fields flexibly
+          // Parse structured fields
           const kmMatch = textForAI.match(/km\s*[:=]\s*([\d.]+)/i);
-          
-          // Manutenção: capture the FULL value after the colon (not just sim/não)
           const manutencaoFullMatch = textForAI.match(/manuten[cç][aã]o\s*[:=]\s*(.+?)(?:\n|$)/i);
           const manutencaoValue = manutencaoFullMatch ? manutencaoFullMatch[1].trim() : null;
-          
-          // Determine if needs maintenance: "não", "nao", "n", "_", "-" = false; anything else = true
-          const isNoMaintenance = manutencaoValue 
-            ? /^(n[aã]o|n|_|-|nenhuma|nenhum|não precisa)$/i.test(manutencaoValue)
-            : false;
-          const needsMaintenance = manutencaoValue ? !isNoMaintenance : false;
-          
-          // The maintenance description is the value itself if it's not just "sim"
-          const maintenanceDescription = (manutencaoValue && !/^(sim|s|n[aã]o|n|_|-)$/i.test(manutencaoValue)) 
-            ? manutencaoValue : null;
-          
-          // Descrição field (separate, optional)
+          const isNoMaintenance = manutencaoValue ? /^(n[aã]o|n|_|-|nenhuma|nenhum|não precisa)$/i.test(manutencaoValue) : false;
+          const needsMaintenance = manutencaoValue ? !isNoMaintenance : null;
+          const maintenanceDescription = (manutencaoValue && !/^(sim|s|n[aã]o|n|_|-)$/i.test(manutencaoValue)) ? manutencaoValue : null;
           const descricaoMatch = textForAI.match(/descri[cç][aã]o\s*[:=]\s*(.+?)(?:\n|$)/i);
           const descricaoValue = descricaoMatch ? descricaoMatch[1].trim() : null;
-          
-          // Ferramentas: capture the FULL value
           const ferramentasFullMatch = textForAI.match(/ferramenta[s]?\s*[:=]\s*(.+?)(?:\n|$)/i);
           const ferramentasValue = ferramentasFullMatch ? ferramentasFullMatch[1].trim() : null;
-          
-          // Determine if tools are OK
-          const toolsOk = ferramentasValue 
-            ? /^(sim|s|ok|completa[s]?|tudo ok|tudo certo|_|-)$/i.test(ferramentasValue)
-            : null;
-          
-          // Tools description if not just sim/não
-          const toolsDescription = (ferramentasValue && !/^(sim|s|n[aã]o|n|ok|completa[s]?|tudo ok|tudo certo|_|-)$/i.test(ferramentasValue))
-            ? ferramentasValue : null;
-          
-          // Observação ferramentas (separate, optional)
+          const toolsOk = ferramentasValue ? /^(sim|s|ok|completa[s]?|tudo ok|tudo certo|_|-)$/i.test(ferramentasValue) : null;
+          const toolsDescription = (ferramentasValue && !/^(sim|s|n[aã]o|n|ok|completa[s]?|tudo ok|tudo certo|_|-)$/i.test(ferramentasValue)) ? ferramentasValue : null;
           const obsFerramentasMatch = textForAI.match(/observa[cç][aã]o\s*ferramenta[s]?\s*[:=]\s*(.+?)(?:\n|$)/i);
           const obsFerramentasValue = obsFerramentasMatch ? obsFerramentasMatch[1].trim() : null;
-
           const kmValue = kmMatch ? Math.round(Number(kmMatch[1].replace(/\./g, ""))) : null;
-          
-          // Build description combining all info
-          let fullDescription = "";
+
           const effectiveDescription = maintenanceDescription || (descricaoValue && descricaoValue !== "_" && descricaoValue !== "-" ? descricaoValue : null);
-          if (effectiveDescription) {
-            fullDescription += `Manutenção: ${effectiveDescription}`;
-          }
-          
           const effectiveToolsObs = toolsDescription || (obsFerramentasValue && obsFerramentasValue !== "_" && obsFerramentasValue !== "-" ? obsFerramentasValue : null);
-          if (effectiveToolsObs) {
-            if (fullDescription) fullDescription += "\n";
-            fullDescription += `Ferramentas: ${effectiveToolsObs}`;
-          } else if (toolsOk === true) {
-            if (fullDescription) fullDescription += "\n";
-            fullDescription += "Ferramentas: OK";
-          } else if (toolsOk === false) {
-            if (fullDescription) fullDescription += "\n";
-            fullDescription += "Ferramentas: Incompletas";
-          }
 
-          // Update the check-in record
-          const updateData: any = { status: "answered" };
-          if (kmValue) updateData.km_reported = kmValue;
-          updateData.needs_maintenance = needsMaintenance;
-          if (fullDescription) updateData.description = fullDescription;
-
-          await supabase
-            .from("fleet_checkins")
-            .update(updateData)
-            .eq("id", pendingCheckin.id);
-
-          // Update vehicle KM if provided
-          if (kmValue) {
-            await supabase
-              .from("fleet_vehicles")
-              .update({ current_km: kmValue } as any)
-              .eq("id", pendingCheckin.vehicle_id);
-          }
-
-          // Build response message
-          let responseMsg = "✅ *Check-in registrado com sucesso!*\n\n";
-          if (kmValue) responseMsg += `🔢 *KM:* ${kmValue.toLocaleString("pt-BR")} km\n`;
-          responseMsg += `🔧 *Manutenção:* ${needsMaintenance ? "Sim ⚠️" : "Não ✅"}\n`;
-          if (effectiveDescription) {
-            responseMsg += `📝 *Descrição:* ${effectiveDescription}\n`;
-          }
-          if (ferramentasValue) {
-            if (toolsOk === true) {
-              responseMsg += `🧰 *Ferramentas:* Completas ✅\n`;
-            } else if (effectiveToolsObs) {
-              responseMsg += `🧰 *Ferramentas:* ${effectiveToolsObs}\n`;
-            } else {
-              responseMsg += `🧰 *Ferramentas:* Incompletas ⚠️\n`;
-            }
-          }
-          responseMsg += "\nObrigado pelo retorno! 👍";
-
-          // If needs maintenance, create a task automatically
-          if (needsMaintenance) {
-            try {
-              const { data: fleetSettings } = await supabase
-                .from("fleet_settings")
-                .select("default_board_id, default_assignee_id, default_task_deadline_days")
-                .limit(1)
-                .maybeSingle();
-
-              if (fleetSettings?.default_board_id) {
-                const { data: firstCol } = await supabase
-                  .from("board_columns")
-                  .select("id")
-                  .eq("board_id", fleetSettings.default_board_id)
-                  .order("position", { ascending: true })
-                  .limit(1)
-                  .maybeSingle();
-
-                if (firstCol) {
-                  const { data: vehicle } = await supabase
-                    .from("fleet_vehicles")
-                    .select("name, plate")
-                    .eq("id", pendingCheckin.vehicle_id)
-                    .maybeSingle();
-
-                  const deadlineDays = fleetSettings.default_task_deadline_days || 3;
-                  const dueDate = new Date();
-                  dueDate.setDate(dueDate.getDate() + deadlineDays);
-
-                  const taskTitle = `Manutenção - ${vehicle?.name || "Veículo"} (${vehicle?.plate || ""})`;
-                  const taskDesc = effectiveDescription || "Motorista reportou necessidade de manutenção no check-in semanal.";
-
-                  await supabase.from("tasks").insert({
-                    column_id: firstCol.id,
-                    title: taskTitle,
-                    description: taskDesc,
-                    priority: "medium",
-                    due_date: dueDate.toISOString(),
-                    assignee_id: fleetSettings.default_assignee_id || userProfile.user_id,
-                    created_by: userProfile.user_id,
-                  } as any);
-
-                  responseMsg += `\n📋 *Tarefa de manutenção criada automaticamente!*`;
-                }
-              }
-            } catch (taskErr: any) {
-              console.error("Error creating maintenance task:", taskErr);
-            }
-          }
+          // Call unified handler
+          const responseMsg = await handleCheckinUpdate(supabase, userProfile, pendingCheckin, {
+            km: kmValue,
+            manutencao: needsMaintenance,
+            descricao_manutencao: effectiveDescription,
+            ferramentas_ok: toolsOk,
+            observacao_ferramentas: effectiveToolsObs,
+          });
 
           await sendWhatsApp(supabase, cleanPhone, responseMsg);
-
           await supabase.from("whatsapp_chat_history").insert({
             user_id: userProfile.user_id,
             phone: cleanPhone,
@@ -709,11 +593,59 @@ Não inclua nenhum texto fora do JSON.`,
             content: responseMsg,
           });
 
-          return new Response(JSON.stringify({ ok: true, action: "checkin_response", km: kmValue }), {
+          return new Response(JSON.stringify({ ok: true, action: "checkin_response" }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
       }
+    }
+
+    // ─── CHECK-IN CONTEXT INJECTION ───
+    // Before calling the AI, check if user has a recent check-in and inject context
+    let checkinContextPrompt = "";
+    const { data: recentCheckin } = await supabase
+      .from("fleet_checkins")
+      .select("id, vehicle_id, km_reported, needs_maintenance, description, tools_ok, tools_description, status")
+      .eq("driver_user_id", userProfile.user_id)
+      .in("status", ["pending", "answered"])
+      .gte("checkin_date", todayStr)
+      .order("checkin_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (recentCheckin) {
+      // Get vehicle info
+      const { data: checkinVehicle } = await supabase
+        .from("fleet_vehicles")
+        .select("name, plate")
+        .eq("id", recentCheckin.vehicle_id)
+        .maybeSingle();
+
+      const vehicleName = checkinVehicle ? `${checkinVehicle.name} (${checkinVehicle.plate})` : "veículo";
+      const filledFields: string[] = [];
+      const missingFields: string[] = [];
+
+      if (recentCheckin.km_reported) filledFields.push(`KM: ${recentCheckin.km_reported}`);
+      else missingFields.push("KM (quilometragem)");
+
+      if (recentCheckin.needs_maintenance !== null) filledFields.push(`Manutenção: ${recentCheckin.needs_maintenance ? "Sim" : "Não"}`);
+      else missingFields.push("Manutenção (sim/não e descrição do problema)");
+
+      if (recentCheckin.tools_ok !== null) filledFields.push(`Ferramentas: ${recentCheckin.tools_ok ? "OK" : "Incompletas"}`);
+      else missingFields.push("Ferramentas (completas sim/não)");
+
+      checkinContextPrompt = `\n\n🚨 CONTEXTO IMPORTANTE: Este usuário tem um CHECK-IN DE FROTA em andamento para o veículo ${vehicleName}.
+Campos já preenchidos: ${filledFields.length > 0 ? filledFields.join(", ") : "nenhum"}
+Campos faltando: ${missingFields.length > 0 ? missingFields.join(", ") : "nenhum (check-in completo)"}
+
+Se a mensagem do usuário parecer uma RESPOSTA ao check-in (falando sobre KM, manutenção, problemas no veículo, ferramentas, ou qualquer descrição de problema mecânico/elétrico), use a ferramenta "responder_checkin_frota" em vez de criar tarefas.
+Exemplos de respostas de check-in:
+- "Barulho na suspensão" → responder_checkin_frota(manutencao=true, descricao_manutencao="Barulho na suspensão")
+- "Tudo ok" ou "Não precisa" → responder_checkin_frota(manutencao=false)
+- "Sim" (se falta manutenção) → responder_checkin_frota(manutencao=true) ou responder_checkin_frota(ferramentas_ok=true) dependendo do que falta
+- "Falta chave de roda" → responder_checkin_frota(ferramentas_ok=false, observacao_ferramentas="Falta chave de roda")
+- "45230" ou "KM 45230" → responder_checkin_frota(km=45230)
+IMPORTANTE: NÃO crie tarefas Kanban com o conteúdo do check-in!`;
     }
 
     // Call Lovable AI to interpret the command
@@ -726,7 +658,7 @@ Não inclua nenhum texto fora do JSON.`,
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
+          { role: "system", content: SYSTEM_PROMPT + checkinContextPrompt },
           ...historyMessages,
           { role: "user", content: textForAI },
         ],
