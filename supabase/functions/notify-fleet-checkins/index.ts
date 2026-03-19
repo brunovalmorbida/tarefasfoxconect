@@ -163,17 +163,11 @@ Deno.serve(async (req) => {
 
 Por favor, responda com as seguintes informações:
 
-1️⃣ *KM atual:*
-2️⃣ *Precisa de manutenção?* (sim ou não)
-3️⃣ *Descrição* (se precisar de manutenção, descreva o problema)
-4️⃣ *Ferramentas:* Todas as ferramentas estão completas? (sim ou não, se não, descreva o que está faltando)
+1️⃣ *KM:* Envie uma foto do painel ou digite a quilometragem
+2️⃣ *Manutenção:* Precisa de manutenção? (sim/não, ou descreva o problema)
+3️⃣ *Ferramentas:* Todas completas? (sim/não, ou diga o que falta)
 
-Responda neste formato:
-KM: ___
-Manutenção: sim/não
-Descrição: ___
-Ferramentas: sim/não
-Observação ferramentas: ___`;
+Você pode responder tudo de uma vez ou em mensagens separadas!`;
 
     const template = settings.checkin_message_template || defaultTemplate;
 
