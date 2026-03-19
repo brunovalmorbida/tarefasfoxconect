@@ -154,7 +154,14 @@ Deno.serve(async (req) => {
     const { data: legacyDrivers } = driverIds.length > 0
       ? await adminClient.from("fleet_drivers").select("id, name, phone").in("id", driverIds)
       : { data: [] };
+
+    const vehicleIds = [...new Set(vehicles.map(v => v.id))];
+    const { data: driversByVehicle } = vehicleIds.length > 0
+      ? await adminClient.from("fleet_drivers").select("id, name, phone, vehicle_id").in("vehicle_id", vehicleIds)
+      : { data: [] };
+
     const legacyDriverMap = new Map((legacyDrivers || []).map(d => [d.id, d]));
+    const vehicleDriverMap = new Map((driversByVehicle || []).map(d => [d.vehicle_id, d]));
 
     // 7. Message template
     const defaultTemplate = `Bom dia, {nome}! 👋
@@ -171,7 +178,9 @@ Você pode responder tudo de uma vez ou em mensagens separadas!`;
 
     const template = settings.checkin_message_template || defaultTemplate;
 
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const _now3 = new Date();
+    const _brtNow2 = new Date(_now3.getTime() + (-3 * 60 + _now3.getTimezoneOffset()) * 60000);
+    const todayStr = _brtNow2.toISOString().slice(0, 10);
     const results: Array<{ vehicle: string; driver: string; phone: string; status: string; error?: string }> = [];
 
     for (const vehicle of vehicles) {
@@ -209,14 +218,87 @@ Você pode responder tudo de uma vez ou em mensagens separadas!`;
         const responseData = await response.json();
 
         if (response.ok) {
-          // Create pending checkin record
-          await adminClient.from("fleet_checkins").insert({
-            vehicle_id: vehicle.id,
-            driver_id: vehicle.driver_id || vehicle.id, // fallback
-            driver_user_id: vehicle.driver_user_id,
-            checkin_date: todayStr,
-            status: "pending",
-          });
+          // Resolve driver_id required by fleet_checkins (legacy FK)
+          let resolvedDriverId = vehicle.driver_id || vehicleDriverMap.get(vehicle.id)?.id || null;
+
+          if (!resolvedDriverId && vehicle.driver_user_id) {
+            const { data: createdDriver, error: createDriverError } = await adminClient
+              .from("fleet_drivers")
+              .insert({
+                name: driverName,
+                phone,
+                created_by: vehicle.driver_user_id,
+                vehicle_id: vehicle.id,
+                status: "active",
+              })
+              .select("id, name, phone, vehicle_id")
+              .single();
+
+            if (createDriverError || !createdDriver) {
+              results.push({
+                vehicle: vehicle.name,
+                driver: driverName,
+                phone,
+                status: "error",
+                error: `Falha ao criar motorista legado: ${createDriverError?.message || "sem retorno"}`,
+              });
+              continue;
+            }
+
+            resolvedDriverId = createdDriver.id;
+            vehicleDriverMap.set(vehicle.id, createdDriver);
+
+            // Keep vehicle linked for future runs
+            await adminClient
+              .from("fleet_vehicles")
+              .update({ driver_id: resolvedDriverId })
+              .eq("id", vehicle.id);
+          }
+
+          if (!resolvedDriverId) {
+            results.push({
+              vehicle: vehicle.name,
+              driver: driverName,
+              phone,
+              status: "error",
+              error: "Sem driver_id para criar check-in pendente",
+            });
+            continue;
+          }
+
+          const { data: existingTodayCheckin } = await adminClient
+            .from("fleet_checkins")
+            .select("id")
+            .eq("vehicle_id", vehicle.id)
+            .eq("checkin_date", todayStr)
+            .limit(1)
+            .maybeSingle();
+
+          if (!existingTodayCheckin) {
+            const { error: insertCheckinError } = await adminClient.from("fleet_checkins").insert({
+              vehicle_id: vehicle.id,
+              driver_id: resolvedDriverId,
+              driver_user_id: vehicle.driver_user_id,
+              checkin_date: todayStr,
+              km_reported: null,
+              needs_maintenance: null,
+              tools_ok: null,
+              description: null,
+              tools_description: null,
+              status: "pending",
+            });
+
+            if (insertCheckinError) {
+              results.push({
+                vehicle: vehicle.name,
+                driver: driverName,
+                phone,
+                status: "error",
+                error: `Falha ao criar check-in pendente: ${insertCheckinError.message}`,
+              });
+              continue;
+            }
+          }
 
           results.push({ vehicle: vehicle.name, driver: driverName, phone, status: "sent" });
         } else {
