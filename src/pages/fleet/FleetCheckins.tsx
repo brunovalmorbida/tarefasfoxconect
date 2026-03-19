@@ -8,13 +8,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { useFleetCheckins, useFleetVehicles, FleetCheckin } from "@/hooks/useFleet";
+import { useFleetCheckins, useFleetVehicles, useFleetMaintenances, FleetCheckin } from "@/hooks/useFleet";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Search, ClipboardCheck, AlertTriangle, CheckCircle2, Clock, Car } from "lucide-react";
+import { Plus, Search, ClipboardCheck, AlertTriangle, CheckCircle2, Clock, Car, Wrench, Hammer, PackageOpen } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
 
 const STATUS_MAP: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: any }> = {
   pending: { label: "Pendente", variant: "outline", icon: Clock },
@@ -28,8 +30,10 @@ interface DriverProfile {
 }
 
 export default function FleetCheckins() {
+  const { user } = useAuth();
   const { checkins, isLoading, createCheckin, updateCheckin } = useFleetCheckins();
   const { vehicles } = useFleetVehicles();
+  const { createMaintenance } = useFleetMaintenances();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<FleetCheckin | null>(null);
   const [search, setSearch] = useState("");
@@ -109,6 +113,29 @@ export default function FleetCheckins() {
     setDialogOpen(false); resetForm(); setEditing(null);
   };
 
+  const handleCreateMaintenance = async (c: FleetCheckin, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const vehicle = vehicles.find(v => v.id === c.vehicle_id);
+    const parts: string[] = [];
+    if (c.description) parts.push(c.description);
+    const toolsDesc = (c as any).tools_description;
+    if (toolsDesc) parts.push(`Ferramentas: ${toolsDesc}`);
+
+    try {
+      await createMaintenance.mutateAsync({
+        vehicle_id: c.vehicle_id,
+        maintenance_type: "corrective",
+        maintenance_date: c.checkin_date,
+        km_at_maintenance: c.km_reported || undefined,
+        description: parts.join("\n") || `Manutenção reportada no check-in de ${format(new Date(c.checkin_date), "dd/MM/yyyy")}`,
+        status: "pending",
+      } as any);
+      toast.success(`Manutenção criada para ${vehicle?.name || "veículo"}`);
+    } catch {
+      toast.error("Erro ao criar manutenção");
+    }
+  };
+
   const getDriverName = (checkin: FleetCheckin) => {
     const duid = (checkin as any).driver_user_id;
     if (duid) {
@@ -171,6 +198,10 @@ export default function FleetCheckins() {
           {filtered.map(c => {
             const statusInfo = STATUS_MAP[c.status] || STATUS_MAP.pending;
             const StatusIcon = statusInfo.icon;
+            const toolsOk = (c as any).tools_ok;
+            const toolsDescription = (c as any).tools_description;
+            const hasIssues = c.needs_maintenance || toolsOk === false;
+
             return (
               <Card key={c.id} className="hover:shadow-md transition-shadow cursor-pointer group" onClick={() => openEdit(c)}>
                 <CardContent className="p-4 space-y-3">
@@ -202,15 +233,55 @@ export default function FleetCheckins() {
                     )}
                   </div>
 
+                  {/* Manutenção section */}
                   {c.needs_maintenance && (
-                    <div className="flex items-center gap-1.5 text-destructive bg-destructive/10 rounded-md px-2.5 py-1.5 text-xs font-medium">
-                      <AlertTriangle className="h-3.5 w-3.5" />
-                      Manutenção necessária
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5 text-destructive bg-destructive/10 rounded-md px-2.5 py-1.5 text-xs font-medium">
+                        <Wrench className="h-3.5 w-3.5" />
+                        Manutenção necessária
+                      </div>
+                      {c.description && (
+                        <p className="text-xs text-muted-foreground pl-1">🔧 {c.description}</p>
+                      )}
                     </div>
                   )}
 
-                  {c.description && (
+                  {/* Ferramentas section */}
+                  {toolsOk === false && (
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5 text-amber-700 bg-amber-100 dark:text-amber-400 dark:bg-amber-900/30 rounded-md px-2.5 py-1.5 text-xs font-medium">
+                        <PackageOpen className="h-3.5 w-3.5" />
+                        Ferramentas incompletas
+                      </div>
+                      {toolsDescription && (
+                        <p className="text-xs text-muted-foreground pl-1">🧰 {toolsDescription}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {toolsOk === true && (
+                    <div className="flex items-center gap-1.5 text-emerald-700 bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-900/30 rounded-md px-2.5 py-1.5 text-xs font-medium">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      Ferramentas completas
+                    </div>
+                  )}
+
+                  {/* Description without maintenance context */}
+                  {c.description && !c.needs_maintenance && (
                     <p className="text-xs text-muted-foreground line-clamp-2 border-t pt-2">{c.description}</p>
+                  )}
+
+                  {/* Triage button */}
+                  {hasIssues && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full gap-1.5 text-xs border-destructive/30 text-destructive hover:bg-destructive/10"
+                      onClick={(e) => handleCreateMaintenance(c, e)}
+                    >
+                      <Hammer className="h-3.5 w-3.5" />
+                      Criar Manutenção
+                    </Button>
                   )}
                 </CardContent>
               </Card>

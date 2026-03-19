@@ -893,7 +893,15 @@ async function handleCheckinUpdate(
             dueDate.setDate(dueDate.getDate() + deadlineDays);
 
             const taskTitle = `Manutenção - ${vehicle?.name || "Veículo"} (${vehicle?.plate || ""})`;
-            const taskDesc = newDescription || "Motorista reportou necessidade de manutenção no check-in semanal.";
+            let taskDesc = `📋 *Check-in semanal — ${vehicleName}*\n\n`;
+            taskDesc += `🔧 *Manutenção:* ${newDescription || "Motorista reportou necessidade de manutenção."}\n`;
+            if (newToolsOk === false && newToolsDesc) {
+              taskDesc += `🧰 *Ferramentas incompletas:* ${newToolsDesc}\n`;
+            } else if (newToolsOk === false) {
+              taskDesc += `🧰 *Ferramentas:* Incompletas\n`;
+            }
+            if (newKm != null) taskDesc += `📍 *KM:* ${newKm.toLocaleString("pt-BR")}\n`;
+            taskDesc += `\nMotorista: ${userProfile.name}`;
 
             await supabase.from("tasks").insert({
               column_id: firstCol.id,
