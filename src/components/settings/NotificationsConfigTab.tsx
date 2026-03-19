@@ -6,7 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { Bell, Loader2, Send, Clock, AlertTriangle, CalendarClock, CheckCircle2, ShoppingCart } from "lucide-react";
+import { Bell, Loader2, Send, Clock, AlertTriangle, CalendarClock, CheckCircle2, ShoppingCart, Car } from "lucide-react";
 import { PurchaseNotificationsConfig } from "./PurchaseNotificationsConfig";
 
 export function NotificationsConfigTab() {
