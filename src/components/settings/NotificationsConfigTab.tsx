@@ -16,11 +16,13 @@ export function NotificationsConfigTab() {
   const [sendingRecurring, setSendingRecurring] = useState(false);
   const [sendingPurchaseReminders, setSendingPurchaseReminders] = useState(false);
   const [sendingEndOfDay, setSendingEndOfDay] = useState(false);
+  const [sendingFleetCheckin, setSendingFleetCheckin] = useState(false);
   const [overdueResult, setOverdueResult] = useState<any>(null);
   const [dueResult, setDueResult] = useState<any>(null);
   const [recurringResult, setRecurringResult] = useState<any>(null);
   const [purchaseReminderResult, setPurchaseReminderResult] = useState<any>(null);
   const [endOfDayResult, setEndOfDayResult] = useState<any>(null);
+  const [fleetCheckinResult, setFleetCheckinResult] = useState<any>(null);
 
   const { data: zapiConfig, isLoading } = useQuery({
     queryKey: ["zapi-config"],
