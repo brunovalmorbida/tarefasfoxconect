@@ -48,10 +48,12 @@ Deno.serve(async (req) => {
     // Parse body for test mode
     let testMode = false;
     let testPhone = "";
+    let testVehicleIds: string[] = [];
     try {
       const body = await req.json();
       testMode = body?.testMode === true;
       testPhone = body?.testPhone || "";
+      testVehicleIds = body?.vehicleIds || [];
     } catch {
       // No body (cron call)
     }
