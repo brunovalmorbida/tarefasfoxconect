@@ -538,31 +538,63 @@ Não inclua nenhum texto fora do JSON.`,
           .maybeSingle();
 
         if (pendingCheckin) {
-          // Parse the check-in fields
+          // Parse the check-in fields flexibly
           const kmMatch = textForAI.match(/km\s*[:=]\s*([\d.]+)/i);
-          const manutencaoMatch = textForAI.match(/manuten[cç][aã]o\s*[:=]\s*(sim|n[aã]o|s|n)/i);
+          
+          // Manutenção: capture the FULL value after the colon (not just sim/não)
+          const manutencaoFullMatch = textForAI.match(/manuten[cç][aã]o\s*[:=]\s*(.+?)(?:\n|$)/i);
+          const manutencaoValue = manutencaoFullMatch ? manutencaoFullMatch[1].trim() : null;
+          
+          // Determine if needs maintenance: "não", "nao", "n", "_", "-" = false; anything else = true
+          const isNoMaintenance = manutencaoValue 
+            ? /^(n[aã]o|n|_|-|nenhuma|nenhum|não precisa)$/i.test(manutencaoValue)
+            : false;
+          const needsMaintenance = manutencaoValue ? !isNoMaintenance : false;
+          
+          // The maintenance description is the value itself if it's not just "sim"
+          const maintenanceDescription = (manutencaoValue && !/^(sim|s|n[aã]o|n|_|-)$/i.test(manutencaoValue)) 
+            ? manutencaoValue : null;
+          
+          // Descrição field (separate, optional)
           const descricaoMatch = textForAI.match(/descri[cç][aã]o\s*[:=]\s*(.+?)(?:\n|$)/i);
-          const ferramentasMatch = textForAI.match(/ferramenta[s]?\s*[:=]\s*(sim|n[aã]o|s|n|ok|completa[s]?)/i);
+          const descricaoValue = descricaoMatch ? descricaoMatch[1].trim() : null;
+          
+          // Ferramentas: capture the FULL value
+          const ferramentasFullMatch = textForAI.match(/ferramenta[s]?\s*[:=]\s*(.+?)(?:\n|$)/i);
+          const ferramentasValue = ferramentasFullMatch ? ferramentasFullMatch[1].trim() : null;
+          
+          // Determine if tools are OK
+          const toolsOk = ferramentasValue 
+            ? /^(sim|s|ok|completa[s]?|tudo ok|tudo certo|_|-)$/i.test(ferramentasValue)
+            : null;
+          
+          // Tools description if not just sim/não
+          const toolsDescription = (ferramentasValue && !/^(sim|s|n[aã]o|n|ok|completa[s]?|tudo ok|tudo certo|_|-)$/i.test(ferramentasValue))
+            ? ferramentasValue : null;
+          
+          // Observação ferramentas (separate, optional)
           const obsFerramentasMatch = textForAI.match(/observa[cç][aã]o\s*ferramenta[s]?\s*[:=]\s*(.+?)(?:\n|$)/i);
+          const obsFerramentasValue = obsFerramentasMatch ? obsFerramentasMatch[1].trim() : null;
 
           const kmValue = kmMatch ? Math.round(Number(kmMatch[1].replace(/\./g, ""))) : null;
-          const needsMaintenance = manutencaoMatch ? /^(sim|s)$/i.test(manutencaoMatch[1]) : false;
-          const description = descricaoMatch ? descricaoMatch[1].trim() : null;
-          const toolsOk = ferramentasMatch ? /^(sim|s|ok|completa[s]?)$/i.test(ferramentasMatch[1]) : null;
-          const toolsObs = obsFerramentasMatch ? obsFerramentasMatch[1].trim() : null;
-
-          // Build description combining maintenance + tools info
+          
+          // Build description combining all info
           let fullDescription = "";
-          if (description && description !== "_" && description !== "-") {
-            fullDescription += `Manutenção: ${description}`;
+          const effectiveDescription = maintenanceDescription || (descricaoValue && descricaoValue !== "_" && descricaoValue !== "-" ? descricaoValue : null);
+          if (effectiveDescription) {
+            fullDescription += `Manutenção: ${effectiveDescription}`;
           }
-          if (toolsOk === false || (toolsObs && toolsObs !== "_" && toolsObs !== "-")) {
+          
+          const effectiveToolsObs = toolsDescription || (obsFerramentasValue && obsFerramentasValue !== "_" && obsFerramentasValue !== "-" ? obsFerramentasValue : null);
+          if (effectiveToolsObs) {
             if (fullDescription) fullDescription += "\n";
-            fullDescription += `Ferramentas: ${toolsOk === false ? "Incompletas" : "OK"}`;
-            if (toolsObs) fullDescription += ` - ${toolsObs}`;
+            fullDescription += `Ferramentas: ${effectiveToolsObs}`;
           } else if (toolsOk === true) {
             if (fullDescription) fullDescription += "\n";
             fullDescription += "Ferramentas: OK";
+          } else if (toolsOk === false) {
+            if (fullDescription) fullDescription += "\n";
+            fullDescription += "Ferramentas: Incompletas";
           }
 
           // Update the check-in record
@@ -588,14 +620,17 @@ Não inclua nenhum texto fora do JSON.`,
           let responseMsg = "✅ *Check-in registrado com sucesso!*\n\n";
           if (kmValue) responseMsg += `🔢 *KM:* ${kmValue.toLocaleString("pt-BR")} km\n`;
           responseMsg += `🔧 *Manutenção:* ${needsMaintenance ? "Sim ⚠️" : "Não ✅"}\n`;
-          if (description && description !== "_" && description !== "-") {
-            responseMsg += `📝 *Descrição:* ${description}\n`;
+          if (effectiveDescription) {
+            responseMsg += `📝 *Descrição:* ${effectiveDescription}\n`;
           }
-          if (toolsOk !== null) {
-            responseMsg += `🧰 *Ferramentas:* ${toolsOk ? "Completas ✅" : "Incompletas ⚠️"}\n`;
-          }
-          if (toolsObs && toolsObs !== "_" && toolsObs !== "-") {
-            responseMsg += `📋 *Obs. ferramentas:* ${toolsObs}\n`;
+          if (ferramentasValue) {
+            if (toolsOk === true) {
+              responseMsg += `🧰 *Ferramentas:* Completas ✅\n`;
+            } else if (effectiveToolsObs) {
+              responseMsg += `🧰 *Ferramentas:* ${effectiveToolsObs}\n`;
+            } else {
+              responseMsg += `🧰 *Ferramentas:* Incompletas ⚠️\n`;
+            }
           }
           responseMsg += "\nObrigado pelo retorno! 👍";
 
