@@ -343,17 +343,42 @@ export default function FleetCheckins() {
               <Switch checked={form.needs_maintenance} onCheckedChange={v => setForm(f => ({ ...f, needs_maintenance: v }))} />
               <Label>Precisa de manutenção</Label>
             </div>
-            <div><Label>Descrição / Observações</Label><Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={3} /></div>
-            <div>
-              <Label>Status</Label>
-              <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">Pendente</SelectItem>
-                  <SelectItem value="answered">Respondido</SelectItem>
-                  <SelectItem value="overdue">Atrasado</SelectItem>
-                </SelectContent>
-              </Select>
+            <div><Label>Descrição / Observações (Manutenção)</Label><Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} /></div>
+            
+            <div className="border-t pt-3 space-y-3">
+              <Label className="text-sm font-semibold flex items-center gap-1.5"><PackageOpen className="h-4 w-4" /> Ferramentas</Label>
+              <div className="flex items-center gap-3">
+                <Switch checked={form.tools_ok} onCheckedChange={v => setForm(f => ({ ...f, tools_ok: v }))} />
+                <Label>{form.tools_ok ? "Ferramentas completas" : "Ferramentas incompletas"}</Label>
+              </div>
+              {!form.tools_ok && (
+                <div><Label>Descrição das ferramentas</Label><Textarea value={form.tools_description} onChange={e => setForm(f => ({ ...f, tools_description: e.target.value }))} rows={2} placeholder="Quais ferramentas estão faltando ou com problema?" /></div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 border-t pt-3">
+              <div>
+                <Label>Status do Check-in</Label>
+                <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pendente</SelectItem>
+                    <SelectItem value="answered">Respondido</SelectItem>
+                    <SelectItem value="overdue">Atrasado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Triagem</Label>
+                <Select value={form.resolution_status} onValueChange={v => setForm(f => ({ ...f, resolution_status: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="open">Em aberto</SelectItem>
+                    <SelectItem value="scheduled">Manutenção agendada</SelectItem>
+                    <SelectItem value="resolved">Resolvido</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <Button onClick={handleSubmit} disabled={!form.vehicle_id || !form.driver_user_id}>
               {editing ? "Salvar" : "Registrar"}
