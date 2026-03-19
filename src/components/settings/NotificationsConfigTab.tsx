@@ -139,6 +139,26 @@ export function NotificationsConfigTab() {
     }
   };
 
+  const handleSendFleetCheckin = async () => {
+    setSendingFleetCheckin(true);
+    setFleetCheckinResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("notify-fleet-checkins", { body: { testMode: true } });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setFleetCheckinResult(data);
+      toast({
+        title: data.sent > 0
+          ? `${data.sent} check-in(s) enviado(s)!`
+          : data.message || "Nenhum motorista para notificar.",
+      });
+    } catch (e: any) {
+      toast({ title: "Erro ao enviar", description: e.message, variant: "destructive" });
+    } finally {
+      setSendingFleetCheckin(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center py-8">
