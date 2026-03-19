@@ -27,7 +27,11 @@
 - **Tarefas automáticas detalhadas**: tarefas criadas no Kanban incluem descrição completa de manutenção e ferramentas
 - **Página de detalhes do veículo**: timeline de histórico, documentos anexados, alertas de vencimento
 
-## Próximos Passos
-- Dashboard analítico avançado da frota (custos, tendências de KM, histórico de manutenções)
-- Relatórios exportáveis (PDF/CSV) de check-ins e manutenções
-- Integração de abastecimento (controle de combustível por veículo)
+## V3.1 — Refinamento Visual & Prevenção (Próximo)
+- **Melhorias visuais**: redesign de cards, dashboards e responsividade mobile
+- **Manutenção preventiva**: alertas automáticos baseados em KM, tempo desde última manutenção e histórico do veículo
+- **Dashboard analítico da frota**: custos, tendências de KM, histórico de manutenções
+- **Relatórios exportáveis** (PDF/CSV) de check-ins e manutenções
+- **Integração de abastecimento**: controle de combustível por veículo
+
+⚠️ **Regra de estabilidade V3.1+**: Nenhuma alteração pode quebrar funcionalidades consolidadas na V3.0. Todas as mudanças devem ser aditivas ou isoladas em novos componentes.
