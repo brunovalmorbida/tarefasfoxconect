@@ -240,10 +240,14 @@ Deno.serve(async (req) => {
     // Z-API webhook format
     const phone = body.phone || body.from;
     const messageText = body.text?.message || body.body || body.message?.text || "";
+    const imageUrl = body.image?.imageUrl || null;
+    const imageCaption = body.image?.caption || "";
 
-    if (!phone || !messageText) {
+    // Allow either text or image messages
+    if (!phone || (!messageText && !imageUrl)) {
       return new Response(JSON.stringify({ ok: true, skipped: "no message" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
       });
     }
 
@@ -380,12 +384,140 @@ Deno.serve(async (req) => {
     }
 
     // Save current user message to history
+    const displayText = imageUrl ? (imageCaption || "[Foto enviada]") : messageText;
     await supabase.from("whatsapp_chat_history").insert({
       user_id: userProfile.user_id,
       phone: cleanPhone,
       role: "user",
-      content: messageText,
+      content: displayText,
     });
+
+    // ─── IMAGE HANDLING: Fleet KM photo reading ───
+    if (imageUrl) {
+      try {
+        // Check if user has a pending fleet check-in
+        const { data: pendingCheckin } = await supabase
+          .from("fleet_checkins")
+          .select("id, vehicle_id")
+          .eq("driver_user_id", userProfile.user_id)
+          .eq("status", "pending")
+          .order("checkin_date", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        // Use Gemini vision to read the KM from the dashboard photo
+        const visionResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${lovableApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash",
+            messages: [
+              {
+                role: "system",
+                content: `Você é um assistente que analisa fotos de painéis de veículos para extrair a quilometragem (KM).
+Analise a imagem e retorne APENAS um JSON no formato: {"km": numero, "confianca": "alta"|"media"|"baixa", "observacao": "texto opcional"}
+Se não conseguir identificar a KM, retorne: {"km": null, "confianca": "nenhuma", "observacao": "motivo"}
+Não inclua nenhum texto fora do JSON.`,
+              },
+              {
+                role: "user",
+                content: [
+                  { type: "text", text: imageCaption ? `A legenda da foto é: "${imageCaption}". Extraia a KM do painel do veículo.` : "Extraia a KM do painel do veículo nesta foto." },
+                  { type: "image_url", image_url: { url: imageUrl } },
+                ],
+              },
+            ],
+          }),
+        });
+
+        if (visionResponse.ok) {
+          const visionData = await visionResponse.json();
+          const visionText = visionData.choices?.[0]?.message?.content || "";
+          
+          // Extract JSON from response
+          const jsonMatch = visionText.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const kmResult = JSON.parse(jsonMatch[0]);
+            
+            if (kmResult.km !== null && kmResult.km !== undefined) {
+              const kmValue = Math.round(Number(kmResult.km));
+              
+              let responseMsg = `📸 *Leitura de KM por foto*\n\n`;
+              responseMsg += `🔢 *KM identificado:* ${kmValue.toLocaleString("pt-BR")} km\n`;
+              responseMsg += `📊 *Confiança:* ${kmResult.confianca === "alta" ? "✅ Alta" : kmResult.confianca === "media" ? "⚠️ Média" : "❓ Baixa"}\n`;
+              if (kmResult.observacao) responseMsg += `💬 ${kmResult.observacao}\n`;
+
+              if (pendingCheckin) {
+                // Update the pending check-in with the KM
+                await supabase
+                  .from("fleet_checkins")
+                  .update({ km_reported: kmValue, status: "answered" } as any)
+                  .eq("id", pendingCheckin.id);
+                
+                // Also update vehicle current_km
+                await supabase
+                  .from("fleet_vehicles")
+                  .update({ current_km: kmValue } as any)
+                  .eq("id", pendingCheckin.vehicle_id);
+
+                responseMsg += `\n✅ Check-in atualizado com sucesso!`;
+                responseMsg += `\n\nAgora responda as outras perguntas do check-in:\n`;
+                responseMsg += `2️⃣ *Manutenção:* sim/não\n`;
+                responseMsg += `3️⃣ *Descrição:* (se precisar)\n`;
+                responseMsg += `4️⃣ *Ferramentas:* sim/não\n`;
+                responseMsg += `5️⃣ *Observação ferramentas:* (se faltar algo)`;
+              } else {
+                responseMsg += `\n💡 Nenhum check-in pendente encontrado. A KM foi registrada apenas como leitura.`;
+              }
+
+              await sendWhatsApp(supabase, cleanPhone, responseMsg);
+
+              await supabase.from("whatsapp_chat_history").insert({
+                user_id: userProfile.user_id,
+                phone: cleanPhone,
+                role: "assistant",
+                content: responseMsg,
+              });
+
+              return new Response(JSON.stringify({ ok: true, action: "km_photo_read", km: kmValue }), {
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+              });
+            } else {
+              // Could not read KM
+              const failMsg = `📸 Recebi sua foto, mas não consegui identificar a quilometragem no painel.\n\n${kmResult.observacao || "Tente enviar uma foto mais nítida do hodômetro, ou digite a KM manualmente."}\n\nExemplo: *KM: 45230*`;
+              await sendWhatsApp(supabase, cleanPhone, failMsg);
+
+              await supabase.from("whatsapp_chat_history").insert({
+                user_id: userProfile.user_id,
+                phone: cleanPhone,
+                role: "assistant",
+                content: failMsg,
+              });
+
+              return new Response(JSON.stringify({ ok: true, action: "km_photo_failed" }), {
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+              });
+            }
+          }
+        }
+      } catch (imgErr: any) {
+        console.error("Image processing error:", imgErr);
+      }
+
+      // If image processing failed or didn't match, treat caption as text if available
+      if (!imageCaption && !messageText) {
+        await sendWhatsApp(supabase, cleanPhone, "📸 Recebi sua foto! Se é uma foto do painel de KM, tente enviar novamente com mais nitidez. Ou digite a KM manualmente: *KM: 45230*");
+        return new Response(JSON.stringify({ ok: true, action: "image_no_caption" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    // Use messageText or imageCaption for AI processing
+    const textForAI = messageText || imageCaption;
 
     // Call Lovable AI to interpret the command
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -399,7 +531,7 @@ Deno.serve(async (req) => {
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           ...historyMessages,
-          { role: "user", content: messageText },
+          { role: "user", content: textForAI },
         ],
         tools: TOOLS,
         tool_choice: "required",
