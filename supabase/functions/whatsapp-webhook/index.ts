@@ -410,14 +410,16 @@ Deno.serve(async (req) => {
     });
 
     // ─── IMAGE HANDLING: Fleet KM photo reading ───
+    const todayStrImg = new Date().toISOString().slice(0, 10);
     if (imageUrl) {
       try {
-        // Check if user has a pending fleet check-in
+        // Check if user has a recent fleet check-in (pending or today's)
         const { data: pendingCheckin } = await supabase
           .from("fleet_checkins")
-          .select("id, vehicle_id")
+          .select("id, vehicle_id, km_reported, needs_maintenance, tools_ok, status")
           .eq("driver_user_id", userProfile.user_id)
-          .eq("status", "pending")
+          .in("status", ["pending", "answered"])
+          .gte("checkin_date", todayStrImg)
           .order("checkin_date", { ascending: false })
           .limit(1)
           .maybeSingle();
