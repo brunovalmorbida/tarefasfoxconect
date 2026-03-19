@@ -97,6 +97,9 @@ export default function FleetCheckins() {
       needs_maintenance: c.needs_maintenance ?? false,
       description: c.description || "",
       status: c.status,
+      tools_ok: (c as any).tools_ok ?? true,
+      tools_description: (c as any).tools_description || "",
+      resolution_status: (c as any).resolution_status || "open",
     });
     setDialogOpen(true);
   };
