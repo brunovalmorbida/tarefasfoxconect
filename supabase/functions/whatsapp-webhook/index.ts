@@ -175,14 +175,14 @@ const TOOLS = [
     type: "function",
     function: {
       name: "responder_checkin_frota",
-      description: "Responde ao check-in semanal da frota. Use SEMPRE que o usuário estiver respondendo perguntas do check-in de veículo (KM, manutenção, ferramentas). Pode receber dados parciais — o sistema vai acumulando até completar.",
+      description: "Responde ao check-in semanal da frota. Use SEMPRE que o usuário estiver respondendo perguntas do check-in de veículo (KM, manutenção, ferramentas). Pode receber dados parciais — o sistema vai acumulando até completar. REGRA CRÍTICA: Só preencha os campos que o usuário EXPLICITAMENTE mencionou na mensagem atual. Se o usuário só falou sobre manutenção, NÃO preencha ferramentas_ok. Se só falou sobre ferramentas, NÃO preencha manutencao. Cada campo deve ser respondido separadamente pelo motorista.",
       parameters: {
         type: "object",
         properties: {
-          km: { type: "number", description: "Quilometragem atual do veículo (apenas número)" },
-          manutencao: { type: "boolean", description: "Se o veículo precisa de manutenção. true se o motorista descrever qualquer problema, false se disser que está tudo ok" },
+          km: { type: "number", description: "Quilometragem atual do veículo (apenas número). Só preencha se o usuário digitou um número de KM." },
+          manutencao: { type: "boolean", description: "Se o veículo precisa de manutenção. true se o motorista descrever qualquer problema, false se disser que não precisa. NÃO preencha este campo se o usuário está respondendo sobre ferramentas." },
           descricao_manutencao: { type: "string", description: "Descrição do problema de manutenção, se houver" },
-          ferramentas_ok: { type: "boolean", description: "Se todas as ferramentas estão completas. true = tudo ok, false = falta algo" },
+          ferramentas_ok: { type: "boolean", description: "Se todas as ferramentas estão completas. true = tudo ok, false = falta algo. NÃO preencha este campo se o usuário está respondendo sobre manutenção. Só preencha quando o usuário EXPLICITAMENTE mencionar ferramentas." },
           observacao_ferramentas: { type: "string", description: "Descrição do que está faltando nas ferramentas, se aplicável" },
         },
         additionalProperties: false,
