@@ -77,11 +77,13 @@ export default function FleetCheckins() {
   const [form, setForm] = useState({
     vehicle_id: "", driver_user_id: "", checkin_date: new Date().toISOString().split("T")[0],
     km_reported: "", needs_maintenance: false, description: "", status: "answered",
+    tools_ok: true, tools_description: "", resolution_status: "open",
   });
 
   const resetForm = () => setForm({
     vehicle_id: "", driver_user_id: "", checkin_date: new Date().toISOString().split("T")[0],
     km_reported: "", needs_maintenance: false, description: "", status: "answered",
+    tools_ok: true, tools_description: "", resolution_status: "open",
   });
 
   const openCreate = () => { resetForm(); setEditing(null); setDialogOpen(true); };
