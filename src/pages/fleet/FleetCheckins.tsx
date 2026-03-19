@@ -214,6 +214,8 @@ export default function FleetCheckins() {
             const StatusIcon = statusInfo.icon;
             const toolsOk = (c as any).tools_ok;
             const toolsDescription = (c as any).tools_description;
+            const resolutionStatus = (c as any).resolution_status || "open";
+            const resolutionInfo = RESOLUTION_MAP[resolutionStatus] || RESOLUTION_MAP.open;
             const hasIssues = c.needs_maintenance || toolsOk === false;
 
             return (
