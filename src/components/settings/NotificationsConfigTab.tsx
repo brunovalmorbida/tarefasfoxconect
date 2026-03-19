@@ -255,6 +255,16 @@ export function NotificationsConfigTab() {
               </div>
               <Badge variant="destructive" className="shrink-0">16:30 BRT</Badge>
             </div>
+            <div className="flex items-center gap-3 rounded-lg border border-blue-200 bg-blue-50/50 dark:border-blue-900 dark:bg-blue-950/30 p-3">
+              <Car className="h-5 w-5 text-blue-600 shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-medium">🚗 Check-in da Frota</p>
+                <p className="text-xs text-muted-foreground">
+                  Envia mensagem aos motoristas pedindo KM, status de manutenção e ferramentas. Dia e horário configuráveis em Configurações &gt; Frota.
+                </p>
+              </div>
+              <Badge variant="outline" className="shrink-0">Configurável</Badge>
+            </div>
           </div>
         </CardContent>
       </Card>
