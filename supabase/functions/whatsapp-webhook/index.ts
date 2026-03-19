@@ -469,10 +469,10 @@ Não inclua nenhum texto fora do JSON.`,
               if (kmResult.observacao) responseMsg += `💬 ${kmResult.observacao}\n`;
 
               if (pendingCheckin) {
-                // Update the pending check-in with the KM
+                // Update the pending check-in with the KM but keep status "pending" until all fields are filled
                 await supabase
                   .from("fleet_checkins")
-                  .update({ km_reported: kmValue, status: "answered" } as any)
+                  .update({ km_reported: kmValue } as any)
                   .eq("id", pendingCheckin.id);
                 
                 // Also update vehicle current_km
@@ -481,12 +481,10 @@ Não inclua nenhum texto fora do JSON.`,
                   .update({ current_km: kmValue } as any)
                   .eq("id", pendingCheckin.vehicle_id);
 
-                responseMsg += `\n✅ Check-in atualizado com sucesso!`;
-                responseMsg += `\n\nAgora responda as outras perguntas do check-in:\n`;
-                responseMsg += `2️⃣ *Manutenção:* sim/não\n`;
-                responseMsg += `3️⃣ *Descrição:* (se precisar)\n`;
-                responseMsg += `4️⃣ *Ferramentas:* sim/não\n`;
-                responseMsg += `5️⃣ *Observação ferramentas:* (se faltar algo)`;
+                responseMsg += `\n✅ KM registrado no check-in!`;
+                responseMsg += `\n\nAgora responda as outras perguntas:\n`;
+                responseMsg += `1️⃣ *Manutenção:* Precisa de manutenção? (sim/não, ou descreva o problema)\n`;
+                responseMsg += `2️⃣ *Ferramentas:* Todas completas? (sim/não, ou diga o que falta)`;
               } else {
                 responseMsg += `\n💡 Nenhum check-in pendente encontrado. A KM foi registrada apenas como leitura.`;
               }
