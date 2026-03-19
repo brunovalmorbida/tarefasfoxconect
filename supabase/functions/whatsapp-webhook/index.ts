@@ -664,7 +664,7 @@ Não inclua nenhum texto fora do JSON.`,
                   dueDate.setDate(dueDate.getDate() + deadlineDays);
 
                   const taskTitle = `Manutenção - ${vehicle?.name || "Veículo"} (${vehicle?.plate || ""})`;
-                  const taskDesc = description || "Motorista reportou necessidade de manutenção no check-in semanal.";
+                  const taskDesc = effectiveDescription || "Motorista reportou necessidade de manutenção no check-in semanal.";
 
                   await supabase.from("tasks").insert({
                     column_id: firstCol.id,
