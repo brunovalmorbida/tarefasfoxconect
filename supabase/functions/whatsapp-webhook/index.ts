@@ -240,10 +240,14 @@ Deno.serve(async (req) => {
     // Z-API webhook format
     const phone = body.phone || body.from;
     const messageText = body.text?.message || body.body || body.message?.text || "";
+    const imageUrl = body.image?.imageUrl || null;
+    const imageCaption = body.image?.caption || "";
 
-    if (!phone || !messageText) {
+    // Allow either text or image messages
+    if (!phone || (!messageText && !imageUrl)) {
       return new Response(JSON.stringify({ ok: true, skipped: "no message" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
       });
     }
 
