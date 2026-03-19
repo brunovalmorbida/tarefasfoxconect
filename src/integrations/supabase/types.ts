@@ -167,6 +167,7 @@ export type Database = {
           id: string
           km_reported: number | null
           needs_maintenance: boolean | null
+          resolution_status: string
           status: string
           task_id: string | null
           tools_description: string | null
@@ -183,6 +184,7 @@ export type Database = {
           id?: string
           km_reported?: number | null
           needs_maintenance?: boolean | null
+          resolution_status?: string
           status?: string
           task_id?: string | null
           tools_description?: string | null
@@ -199,6 +201,7 @@ export type Database = {
           id?: string
           km_reported?: number | null
           needs_maintenance?: boolean | null
+          resolution_status?: string
           status?: string
           task_id?: string | null
           tools_description?: string | null

@@ -24,6 +24,12 @@ const STATUS_MAP: Record<string, { label: string; variant: "default" | "secondar
   overdue: { label: "Atrasado", variant: "destructive", icon: AlertTriangle },
 };
 
+const RESOLUTION_MAP: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+  open: { label: "Em aberto", variant: "outline" },
+  scheduled: { label: "Manutenção agendada", variant: "secondary" },
+  resolved: { label: "Resolvido", variant: "default" },
+};
+
 interface DriverProfile {
   user_id: string;
   name: string;
@@ -71,11 +77,13 @@ export default function FleetCheckins() {
   const [form, setForm] = useState({
     vehicle_id: "", driver_user_id: "", checkin_date: new Date().toISOString().split("T")[0],
     km_reported: "", needs_maintenance: false, description: "", status: "answered",
+    tools_ok: true, tools_description: "", resolution_status: "open",
   });
 
   const resetForm = () => setForm({
     vehicle_id: "", driver_user_id: "", checkin_date: new Date().toISOString().split("T")[0],
     km_reported: "", needs_maintenance: false, description: "", status: "answered",
+    tools_ok: true, tools_description: "", resolution_status: "open",
   });
 
   const openCreate = () => { resetForm(); setEditing(null); setDialogOpen(true); };
@@ -89,6 +97,9 @@ export default function FleetCheckins() {
       needs_maintenance: c.needs_maintenance ?? false,
       description: c.description || "",
       status: c.status,
+      tools_ok: (c as any).tools_ok ?? true,
+      tools_description: (c as any).tools_description || "",
+      resolution_status: (c as any).resolution_status || "open",
     });
     setDialogOpen(true);
   };
@@ -104,6 +115,9 @@ export default function FleetCheckins() {
       needs_maintenance: form.needs_maintenance,
       description: form.description || null,
       status: form.status,
+      tools_ok: form.tools_ok,
+      tools_description: form.tools_description || null,
+      resolution_status: form.resolution_status,
     };
     if (editing) {
       await updateCheckin.mutateAsync({ id: editing.id, ...payload });
@@ -200,6 +214,8 @@ export default function FleetCheckins() {
             const StatusIcon = statusInfo.icon;
             const toolsOk = (c as any).tools_ok;
             const toolsDescription = (c as any).tools_description;
+            const resolutionStatus = (c as any).resolution_status || "open";
+            const resolutionInfo = RESOLUTION_MAP[resolutionStatus] || RESOLUTION_MAP.open;
             const hasIssues = c.needs_maintenance || toolsOk === false;
 
             return (
@@ -210,10 +226,17 @@ export default function FleetCheckins() {
                       <Car className="h-4 w-4 text-muted-foreground" />
                       <span className="font-semibold text-sm">{getVehicleShort(c.vehicle_id)}</span>
                     </div>
-                    <Badge variant={statusInfo.variant} className="gap-1">
-                      <StatusIcon className="h-3 w-3" />
-                      {statusInfo.label}
-                    </Badge>
+                    <div className="flex gap-1.5 flex-wrap">
+                      <Badge variant={statusInfo.variant} className="gap-1">
+                        <StatusIcon className="h-3 w-3" />
+                        {statusInfo.label}
+                      </Badge>
+                      {hasIssues && (
+                        <Badge variant={resolutionInfo.variant} className="gap-1 text-[10px]">
+                          {resolutionInfo.label}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
 
                   <div className="space-y-1.5 text-sm">
@@ -320,17 +343,42 @@ export default function FleetCheckins() {
               <Switch checked={form.needs_maintenance} onCheckedChange={v => setForm(f => ({ ...f, needs_maintenance: v }))} />
               <Label>Precisa de manutenção</Label>
             </div>
-            <div><Label>Descrição / Observações</Label><Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={3} /></div>
-            <div>
-              <Label>Status</Label>
-              <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">Pendente</SelectItem>
-                  <SelectItem value="answered">Respondido</SelectItem>
-                  <SelectItem value="overdue">Atrasado</SelectItem>
-                </SelectContent>
-              </Select>
+            <div><Label>Descrição / Observações (Manutenção)</Label><Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} /></div>
+            
+            <div className="border-t pt-3 space-y-3">
+              <Label className="text-sm font-semibold flex items-center gap-1.5"><PackageOpen className="h-4 w-4" /> Ferramentas</Label>
+              <div className="flex items-center gap-3">
+                <Switch checked={form.tools_ok} onCheckedChange={v => setForm(f => ({ ...f, tools_ok: v }))} />
+                <Label>{form.tools_ok ? "Ferramentas completas" : "Ferramentas incompletas"}</Label>
+              </div>
+              {!form.tools_ok && (
+                <div><Label>Descrição das ferramentas</Label><Textarea value={form.tools_description} onChange={e => setForm(f => ({ ...f, tools_description: e.target.value }))} rows={2} placeholder="Quais ferramentas estão faltando ou com problema?" /></div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 border-t pt-3">
+              <div>
+                <Label>Status do Check-in</Label>
+                <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pendente</SelectItem>
+                    <SelectItem value="answered">Respondido</SelectItem>
+                    <SelectItem value="overdue">Atrasado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Triagem</Label>
+                <Select value={form.resolution_status} onValueChange={v => setForm(f => ({ ...f, resolution_status: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="open">Em aberto</SelectItem>
+                    <SelectItem value="scheduled">Manutenção agendada</SelectItem>
+                    <SelectItem value="resolved">Resolvido</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <Button onClick={handleSubmit} disabled={!form.vehicle_id || !form.driver_user_id}>
               {editing ? "Salvar" : "Registrar"}
