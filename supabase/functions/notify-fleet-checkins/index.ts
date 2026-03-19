@@ -161,13 +161,7 @@ Deno.serve(async (req) => {
 
 📋 *Check-in semanal do veículo {veiculo} ({placa})*
 
-Por favor, responda com as seguintes informações:
-
-1️⃣ *KM:* Envie uma foto do painel ou digite a quilometragem
-2️⃣ *Manutenção:* Precisa de manutenção? (sim/não, ou descreva o problema)
-3️⃣ *Ferramentas:* Todas completas? (sim/não, ou diga o que falta)
-
-Você pode responder tudo de uma vez ou em mensagens separadas!`;
+📸 Envie uma *foto do painel* com a quilometragem atual para começar o check-in.`;
 
     const template = settings.checkin_message_template || defaultTemplate;
 
