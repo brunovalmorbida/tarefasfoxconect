@@ -280,6 +280,11 @@ Você pode responder tudo de uma vez ou em mensagens separadas!`;
               driver_id: resolvedDriverId,
               driver_user_id: vehicle.driver_user_id,
               checkin_date: todayStr,
+              km_reported: null,
+              needs_maintenance: null,
+              tools_ok: null,
+              description: null,
+              tools_description: null,
               status: "pending",
             });
 
