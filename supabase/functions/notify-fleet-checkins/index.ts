@@ -121,11 +121,18 @@ Deno.serve(async (req) => {
     }
 
     // 4. Get active vehicles with driver_user_id
-    const { data: vehicles } = await adminClient
+    let vehicleQuery = adminClient
       .from("fleet_vehicles")
       .select("id, name, plate, driver_user_id, driver_id")
       .eq("status", "active")
       .not("driver_user_id", "is", null);
+
+    // Filter by specific vehicle IDs in test mode
+    if (testMode && testVehicleIds.length > 0) {
+      vehicleQuery = vehicleQuery.in("id", testVehicleIds);
+    }
+
+    const { data: vehicles } = await vehicleQuery;
 
     if (!vehicles || vehicles.length === 0) {
       return new Response(JSON.stringify({ message: "Nenhum veículo ativo com motorista vinculado", sent: 0 }), {
