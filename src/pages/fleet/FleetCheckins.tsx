@@ -46,6 +46,7 @@ export default function FleetCheckins() {
   const [editing, setEditing] = useState<FleetCheckin | null>(null);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [maintenanceCreated, setMaintenanceCreated] = useState<Set<string>>(new Set());
 
   const { data: driverProfiles = [] } = useQuery({
     queryKey: ["driver-profiles"],
