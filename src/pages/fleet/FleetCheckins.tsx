@@ -130,27 +130,8 @@ export default function FleetCheckins() {
     setDialogOpen(false); resetForm(); setEditing(null);
   };
 
-  const handleCreateMaintenance = async (c: FleetCheckin, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const vehicle = vehicles.find(v => v.id === c.vehicle_id);
-    const parts: string[] = [];
-    if (c.description) parts.push(c.description);
-    const toolsDesc = (c as any).tools_description;
-    if (toolsDesc) parts.push(`Ferramentas: ${toolsDesc}`);
-
-    try {
-      await createMaintenance.mutateAsync({
-        vehicle_id: c.vehicle_id,
-        maintenance_type: "corrective",
-        maintenance_date: c.checkin_date,
-        km_at_maintenance: c.km_reported || undefined,
-        description: parts.join("\n") || `Manutenção reportada no check-in de ${format(new Date(c.checkin_date), "dd/MM/yyyy")}`,
-        status: "pending",
-      } as any);
-      toast.success(`Manutenção criada para ${vehicle?.name || "veículo"}`);
-    } catch {
-      toast.error("Erro ao criar manutenção");
-    }
+  const handleMaintenanceCreated = (checkinId: string) => {
+    setMaintenanceCreated(prev => new Set(prev).add(checkinId));
   };
 
   const getDriverName = (checkin: FleetCheckin) => {
