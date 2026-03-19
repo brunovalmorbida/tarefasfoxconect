@@ -24,6 +24,12 @@ const STATUS_MAP: Record<string, { label: string; variant: "default" | "secondar
   overdue: { label: "Atrasado", variant: "destructive", icon: AlertTriangle },
 };
 
+const RESOLUTION_MAP: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+  open: { label: "Em aberto", variant: "outline" },
+  scheduled: { label: "Manutenção agendada", variant: "secondary" },
+  resolved: { label: "Resolvido", variant: "default" },
+};
+
 interface DriverProfile {
   user_id: string;
   name: string;
