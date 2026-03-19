@@ -169,6 +169,8 @@ export type Database = {
           needs_maintenance: boolean | null
           status: string
           task_id: string | null
+          tools_description: string | null
+          tools_ok: boolean | null
           updated_at: string
           vehicle_id: string
         }
@@ -183,6 +185,8 @@ export type Database = {
           needs_maintenance?: boolean | null
           status?: string
           task_id?: string | null
+          tools_description?: string | null
+          tools_ok?: boolean | null
           updated_at?: string
           vehicle_id: string
         }
@@ -197,6 +201,8 @@ export type Database = {
           needs_maintenance?: boolean | null
           status?: string
           task_id?: string | null
+          tools_description?: string | null
+          tools_ok?: boolean | null
           updated_at?: string
           vehicle_id?: string
         }
