@@ -6,7 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { Bell, Loader2, Send, Clock, AlertTriangle, CalendarClock, CheckCircle2, ShoppingCart } from "lucide-react";
+import { Bell, Loader2, Send, Clock, AlertTriangle, CalendarClock, CheckCircle2, ShoppingCart, Car } from "lucide-react";
 import { PurchaseNotificationsConfig } from "./PurchaseNotificationsConfig";
 
 export function NotificationsConfigTab() {
@@ -16,11 +16,13 @@ export function NotificationsConfigTab() {
   const [sendingRecurring, setSendingRecurring] = useState(false);
   const [sendingPurchaseReminders, setSendingPurchaseReminders] = useState(false);
   const [sendingEndOfDay, setSendingEndOfDay] = useState(false);
+  const [sendingFleetCheckin, setSendingFleetCheckin] = useState(false);
   const [overdueResult, setOverdueResult] = useState<any>(null);
   const [dueResult, setDueResult] = useState<any>(null);
   const [recurringResult, setRecurringResult] = useState<any>(null);
   const [purchaseReminderResult, setPurchaseReminderResult] = useState<any>(null);
   const [endOfDayResult, setEndOfDayResult] = useState<any>(null);
+  const [fleetCheckinResult, setFleetCheckinResult] = useState<any>(null);
 
   const { data: zapiConfig, isLoading } = useQuery({
     queryKey: ["zapi-config"],
@@ -137,6 +139,26 @@ export function NotificationsConfigTab() {
     }
   };
 
+  const handleSendFleetCheckin = async () => {
+    setSendingFleetCheckin(true);
+    setFleetCheckinResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("notify-fleet-checkins", { body: { testMode: true } });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setFleetCheckinResult(data);
+      toast({
+        title: data.sent > 0
+          ? `${data.sent} check-in(s) enviado(s)!`
+          : data.message || "Nenhum motorista para notificar.",
+      });
+    } catch (e: any) {
+      toast({ title: "Erro ao enviar", description: e.message, variant: "destructive" });
+    } finally {
+      setSendingFleetCheckin(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center py-8">
@@ -232,6 +254,16 @@ export function NotificationsConfigTab() {
                 </p>
               </div>
               <Badge variant="destructive" className="shrink-0">16:30 BRT</Badge>
+            </div>
+            <div className="flex items-center gap-3 rounded-lg border border-blue-200 bg-blue-50/50 dark:border-blue-900 dark:bg-blue-950/30 p-3">
+              <Car className="h-5 w-5 text-blue-600 shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-medium">🚗 Check-in da Frota</p>
+                <p className="text-xs text-muted-foreground">
+                  Envia mensagem aos motoristas pedindo KM, status de manutenção e ferramentas. Dia e horário configuráveis em Configurações &gt; Frota.
+                </p>
+              </div>
+              <Badge variant="outline" className="shrink-0">Configurável</Badge>
             </div>
           </div>
         </CardContent>
@@ -407,6 +439,33 @@ export function NotificationsConfigTab() {
                   <p>📊 Tarefas pendentes hoje: <strong>{endOfDayResult.pending_tasks}</strong></p>
                   <p>✅ Enviadas: <strong>{endOfDayResult.sent}</strong></p>
                   {endOfDayResult.errors > 0 && <p>❌ Erros: <strong>{endOfDayResult.errors}</strong></p>}
+                </div>
+              )}
+            </div>
+
+            <Separator />
+
+            {/* Check-in da Frota */}
+            <div className="space-y-2">
+              <Button
+                variant="outline"
+                onClick={handleSendFleetCheckin}
+                disabled={sendingFleetCheckin}
+                className="w-full justify-start"
+              >
+                {sendingFleetCheckin ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Car className="h-4 w-4 mr-2 text-blue-600" />
+                )}
+                {sendingFleetCheckin ? "Enviando..." : "🚗 Enviar Check-in da Frota (Motoristas)"}
+              </Button>
+              {fleetCheckinResult && (
+                <div className="text-xs text-muted-foreground rounded-md border p-3 space-y-1">
+                  <p>🚗 Veículos: <strong>{fleetCheckinResult.total_vehicles}</strong></p>
+                  <p>✅ Enviadas: <strong>{fleetCheckinResult.sent}</strong></p>
+                  {fleetCheckinResult.errors > 0 && <p>❌ Erros: <strong>{fleetCheckinResult.errors}</strong></p>}
+                  {fleetCheckinResult.skipped > 0 && <p>⏭️ Sem WhatsApp: <strong>{fleetCheckinResult.skipped}</strong></p>}
                 </div>
               )}
             </div>
