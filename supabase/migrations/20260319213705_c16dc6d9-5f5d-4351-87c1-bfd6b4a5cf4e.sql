@@ -1,0 +1,1 @@
+ALTER TABLE public.fleet_checkins ADD COLUMN resolution_status text NOT NULL DEFAULT 'open';
