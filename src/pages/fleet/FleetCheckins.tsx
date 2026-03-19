@@ -11,8 +11,10 @@ import { Switch } from "@/components/ui/switch";
 import { useFleetCheckins, useFleetVehicles, useFleetMaintenances, FleetCheckin } from "@/hooks/useFleet";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Search, ClipboardCheck, AlertTriangle, CheckCircle2, Clock, Car, Wrench, Hammer, PackageOpen } from "lucide-react";
+import { Plus, Search, ClipboardCheck, AlertTriangle, CheckCircle2, Clock, Car, Wrench, PackageOpen } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import CreateMaintenanceFromCheckin from "@/components/fleet/CreateMaintenanceFromCheckin";
+import CreatePurchaseFromCheckin from "@/components/fleet/CreatePurchaseFromCheckin";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
@@ -44,6 +46,7 @@ export default function FleetCheckins() {
   const [editing, setEditing] = useState<FleetCheckin | null>(null);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [maintenanceCreated, setMaintenanceCreated] = useState<Set<string>>(new Set());
 
   const { data: driverProfiles = [] } = useQuery({
     queryKey: ["driver-profiles"],
@@ -127,27 +130,8 @@ export default function FleetCheckins() {
     setDialogOpen(false); resetForm(); setEditing(null);
   };
 
-  const handleCreateMaintenance = async (c: FleetCheckin, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const vehicle = vehicles.find(v => v.id === c.vehicle_id);
-    const parts: string[] = [];
-    if (c.description) parts.push(c.description);
-    const toolsDesc = (c as any).tools_description;
-    if (toolsDesc) parts.push(`Ferramentas: ${toolsDesc}`);
-
-    try {
-      await createMaintenance.mutateAsync({
-        vehicle_id: c.vehicle_id,
-        maintenance_type: "corrective",
-        maintenance_date: c.checkin_date,
-        km_at_maintenance: c.km_reported || undefined,
-        description: parts.join("\n") || `Manutenção reportada no check-in de ${format(new Date(c.checkin_date), "dd/MM/yyyy")}`,
-        status: "pending",
-      } as any);
-      toast.success(`Manutenção criada para ${vehicle?.name || "veículo"}`);
-    } catch {
-      toast.error("Erro ao criar manutenção");
-    }
+  const handleMaintenanceCreated = (checkinId: string) => {
+    setMaintenanceCreated(prev => new Set(prev).add(checkinId));
   };
 
   const getDriverName = (checkin: FleetCheckin) => {
@@ -294,17 +278,22 @@ export default function FleetCheckins() {
                     <p className="text-xs text-muted-foreground line-clamp-2 border-t pt-2">{c.description}</p>
                   )}
 
-                  {/* Triage button */}
+                  {/* Action buttons */}
                   {hasIssues && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full gap-1.5 text-xs border-destructive/30 text-destructive hover:bg-destructive/10"
-                      onClick={(e) => handleCreateMaintenance(c, e)}
-                    >
-                      <Hammer className="h-3.5 w-3.5" />
-                      Criar Manutenção
-                    </Button>
+                    <div className="space-y-2">
+                      <CreateMaintenanceFromCheckin
+                        checkin={c}
+                        vehicleName={getVehicleShort(c.vehicle_id)}
+                        alreadyCreated={maintenanceCreated.has(c.id)}
+                        onCreated={handleMaintenanceCreated}
+                      />
+                      {toolsOk === false && toolsDescription && (
+                        <CreatePurchaseFromCheckin
+                          toolsDescription={toolsDescription}
+                          vehicleName={getVehicleShort(c.vehicle_id)}
+                        />
+                      )}
+                    </div>
                   )}
                 </CardContent>
               </Card>
