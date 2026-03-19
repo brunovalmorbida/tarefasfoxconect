@@ -115,6 +115,9 @@ export default function FleetCheckins() {
       needs_maintenance: form.needs_maintenance,
       description: form.description || null,
       status: form.status,
+      tools_ok: form.tools_ok,
+      tools_description: form.tools_description || null,
+      resolution_status: form.resolution_status,
     };
     if (editing) {
       await updateCheckin.mutateAsync({ id: editing.id, ...payload });
