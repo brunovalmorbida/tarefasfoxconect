@@ -640,12 +640,22 @@ Campos já preenchidos: ${filledFields.length > 0 ? filledFields.join(", ") : "n
 Campos faltando: ${missingFields.length > 0 ? missingFields.join(", ") : "nenhum (check-in completo)"}
 
 Se a mensagem do usuário parecer uma RESPOSTA ao check-in (falando sobre KM, manutenção, problemas no veículo, ferramentas, ou qualquer descrição de problema mecânico/elétrico), use a ferramenta "responder_checkin_frota" em vez de criar tarefas.
-Exemplos de respostas de check-in:
-- "Barulho na suspensão" → responder_checkin_frota(manutencao=true, descricao_manutencao="Barulho na suspensão")
-- "Tudo ok" ou "Não precisa" → responder_checkin_frota(manutencao=false)
-- "Sim" (se falta manutenção) → responder_checkin_frota(manutencao=true) ou responder_checkin_frota(ferramentas_ok=true) dependendo do que falta
-- "Falta chave de roda" → responder_checkin_frota(ferramentas_ok=false, observacao_ferramentas="Falta chave de roda")
-- "45230" ou "KM 45230" → responder_checkin_frota(km=45230)
+
+REGRA MAIS IMPORTANTE — PREENCHER APENAS O QUE FOI DITO:
+- Cada campo (manutenção, ferramentas) é uma pergunta SEPARADA. O motorista responde uma de cada vez.
+- Se o motorista respondeu APENAS sobre manutenção (ex: "Sim Balanceamento", "Não precisa"), preencha SOMENTE manutencao e descricao_manutencao. NÃO preencha ferramentas_ok.
+- Se o motorista respondeu APENAS sobre ferramentas (ex: "Sim tudo completo", "Falta chave de roda"), preencha SOMENTE ferramentas_ok e observacao_ferramentas. NÃO preencha manutencao.
+- Se o motorista respondeu sobre AMBOS na mesma mensagem (ex: "Manutenção sim precisa trocar pneu, ferramentas falta alicate"), aí sim preencha ambos.
+- NUNCA assuma que ferramentas estão OK se o motorista não mencionou ferramentas.
+- NUNCA assuma que manutenção está OK se o motorista não mencionou manutenção.
+
+Exemplos:
+- "Sim Balanceamento" → responder_checkin_frota(manutencao=true, descricao_manutencao="Balanceamento") — SEM ferramentas_ok!
+- "Barulho na suspensão" → responder_checkin_frota(manutencao=true, descricao_manutencao="Barulho na suspensão") — SEM ferramentas_ok!
+- "Não precisa de manutenção" → responder_checkin_frota(manutencao=false) — SEM ferramentas_ok!
+- "Sim tudo completo" (quando falta ferramentas) → responder_checkin_frota(ferramentas_ok=true) — SEM manutencao!
+- "Falta chave de roda" → responder_checkin_frota(ferramentas_ok=false, observacao_ferramentas="Falta chave de roda") — SEM manutencao!
+- "Tudo ok" (quando faltam manutenção E ferramentas) → responder_checkin_frota(manutencao=false, ferramentas_ok=true)
 IMPORTANTE: NÃO crie tarefas Kanban com o conteúdo do check-in!`;
     }
 
