@@ -278,17 +278,22 @@ export default function FleetCheckins() {
                     <p className="text-xs text-muted-foreground line-clamp-2 border-t pt-2">{c.description}</p>
                   )}
 
-                  {/* Triage button */}
+                  {/* Action buttons */}
                   {hasIssues && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full gap-1.5 text-xs border-destructive/30 text-destructive hover:bg-destructive/10"
-                      onClick={(e) => handleCreateMaintenance(c, e)}
-                    >
-                      <Hammer className="h-3.5 w-3.5" />
-                      Criar Manutenção
-                    </Button>
+                    <div className="space-y-2">
+                      <CreateMaintenanceFromCheckin
+                        checkin={c}
+                        vehicleName={getVehicleShort(c.vehicle_id)}
+                        alreadyCreated={maintenanceCreated.has(c.id)}
+                        onCreated={handleMaintenanceCreated}
+                      />
+                      {toolsOk === false && toolsDescription && (
+                        <CreatePurchaseFromCheckin
+                          toolsDescription={toolsDescription}
+                          vehicleName={getVehicleShort(c.vehicle_id)}
+                        />
+                      )}
+                    </div>
                   )}
                 </CardContent>
               </Card>
