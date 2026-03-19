@@ -390,7 +390,7 @@ function FleetSettingsSection() {
     auto_checkin_enabled: true,
     warranty_alerts_enabled: true,
     default_board_id: null,
-    checkin_message_template: "Bom dia, {nome}! 👋\n\n📋 *Check-in semanal do veículo {veiculo} ({placa})*\n\n📸 Envie uma *foto do painel* com a quilometragem atual para começar o check-in.",
+    checkin_message_template: "Bom dia, {nome}! 👋\n\n📋 *Check-in semanal do veículo {veiculo} ({placa})*\n\nPor favor, responda com as seguintes informações:\n\n1️⃣ *KM:* Envie uma foto do painel ou digite a quilometragem\n2️⃣ *Manutenção:* Precisa de manutenção? (sim/não, ou descreva o problema)\n3️⃣ *Ferramentas:* Todas completas? (sim/não, ou diga o que falta)\n\nVocê pode responder tudo de uma vez ou em mensagens separadas!",
   };
 
   const DAYS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
