@@ -226,10 +226,17 @@ export default function FleetCheckins() {
                       <Car className="h-4 w-4 text-muted-foreground" />
                       <span className="font-semibold text-sm">{getVehicleShort(c.vehicle_id)}</span>
                     </div>
-                    <Badge variant={statusInfo.variant} className="gap-1">
-                      <StatusIcon className="h-3 w-3" />
-                      {statusInfo.label}
-                    </Badge>
+                    <div className="flex gap-1.5 flex-wrap">
+                      <Badge variant={statusInfo.variant} className="gap-1">
+                        <StatusIcon className="h-3 w-3" />
+                        {statusInfo.label}
+                      </Badge>
+                      {hasIssues && (
+                        <Badge variant={resolutionInfo.variant} className="gap-1 text-[10px]">
+                          {resolutionInfo.label}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
 
                   <div className="space-y-1.5 text-sm">
