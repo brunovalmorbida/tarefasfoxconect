@@ -49,6 +49,8 @@ export default function VehicleDetail() {
   const { maintenances, isLoading: loadingM } = useFleetMaintenances();
   const { documents, isLoading: loadingD } = useFleetDocuments(vehicleId);
   const { checkins, isLoading: loadingC } = useFleetCheckins();
+  const scores = useVehicleScores(vehicles, maintenances, checkins);
+  const vehicleScore = vehicleId ? scores.get(vehicleId) : undefined;
 
   const vehicle = vehicles.find((v) => v.id === vehicleId);
   const driver = vehicle?.driver_id ? drivers.find((d) => d.id === vehicle.driver_id) : null;
