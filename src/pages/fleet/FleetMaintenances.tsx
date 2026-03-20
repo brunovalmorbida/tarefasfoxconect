@@ -10,12 +10,16 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useFleetMaintenances, useFleetVehicles, FleetMaintenance } from "@/hooks/useFleet";
-import { Plus, Search, Wrench, Pencil, Trash2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Plus, Search, Wrench, Pencil, Trash2, ShieldAlert, AlertTriangle, ShieldCheck } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 const MAINTENANCE_TYPES = [
+  { value: "preventive", label: "Preventiva" },
+  { value: "corrective", label: "Corretiva" },
   { value: "oil_change", label: "Troca de Óleo" },
   { value: "tires", label: "Pneus" },
   { value: "battery", label: "Bateria" },
@@ -33,6 +37,12 @@ const STATUS_MAP: Record<string, { label: string; variant: "default" | "secondar
   completed: { label: "Realizada", variant: "default" },
 };
 
+const PRIORITY_MAP: Record<string, { label: string; className: string; icon: typeof ShieldAlert }> = {
+  critical: { label: "Crítico", className: "bg-destructive text-destructive-foreground", icon: ShieldAlert },
+  attention: { label: "Atenção", className: "bg-yellow-500 text-white", icon: AlertTriangle },
+  low: { label: "Baixo", className: "bg-emerald-500 text-white", icon: ShieldCheck },
+};
+
 export default function FleetMaintenances() {
   const { maintenances, isLoading, createMaintenance, updateMaintenance, deleteMaintenance } = useFleetMaintenances();
   const { vehicles } = useFleetVehicles();
@@ -43,11 +53,21 @@ export default function FleetMaintenances() {
   const [form, setForm] = useState({
     vehicle_id: "", maintenance_type: "other", maintenance_date: new Date().toISOString().split("T")[0],
     km_at_maintenance: "", cost: "", supplier: "", description: "", notes: "", status: "pending",
+    priority: "attention", scheduled_date: "", assigned_to: "",
+  });
+
+  const { data: profiles = [] } = useQuery({
+    queryKey: ["profiles-list"],
+    queryFn: async () => {
+      const { data } = await supabase.from("profiles").select("user_id, name").eq("is_active", true).order("name");
+      return (data || []) as { user_id: string; name: string }[];
+    },
   });
 
   const resetForm = () => setForm({
     vehicle_id: "", maintenance_type: "other", maintenance_date: new Date().toISOString().split("T")[0],
     km_at_maintenance: "", cost: "", supplier: "", description: "", notes: "", status: "pending",
+    priority: "attention", scheduled_date: "", assigned_to: "",
   });
 
   const openCreate = () => { resetForm(); setEditing(null); setDialogOpen(true); };
@@ -58,6 +78,9 @@ export default function FleetMaintenances() {
       maintenance_date: m.maintenance_date, km_at_maintenance: m.km_at_maintenance?.toString() || "",
       cost: m.cost?.toString() || "", supplier: m.supplier || "",
       description: m.description || "", notes: m.notes || "", status: m.status,
+      priority: m.priority || "attention",
+      scheduled_date: m.scheduled_date || "",
+      assigned_to: m.assigned_to || "",
     });
     setDialogOpen(true);
   };
@@ -70,6 +93,9 @@ export default function FleetMaintenances() {
       km_at_maintenance: form.km_at_maintenance ? parseInt(form.km_at_maintenance) : null,
       cost: form.cost ? parseFloat(form.cost) : null, supplier: form.supplier || null,
       description: form.description || null, notes: form.notes || null, status: form.status,
+      priority: form.priority,
+      scheduled_date: form.scheduled_date || null,
+      assigned_to: form.assigned_to || null,
     };
     if (editing) {
       await updateMaintenance.mutateAsync({ id: editing.id, ...payload });
@@ -80,6 +106,10 @@ export default function FleetMaintenances() {
   };
 
   const getTypeName = (type: string) => MAINTENANCE_TYPES.find(t => t.value === type)?.label || type;
+  const getProfileName = (userId: string | null) => {
+    if (!userId) return "—";
+    return profiles.find(p => p.user_id === userId)?.name || "—";
+  };
 
   const filtered = maintenances.filter(m => {
     const v = vehicles.find(v => v.id === m.vehicle_id);
@@ -116,9 +146,10 @@ export default function FleetMaintenances() {
                   <TableHead>Data</TableHead>
                   <TableHead>Veículo</TableHead>
                   <TableHead>Tipo</TableHead>
+                  <TableHead>Prioridade</TableHead>
                   <TableHead className="hidden md:table-cell">KM</TableHead>
                   <TableHead className="hidden md:table-cell">Valor</TableHead>
-                  <TableHead className="hidden lg:table-cell">Fornecedor</TableHead>
+                  <TableHead className="hidden lg:table-cell">Responsável</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-20">Ações</TableHead>
                 </TableRow>
@@ -126,14 +157,22 @@ export default function FleetMaintenances() {
               <TableBody>
                 {filtered.map(m => {
                   const v = vehicles.find(v => v.id === m.vehicle_id);
+                  const priority = PRIORITY_MAP[m.priority] || PRIORITY_MAP.attention;
+                  const PIcon = priority.icon;
                   return (
                     <TableRow key={m.id}>
                       <TableCell>{format(new Date(m.maintenance_date), "dd/MM/yyyy", { locale: ptBR })}</TableCell>
                       <TableCell className="font-medium">{v?.name || "—"}</TableCell>
                       <TableCell>{getTypeName(m.maintenance_type)}</TableCell>
+                      <TableCell>
+                        <Badge className={`${priority.className} gap-1 text-xs`}>
+                          <PIcon className="h-3 w-3" />
+                          {priority.label}
+                        </Badge>
+                      </TableCell>
                       <TableCell className="hidden md:table-cell">{m.km_at_maintenance?.toLocaleString("pt-BR") || "—"}</TableCell>
                       <TableCell className="hidden md:table-cell">{m.cost ? `R$ ${Number(m.cost).toFixed(2)}` : "—"}</TableCell>
-                      <TableCell className="hidden lg:table-cell">{m.supplier || "—"}</TableCell>
+                      <TableCell className="hidden lg:table-cell">{getProfileName(m.assigned_to)}</TableCell>
                       <TableCell><Badge variant={STATUS_MAP[m.status]?.variant || "outline"}>{STATUS_MAP[m.status]?.label || m.status}</Badge></TableCell>
                       <TableCell>
                         <div className="flex gap-1">
@@ -151,7 +190,7 @@ export default function FleetMaintenances() {
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader><DialogTitle>{editing ? "Editar Manutenção" : "Nova Manutenção"}</DialogTitle></DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid grid-cols-2 gap-4">
@@ -170,6 +209,29 @@ export default function FleetMaintenances() {
                 </Select>
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Prioridade</Label>
+                <Select value={form.priority} onValueChange={v => setForm(f => ({ ...f, priority: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="critical">🔴 Crítico</SelectItem>
+                    <SelectItem value="attention">🟡 Atenção</SelectItem>
+                    <SelectItem value="low">🟢 Baixo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Responsável</Label>
+                <Select value={form.assigned_to || "none"} onValueChange={v => setForm(f => ({ ...f, assigned_to: v === "none" ? "" : v }))}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhum</SelectItem>
+                    {profiles.map(p => <SelectItem key={p.user_id} value={p.user_id}>{p.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
             <div className="grid grid-cols-3 gap-4">
               <div><Label>Data</Label><Input type="date" value={form.maintenance_date} onChange={e => setForm(f => ({ ...f, maintenance_date: e.target.value }))} /></div>
               <div><Label>KM</Label><Input type="number" value={form.km_at_maintenance} onChange={e => setForm(f => ({ ...f, km_at_maintenance: e.target.value }))} /></div>
@@ -178,16 +240,22 @@ export default function FleetMaintenances() {
             <div><Label>Fornecedor / Oficina</Label><Input value={form.supplier} onChange={e => setForm(f => ({ ...f, supplier: e.target.value }))} /></div>
             <div><Label>Descrição do Serviço</Label><Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} /></div>
             <div><Label>Observações</Label><Textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} /></div>
-            <div>
-              <Label>Status</Label>
-              <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">Pendente</SelectItem>
-                  <SelectItem value="in_progress">Em Andamento</SelectItem>
-                  <SelectItem value="completed">Realizada</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Agendamento</Label>
+                <Input type="date" value={form.scheduled_date} onChange={e => setForm(f => ({ ...f, scheduled_date: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Status</Label>
+                <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pendente</SelectItem>
+                    <SelectItem value="in_progress">Em Andamento</SelectItem>
+                    <SelectItem value="completed">Realizada</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <Button onClick={handleSubmit} disabled={!form.vehicle_id}>{editing ? "Salvar" : "Registrar"}</Button>
           </div>
