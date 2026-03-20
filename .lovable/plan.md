@@ -1,82 +1,90 @@
 
 
-## Plano: Modal de Manutenção Profissional e Inteligente
+## Plano: Sistema de Score de Veículos
 
 ### Resumo
-Reescrever o componente `CreateMaintenanceFromCheckin.tsx` como um modal completo e inteligente, com preenchimento automático baseado no check-in, automações ao salvar (atualizar veículo, criar tarefa Kanban, enviar notificação), e UX profissional com cores de prioridade e sugestões.
+Implementar score automático (0-100) para cada veículo calculado no frontend com base em manutenções, check-ins e ferramentas. Sem alteração no banco de dados -- o score é computado em tempo real a partir dos dados já existentes. Isso mantém a estabilidade do V3.0 e evita migrações desnecessárias.
 
-### Mudanças no Banco de Dados
+### Decisão Arquitetural: Score Calculado no Frontend
 
-**Migração**: Adicionar colunas à tabela `fleet_maintenances`:
-- `priority` (text, default `'medium'`): `critical`, `attention`, `low`
-- `scheduled_date` (date, nullable)
-- `scheduled_time` (time, nullable)
-- `assigned_to` (uuid, nullable)
-- `missing_tools` (text[], nullable)
+O score **não** será armazenado no banco. Será calculado via `useMemo` a partir dos dados já carregados (vehicles, checkins, maintenances). Razões:
+- Dados já estão disponíveis nos hooks existentes
+- Evita migrações e triggers complexos
+- Atualização automática ao recarregar dados
+- Preparado para futuro: pode migrar para DB function se necessário
 
-### Arquivo: `src/components/fleet/CreateMaintenanceFromCheckin.tsx`
-Reescrever completamente com:
+### Novo Arquivo: `src/hooks/useVehicleScore.ts`
 
-**1. Campos do formulário:**
-- **Tipo**: Select com apenas "Preventiva" / "Corretiva", auto-detectado por palavras-chave na descrição
-- **Prioridade**: Select obrigatório com ícones coloridos (Critico/Atenção/Baixo), auto-detectado por palavras-chave (freio, motor, suspensão → Crítico; balanceamento, alinhamento → Atenção)
-- **Oficina/Fornecedor**: Input com datalist de sugestões (query das oficinas já usadas em `fleet_maintenances.supplier`)
-- **Problema do Veículo**: Textarea pré-preenchido do check-in, editável
-- **Ferramentas Faltantes**: Multi-checkbox com lista padrão (Notebook, Alicate, Conector, Máquina de fusão, Chave de fenda, Outros), pré-selecionado do `tools_description`
-- **Custo Estimado**: Input numérico formatado
-- **Data de Agendamento**: Campo date obrigatório + time opcional
-- **Responsável**: Select com usuários do sistema, sugestão automática do motorista do veículo
-- **Observações**: Textarea livre
+Função pura `calculateVehicleScore(vehicleId, maintenances, checkins)` que:
 
-**2. Lógica de auto-preenchimento (`handleOpen`):**
-- Analisa `checkin.description` e `tools_description` para inferir tipo e prioridade
-- Busca oficinas anteriores para sugestões
-- Pré-seleciona ferramentas faltantes parseando o texto do check-in
+```text
+Base: 100 pontos
 
-**3. Automações no `handleSubmit`:**
-- Criar registro de manutenção com novos campos
-- Atualizar status do veículo: Crítico → `"maintenance"`, Atenção → `"active"` (com nota)
-- Criar tarefa Kanban no board configurado em `fleet_settings.default_board_id`
-- Invocar `notify-task-assigned` para notificar responsável
-- Atualizar check-in `resolution_status` para `"scheduled"`
+Deduções:
+- Manutenção não-completed com priority=critical: -30
+- Manutenção não-completed com priority=attention: -15
+- Manutenção não-completed com priority=low: -5
+- Check-in da semana com tools_ok=false: -10
+- Cada item em missing_tools da manutenção: -3
+- Sem check-in answered na semana atual: -20
+- >2 manutenções nos últimos 30 dias: -15
+- >4 manutenções nos últimos 30 dias: -30 (substitui -15)
 
-**4. UX/UI:**
-- Cores de badge para prioridade (vermelho, amarelo, verde)
-- Ícones em cada seção do formulário
-- Layout em grid responsivo com scroll interno
-- Botão "Criar Manutenção" com gradiente e loading state
-- Toast de sucesso detalhado
+Bônus:
+- 30 dias sem manutenção criada: +10
+- Check-in answered na semana: +5
 
-### Arquivo: `src/hooks/useFleet.ts`
-- Atualizar `FleetMaintenance` interface com novos campos (`priority`, `scheduled_date`, `scheduled_time`, `assigned_to`, `missing_tools`)
-- Atualizar `FleetVehicle` status type para incluir `"attention"`
+Clamp: Math.max(0, Math.min(100, score))
+```
 
-### Arquivo: `src/pages/fleet/FleetMaintenances.tsx`
-- Adicionar coluna de Prioridade na tabela com badges coloridos
-- Exibir responsável atribuído
-- Manter compatibilidade com registros antigos sem os novos campos
+Hook `useVehicleScores()` retorna `Map<vehicleId, { score, classification }>`.
+
+Classificação:
+- 80-100: `healthy` (verde)
+- 50-79: `attention` (amarelo)
+- 0-49: `critical` (vermelho)
+
+### Novo Componente: `src/components/fleet/VehicleScoreBadge.tsx`
+
+Badge compacto que exibe score + classificação com cor. Usado nos cards de veículos e no dashboard.
+
+```text
+[🟢 92 Saudável]  [🟡 65 Atenção]  [🔴 32 Crítico]
+```
+
+Inclui barra de progresso circular ou linear opcional.
+
+### Alterações em Arquivos Existentes
+
+**1. `src/pages/fleet/FleetDashboard.tsx`**
+Adicionar seção de Score da Frota:
+- Card "Score Médio da Frota" com valor e cor
+- Card com contagem por classificação (X saudáveis, Y atenção, Z críticos)
+- Ranking: 5 piores veículos (menor score)
+- Ranking: 5 melhores veículos (maior score)
+
+**2. `src/pages/fleet/FleetVehicles.tsx`**
+- Adicionar `VehicleScoreBadge` em cada card de veículo, entre stats e status badge
+- Permitir ordenação por score
+
+**3. `src/pages/fleet/VehicleDetail.tsx`**
+- Adicionar card de Score no topo da página com classificação visual
 
 ### Detalhes Técnicos
 
-**Detecção automática de tipo e prioridade:**
-```text
-Palavras → Corretiva + Crítico: barulho, falha, quebra, motor, freio, suspensão
-Palavras → Corretiva + Atenção: balanceamento, alinhamento, folga
-Palavras → Preventiva: revisão, troca de óleo, km
-Default: Corretiva + Atenção
-```
+**Cálculo centralizado**: Uma única função pura testável. O hook `useVehicleScores` consome os mesmos hooks `useFleetMaintenances` e `useFleetCheckins` já usados no dashboard.
 
-**Criação de tarefa Kanban:**
-- Busca `fleet_settings` para `default_board_id`
-- Busca primeira coluna do board
-- Insere tarefa com título "Manutenção - [Veículo]", descrição, responsável e prazo
+**Performance**: O cálculo é O(n*m) onde n=veículos, m=manutenções+checkins. Com frotas pequenas (<100 veículos) é negligível. Usa `useMemo` com deps nos arrays de dados.
 
-**Sugestão de oficinas:**
-- Query `SELECT DISTINCT supplier FROM fleet_maintenances WHERE supplier IS NOT NULL` para popular datalist
+**Preparação para futuro**: A interface `ScoreConfig` com pesos será exportada para permitir configuração futura via settings.
 
 ### Arquivos Impactados
-1. `src/components/fleet/CreateMaintenanceFromCheckin.tsx` (reescrita)
-2. `src/hooks/useFleet.ts` (tipos atualizados)
-3. `src/pages/fleet/FleetMaintenances.tsx` (tabela atualizada)
-4. Migração SQL (novos campos)
+1. `src/hooks/useVehicleScore.ts` (novo)
+2. `src/components/fleet/VehicleScoreBadge.tsx` (novo)
+3. `src/pages/fleet/FleetDashboard.tsx` (adicionar seção de scores)
+4. `src/pages/fleet/FleetVehicles.tsx` (adicionar badge nos cards)
+5. `src/pages/fleet/VehicleDetail.tsx` (adicionar card de score)
+
+### Sem Alterações no Banco
+Nenhuma migração necessária. Score é 100% calculado no frontend.
 
