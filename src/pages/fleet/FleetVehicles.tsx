@@ -233,6 +233,15 @@ export default function FleetVehicles() {
                       </div>
                       <p className="text-sm font-medium">{lastMaint || "—"}</p>
                     </div>
+                    {(() => {
+                      const s = scores.get(v.id);
+                      return s ? (
+                        <div>
+                          <div className="text-xs text-muted-foreground mb-0.5">Score</div>
+                          <VehicleScoreBadge score={s.score} classification={s.classification} compact />
+                        </div>
+                      ) : null;
+                    })()}
                   </div>
 
                   {/* Badge */}

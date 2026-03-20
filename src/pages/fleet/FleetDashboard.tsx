@@ -1,10 +1,15 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { useFleetVehicles, useFleetDrivers, useFleetCheckins, useFleetMaintenances, useFleetDocuments } from "@/hooks/useFleet";
-import { Car, Users, ClipboardCheck, Wrench, FileText, AlertTriangle, Shield, ShieldAlert } from "lucide-react";
+import { useVehicleScores } from "@/hooks/useVehicleScore";
+import { VehicleScoreBadge } from "@/components/fleet/VehicleScoreBadge";
+import { Car, Users, ClipboardCheck, Wrench, FileText, AlertTriangle, Shield, ShieldAlert, Activity, TrendingUp, TrendingDown } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, addDays, isBefore, startOfWeek, endOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useMemo } from "react";
+import { cn } from "@/lib/utils";
 
 function StatCard({ label, value, icon: Icon, color = "text-primary", description }: { label: string; value: number | string; icon: any; color?: string; description?: string }) {
   return (
@@ -32,6 +37,33 @@ export default function FleetDashboard() {
 
   const isLoading = loadingV || loadingD || loadingC || loadingM || loadingDoc;
 
+  const scores = useVehicleScores(vehicles, maintenances, checkins);
+
+  const scoreStats = useMemo(() => {
+    if (vehicles.length === 0) return { avg: 0, healthy: 0, attention: 0, critical: 0, best: [], worst: [] };
+
+    let total = 0;
+    let healthy = 0, attention = 0, critical = 0;
+    const entries: { id: string; name: string; plate: string; score: number; classification: string }[] = [];
+
+    for (const v of vehicles) {
+      const s = scores.get(v.id);
+      if (!s) continue;
+      total += s.score;
+      if (s.classification === "healthy") healthy++;
+      else if (s.classification === "attention") attention++;
+      else critical++;
+      entries.push({ id: v.id, name: v.name, plate: v.plate, score: s.score, classification: s.classification });
+    }
+
+    entries.sort((a, b) => a.score - b.score);
+    const worst = entries.slice(0, 5);
+    const best = [...entries].sort((a, b) => b.score - a.score).slice(0, 5);
+    const avg = Math.round(total / vehicles.length);
+
+    return { avg, healthy, attention, critical, best, worst };
+  }, [vehicles, scores]);
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -54,7 +86,6 @@ export default function FleetDashboard() {
   });
   const pendingCheckins = weekCheckins.filter(c => c.status === "pending").length;
   const problemCheckins = weekCheckins.filter(c => c.needs_maintenance).length;
-
   const pendingMaintenances = maintenances.filter(m => m.status !== "completed").length;
 
   const warrantyDocs = documents.filter(d => d.document_type === "warranty" && d.warranty_expiry);
@@ -69,11 +100,13 @@ export default function FleetDashboard() {
     return drivers.filter(d => d.status === "active" && d.vehicle_id && !answeredDriverIds.has(d.id));
   })();
 
-  const recentProblems = checkins
-    .filter(c => c.needs_maintenance)
-    .slice(0, 5);
-
+  const recentProblems = checkins.filter(c => c.needs_maintenance).slice(0, 5);
   const recentMaintenances = maintenances.slice(0, 5);
+
+  const avgClassification = scoreStats.avg >= 80 ? "healthy" : scoreStats.avg >= 50 ? "attention" : "critical";
+  const avgColor = avgClassification === "healthy" ? "text-green-600" : avgClassification === "attention" ? "text-yellow-600" : "text-red-600";
+  const avgBg = avgClassification === "healthy" ? "bg-green-500/10" : avgClassification === "attention" ? "bg-yellow-500/10" : "bg-red-500/10";
+  const avgProgressColor = avgClassification === "healthy" ? "[&>div]:bg-green-500" : avgClassification === "attention" ? "[&>div]:bg-yellow-500" : "[&>div]:bg-red-500";
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -82,6 +115,84 @@ export default function FleetDashboard() {
         <p className="text-muted-foreground text-sm">Visão geral da frota da empresa</p>
       </div>
 
+      {/* Score Section */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className={cn("md:col-span-1", avgBg, "border-0")}>
+          <CardContent className="flex flex-col items-center justify-center p-6 text-center">
+            <Activity className={cn("h-6 w-6 mb-2", avgColor)} />
+            <p className={cn("text-4xl font-bold tabular-nums", avgColor)}>{scoreStats.avg}</p>
+            <p className="text-sm font-medium text-muted-foreground mt-1">Score Médio</p>
+            <Progress value={scoreStats.avg} className={cn("h-2 mt-3 w-full", avgProgressColor)} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <p className="text-sm font-medium text-muted-foreground">Distribuição</p>
+            <div className="space-y-2">
+              {[
+                { label: "Saudável", count: scoreStats.healthy, color: "bg-green-500", textColor: "text-green-600" },
+                { label: "Atenção", count: scoreStats.attention, color: "bg-yellow-500", textColor: "text-yellow-600" },
+                { label: "Crítico", count: scoreStats.critical, color: "bg-red-500", textColor: "text-red-600" },
+              ].map((item) => (
+                <div key={item.label} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className={cn("h-2.5 w-2.5 rounded-full", item.color)} />
+                    <span className="text-sm">{item.label}</span>
+                  </div>
+                  <span className={cn("text-sm font-bold tabular-nums", item.textColor)}>{item.count}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 space-y-2">
+            <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground mb-1">
+              <TrendingDown className="h-4 w-4 text-red-500" />
+              Piores Scores
+            </div>
+            {scoreStats.worst.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Sem dados</p>
+            ) : (
+              scoreStats.worst.map((v) => {
+                const s = scores.get(v.id)!;
+                return (
+                  <div key={v.id} className="flex items-center justify-between">
+                    <span className="text-xs truncate max-w-[120px]">{v.name}</span>
+                    <VehicleScoreBadge score={s.score} classification={s.classification} compact />
+                  </div>
+                );
+              })
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 space-y-2">
+            <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground mb-1">
+              <TrendingUp className="h-4 w-4 text-green-500" />
+              Melhores Scores
+            </div>
+            {scoreStats.best.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Sem dados</p>
+            ) : (
+              scoreStats.best.map((v) => {
+                const s = scores.get(v.id)!;
+                return (
+                  <div key={v.id} className="flex items-center justify-between">
+                    <span className="text-xs truncate max-w-[120px]">{v.name}</span>
+                    <VehicleScoreBadge score={s.score} classification={s.classification} compact />
+                  </div>
+                );
+              })
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Operational Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard label="Total de Veículos" value={vehicles.length} icon={Car} />
         <StatCard label="Veículos Ativos" value={activeVehicles} icon={Car} color="text-green-600" />
@@ -94,7 +205,6 @@ export default function FleetDashboard() {
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
-        {/* Motoristas sem check-in */}
         <Card>
           <CardHeader><CardTitle className="text-base">Motoristas sem check-in esta semana</CardTitle></CardHeader>
           <CardContent>
@@ -119,7 +229,6 @@ export default function FleetDashboard() {
           </CardContent>
         </Card>
 
-        {/* Últimos problemas */}
         <Card>
           <CardHeader><CardTitle className="text-base">Últimos problemas informados</CardTitle></CardHeader>
           <CardContent>
@@ -148,7 +257,6 @@ export default function FleetDashboard() {
           </CardContent>
         </Card>
 
-        {/* Últimas manutenções */}
         <Card>
           <CardHeader><CardTitle className="text-base">Últimas manutenções</CardTitle></CardHeader>
           <CardContent>
@@ -175,7 +283,6 @@ export default function FleetDashboard() {
           </CardContent>
         </Card>
 
-        {/* Garantias próximas de vencer */}
         <Card>
           <CardHeader><CardTitle className="text-base">Garantias próximas de vencer</CardTitle></CardHeader>
           <CardContent>
