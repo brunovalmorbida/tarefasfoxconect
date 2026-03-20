@@ -13,6 +13,7 @@ export interface ScoreConfig {
   freqOver4: number;
   bonusNoMaint30: number;
   bonusCheckinOk: number;
+  highCostRecurrent: number;
 }
 
 const DEFAULT_CONFIG: ScoreConfig = {
