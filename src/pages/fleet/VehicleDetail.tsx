@@ -139,6 +139,11 @@ export default function VehicleDetail() {
           </div>
           <p className="text-muted-foreground text-sm font-mono">{vehicle.plate}</p>
         </div>
+        {vehicleScore && (
+          <Card className="px-4 py-3 shrink-0">
+            <VehicleScoreBadge score={vehicleScore.score} classification={vehicleScore.classification} showBar />
+          </Card>
+        )}
       </div>
 
       {/* Alerts */}
