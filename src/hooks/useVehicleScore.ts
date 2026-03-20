@@ -115,6 +115,18 @@ export function calculateVehicleScore(
     score += config.bonusCheckinOk;
   }
 
+  // Deduction: high cost recurrent (>2 costly maintenances in 30 days)
+  const costlyRecent = recentMaints.filter(m => {
+    const cost = m.actual_cost || m.cost || 0;
+    return cost > 0;
+  });
+  if (costlyRecent.length > 2) {
+    const totalCost = costlyRecent.reduce((s, m) => s + (m.actual_cost || m.cost || 0), 0);
+    if (totalCost > 500) {
+      score += config.highCostRecurrent;
+    }
+  }
+
   score = Math.max(0, Math.min(100, score));
 
   return { score, classification: classify(score) };
