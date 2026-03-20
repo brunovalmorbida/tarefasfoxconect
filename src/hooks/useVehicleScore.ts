@@ -27,6 +27,7 @@ const DEFAULT_CONFIG: ScoreConfig = {
   freqOver4: -30,
   bonusNoMaint30: 10,
   bonusCheckinOk: 5,
+  highCostRecurrent: -15,
 };
 
 export type ScoreClassification = "healthy" | "attention" | "critical";
