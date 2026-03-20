@@ -1,37 +1,82 @@
-# TaskFox — Roadmap & Milestones
 
-## V1.0 — Base (Fev/2026)
-- Kanban com quadros, colunas e tarefas
-- Tarefas recorrentes (diárias, semanais, mensais)
-- Sistema de compras de materiais
-- Autenticação e permissões por usuário
-- Notificações internas
 
-## V2.0 — Consolidação (09/03/2026)
-- Módulo de Frota (veículos, motoristas, manutenções, documentos)
-- Módulo Social Media (pipeline, metas, categorias)
-- Busca global (Ctrl+K)
-- Subtarefas e comentários
-- Perfis editáveis
-- Automações WhatsApp com memória conversacional e botões interativos
-- Edição de listas de compras
+## Plano: Modal de Manutenção Profissional e Inteligente
 
-## V3.0 — Frota Completa (19/03/2026)
-- **Check-in multi-mensagem via WhatsApp**: motoristas respondem em múltiplas mensagens (foto + texto), com visão computacional (Gemini) para leitura de KM
-- **Contexto de IA para check-ins**: sistema injeta contexto do check-in pendente no prompt da IA, garantindo que descrições de manutenção e ferramentas sejam interpretadas corretamente via tool calling (`responder_checkin_frota`)
-- **Rastreamento parcial de conclusão**: check-in só é marcado como "respondido" quando KM, manutenção e ferramentas estão todos preenchidos
-- **Lembretes automáticos a cada 15 min**: edge function (`notify-checkin-reminder`) dispara via cron durante horário comercial, listando exatamente quais itens faltam
-- **Triagem de check-ins na UI**: campo `resolution_status` (Em aberto / Manutenção agendada / Resolvido) para acompanhar se problemas reportados foram tratados
-- **Ferramentas no diálogo**: seção dedicada no formulário de edição para status e descrição das ferramentas
-- **Botão "Criar Manutenção"**: criação direta de registro de manutenção a partir de problemas reportados no check-in
-- **Tarefas automáticas detalhadas**: tarefas criadas no Kanban incluem descrição completa de manutenção e ferramentas
-- **Página de detalhes do veículo**: timeline de histórico, documentos anexados, alertas de vencimento
+### Resumo
+Reescrever o componente `CreateMaintenanceFromCheckin.tsx` como um modal completo e inteligente, com preenchimento automático baseado no check-in, automações ao salvar (atualizar veículo, criar tarefa Kanban, enviar notificação), e UX profissional com cores de prioridade e sugestões.
 
-## V3.1 — Refinamento Visual & Prevenção (Próximo)
-- **Melhorias visuais**: redesign de cards, dashboards e responsividade mobile
-- **Manutenção preventiva**: alertas automáticos baseados em KM, tempo desde última manutenção e histórico do veículo
-- **Dashboard analítico da frota**: custos, tendências de KM, histórico de manutenções
-- **Relatórios exportáveis** (PDF/CSV) de check-ins e manutenções
-- **Integração de abastecimento**: controle de combustível por veículo
+### Mudanças no Banco de Dados
 
-⚠️ **Regra de estabilidade V3.1+**: Nenhuma alteração pode quebrar funcionalidades consolidadas na V3.0. Todas as mudanças devem ser aditivas ou isoladas em novos componentes.
+**Migração**: Adicionar colunas à tabela `fleet_maintenances`:
+- `priority` (text, default `'medium'`): `critical`, `attention`, `low`
+- `scheduled_date` (date, nullable)
+- `scheduled_time` (time, nullable)
+- `assigned_to` (uuid, nullable)
+- `missing_tools` (text[], nullable)
+
+### Arquivo: `src/components/fleet/CreateMaintenanceFromCheckin.tsx`
+Reescrever completamente com:
+
+**1. Campos do formulário:**
+- **Tipo**: Select com apenas "Preventiva" / "Corretiva", auto-detectado por palavras-chave na descrição
+- **Prioridade**: Select obrigatório com ícones coloridos (Critico/Atenção/Baixo), auto-detectado por palavras-chave (freio, motor, suspensão → Crítico; balanceamento, alinhamento → Atenção)
+- **Oficina/Fornecedor**: Input com datalist de sugestões (query das oficinas já usadas em `fleet_maintenances.supplier`)
+- **Problema do Veículo**: Textarea pré-preenchido do check-in, editável
+- **Ferramentas Faltantes**: Multi-checkbox com lista padrão (Notebook, Alicate, Conector, Máquina de fusão, Chave de fenda, Outros), pré-selecionado do `tools_description`
+- **Custo Estimado**: Input numérico formatado
+- **Data de Agendamento**: Campo date obrigatório + time opcional
+- **Responsável**: Select com usuários do sistema, sugestão automática do motorista do veículo
+- **Observações**: Textarea livre
+
+**2. Lógica de auto-preenchimento (`handleOpen`):**
+- Analisa `checkin.description` e `tools_description` para inferir tipo e prioridade
+- Busca oficinas anteriores para sugestões
+- Pré-seleciona ferramentas faltantes parseando o texto do check-in
+
+**3. Automações no `handleSubmit`:**
+- Criar registro de manutenção com novos campos
+- Atualizar status do veículo: Crítico → `"maintenance"`, Atenção → `"active"` (com nota)
+- Criar tarefa Kanban no board configurado em `fleet_settings.default_board_id`
+- Invocar `notify-task-assigned` para notificar responsável
+- Atualizar check-in `resolution_status` para `"scheduled"`
+
+**4. UX/UI:**
+- Cores de badge para prioridade (vermelho, amarelo, verde)
+- Ícones em cada seção do formulário
+- Layout em grid responsivo com scroll interno
+- Botão "Criar Manutenção" com gradiente e loading state
+- Toast de sucesso detalhado
+
+### Arquivo: `src/hooks/useFleet.ts`
+- Atualizar `FleetMaintenance` interface com novos campos (`priority`, `scheduled_date`, `scheduled_time`, `assigned_to`, `missing_tools`)
+- Atualizar `FleetVehicle` status type para incluir `"attention"`
+
+### Arquivo: `src/pages/fleet/FleetMaintenances.tsx`
+- Adicionar coluna de Prioridade na tabela com badges coloridos
+- Exibir responsável atribuído
+- Manter compatibilidade com registros antigos sem os novos campos
+
+### Detalhes Técnicos
+
+**Detecção automática de tipo e prioridade:**
+```text
+Palavras → Corretiva + Crítico: barulho, falha, quebra, motor, freio, suspensão
+Palavras → Corretiva + Atenção: balanceamento, alinhamento, folga
+Palavras → Preventiva: revisão, troca de óleo, km
+Default: Corretiva + Atenção
+```
+
+**Criação de tarefa Kanban:**
+- Busca `fleet_settings` para `default_board_id`
+- Busca primeira coluna do board
+- Insere tarefa com título "Manutenção - [Veículo]", descrição, responsável e prazo
+
+**Sugestão de oficinas:**
+- Query `SELECT DISTINCT supplier FROM fleet_maintenances WHERE supplier IS NOT NULL` para popular datalist
+
+### Arquivos Impactados
+1. `src/components/fleet/CreateMaintenanceFromCheckin.tsx` (reescrita)
+2. `src/hooks/useFleet.ts` (tipos atualizados)
+3. `src/pages/fleet/FleetMaintenances.tsx` (tabela atualizada)
+4. Migração SQL (novos campos)
+
