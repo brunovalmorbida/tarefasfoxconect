@@ -60,6 +60,11 @@ export interface FleetMaintenance {
   description: string | null;
   notes: string | null;
   status: "pending" | "in_progress" | "completed";
+  priority: "critical" | "attention" | "low";
+  scheduled_date: string | null;
+  scheduled_time: string | null;
+  assigned_to: string | null;
+  missing_tools: string[] | null;
   created_by: string;
   created_at: string;
   updated_at: string;
