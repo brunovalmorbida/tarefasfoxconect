@@ -34,6 +34,8 @@ export default function FleetVehicles() {
   const { vehicles, isLoading, createVehicle, updateVehicle, deleteVehicle } = useFleetVehicles();
   const { drivers } = useFleetDrivers();
   const { maintenances } = useFleetMaintenances();
+  const { checkins } = useFleetCheckins();
+  const scores = useVehicleScores(vehicles, maintenances, checkins);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editing, setEditing] = useState<FleetVehicle | null>(null);
