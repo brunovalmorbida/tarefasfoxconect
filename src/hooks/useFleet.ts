@@ -39,10 +39,14 @@ export interface FleetCheckin {
   id: string;
   vehicle_id: string;
   driver_id: string;
+  driver_user_id: string | null;
   checkin_date: string;
   km_reported: number | null;
   needs_maintenance: boolean;
   description: string | null;
+  tools_ok: boolean | null;
+  tools_description: string | null;
+  resolution_status: string;
   status: "pending" | "answered" | "overdue";
   task_id: string | null;
   created_at: string;
