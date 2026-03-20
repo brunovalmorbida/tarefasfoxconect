@@ -9,7 +9,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { useFleetVehicles, useFleetDrivers, useFleetMaintenances, FleetVehicle } from "@/hooks/useFleet";
+import { useFleetVehicles, useFleetDrivers, useFleetMaintenances, useFleetCheckins, FleetVehicle } from "@/hooks/useFleet";
+import { useVehicleScores } from "@/hooks/useVehicleScore";
+import { VehicleScoreBadge } from "@/components/fleet/VehicleScoreBadge";
 import { Plus, Pencil, Trash2, Car, Search, Gauge, Wrench, MoreHorizontal, Eye, ParkingSquare } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -28,6 +30,8 @@ export default function FleetVehicles() {
   const { vehicles, isLoading, createVehicle, updateVehicle, deleteVehicle } = useFleetVehicles();
   const { drivers } = useFleetDrivers();
   const { maintenances } = useFleetMaintenances();
+  const { checkins } = useFleetCheckins();
+  const scores = useVehicleScores(vehicles, maintenances, checkins);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editing, setEditing] = useState<FleetVehicle | null>(null);
@@ -225,6 +229,15 @@ export default function FleetVehicles() {
                       </div>
                       <p className="text-sm font-medium">{lastMaint || "—"}</p>
                     </div>
+                    {(() => {
+                      const s = scores.get(v.id);
+                      return s ? (
+                        <div>
+                          <div className="text-xs text-muted-foreground mb-0.5">Score</div>
+                          <VehicleScoreBadge score={s.score} classification={s.classification} compact />
+                        </div>
+                      ) : null;
+                    })()}
                   </div>
 
                   {/* Badge */}

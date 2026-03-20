@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useFleetVehicles, useFleetDrivers, useFleetMaintenances, useFleetDocuments, useFleetCheckins } from "@/hooks/useFleet";
+import { useVehicleScores } from "@/hooks/useVehicleScore";
+import { VehicleScoreBadge } from "@/components/fleet/VehicleScoreBadge";
 import {
   ArrowLeft, Car, User, Gauge, MapPin, Calendar, Wrench, FileText,
   ClipboardCheck, AlertTriangle, Shield, ShieldAlert, ShieldCheck, Eye, Download,
@@ -47,6 +49,8 @@ export default function VehicleDetail() {
   const { maintenances, isLoading: loadingM } = useFleetMaintenances();
   const { documents, isLoading: loadingD } = useFleetDocuments(vehicleId);
   const { checkins, isLoading: loadingC } = useFleetCheckins();
+  const scores = useVehicleScores(vehicles, maintenances, checkins);
+  const vehicleScore = vehicleId ? scores.get(vehicleId) : undefined;
 
   const vehicle = vehicles.find((v) => v.id === vehicleId);
   const driver = vehicle?.driver_id ? drivers.find((d) => d.id === vehicle.driver_id) : null;
@@ -135,6 +139,11 @@ export default function VehicleDetail() {
           </div>
           <p className="text-muted-foreground text-sm font-mono">{vehicle.plate}</p>
         </div>
+        {vehicleScore && (
+          <Card className="px-4 py-3 shrink-0">
+            <VehicleScoreBadge score={vehicleScore.score} classification={vehicleScore.classification} showBar />
+          </Card>
+        )}
       </div>
 
       {/* Alerts */}
