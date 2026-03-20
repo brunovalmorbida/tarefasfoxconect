@@ -9,8 +9,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { useFleetVehicles, useFleetDrivers, useFleetMaintenances, FleetVehicle } from "@/hooks/useFleet";
+import { useFleetVehicles, useFleetDrivers, useFleetMaintenances, useFleetCheckins, FleetVehicle } from "@/hooks/useFleet";
+import { useVehicleScores } from "@/hooks/useVehicleScore";
+import { VehicleScoreBadge } from "@/components/fleet/VehicleScoreBadge";
 import { Plus, Pencil, Trash2, Car, Search, Gauge, Wrench, MoreHorizontal, Eye, ParkingSquare } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Skeleton } from "@/components/ui/skeleton";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
