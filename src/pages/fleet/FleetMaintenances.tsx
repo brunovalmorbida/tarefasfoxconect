@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,13 +9,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { useFleetMaintenances, useFleetVehicles, FleetMaintenance } from "@/hooks/useFleet";
+import { useFleetMaintenances, useFleetVehicles, FleetMaintenance, uploadFleetFile } from "@/hooks/useFleet";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Search, Wrench, Pencil, Trash2, ShieldAlert, AlertTriangle, ShieldCheck } from "lucide-react";
+import { Plus, Search, Wrench, Pencil, Trash2, ShieldAlert, AlertTriangle, ShieldCheck, Upload, Eye, DollarSign } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 const MAINTENANCE_TYPES = [
   { value: "preventive", label: "Preventiva" },
@@ -43,6 +45,13 @@ const PRIORITY_MAP: Record<string, { label: string; className: string; icon: typ
   low: { label: "Baixo", className: "bg-emerald-500 text-white", icon: ShieldCheck },
 };
 
+const PAYMENT_METHODS = [
+  { value: "dinheiro", label: "Dinheiro" },
+  { value: "pix", label: "PIX" },
+  { value: "cartao", label: "Cartão" },
+  { value: "boleto", label: "Boleto" },
+];
+
 export default function FleetMaintenances() {
   const { maintenances, isLoading, createMaintenance, updateMaintenance, deleteMaintenance } = useFleetMaintenances();
   const { vehicles } = useFleetVehicles();
@@ -50,10 +59,14 @@ export default function FleetMaintenances() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editing, setEditing] = useState<FleetMaintenance | null>(null);
   const [search, setSearch] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
     vehicle_id: "", maintenance_type: "other", maintenance_date: new Date().toISOString().split("T")[0],
-    km_at_maintenance: "", cost: "", supplier: "", description: "", notes: "", status: "pending",
+    km_at_maintenance: "", cost: "", actual_cost: "", supplier: "", description: "", notes: "", status: "pending",
     priority: "attention", scheduled_date: "", assigned_to: "",
+    payment_date: "", payment_method: "", financial_status: "pending",
+    receipt_url: "", receipt_file_name: "",
   });
 
   const { data: profiles = [] } = useQuery({
@@ -66,8 +79,10 @@ export default function FleetMaintenances() {
 
   const resetForm = () => setForm({
     vehicle_id: "", maintenance_type: "other", maintenance_date: new Date().toISOString().split("T")[0],
-    km_at_maintenance: "", cost: "", supplier: "", description: "", notes: "", status: "pending",
+    km_at_maintenance: "", cost: "", actual_cost: "", supplier: "", description: "", notes: "", status: "pending",
     priority: "attention", scheduled_date: "", assigned_to: "",
+    payment_date: "", payment_method: "", financial_status: "pending",
+    receipt_url: "", receipt_file_name: "",
   });
 
   const openCreate = () => { resetForm(); setEditing(null); setDialogOpen(true); };
@@ -76,26 +91,52 @@ export default function FleetMaintenances() {
     setForm({
       vehicle_id: m.vehicle_id, maintenance_type: m.maintenance_type,
       maintenance_date: m.maintenance_date, km_at_maintenance: m.km_at_maintenance?.toString() || "",
-      cost: m.cost?.toString() || "", supplier: m.supplier || "",
-      description: m.description || "", notes: m.notes || "", status: m.status,
-      priority: m.priority || "attention",
-      scheduled_date: m.scheduled_date || "",
-      assigned_to: m.assigned_to || "",
+      cost: m.cost?.toString() || "", actual_cost: m.actual_cost?.toString() || "",
+      supplier: m.supplier || "", description: m.description || "", notes: m.notes || "", status: m.status,
+      priority: m.priority || "attention", scheduled_date: m.scheduled_date || "", assigned_to: m.assigned_to || "",
+      payment_date: m.payment_date || "", payment_method: m.payment_method || "",
+      financial_status: m.financial_status || "pending",
+      receipt_url: m.receipt_url || "", receipt_file_name: m.receipt_file_name || "",
     });
     setDialogOpen(true);
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !form.vehicle_id) return;
+    setUploading(true);
+    try {
+      const url = await uploadFleetFile(file, form.vehicle_id);
+      setForm(f => ({ ...f, receipt_url: url, receipt_file_name: file.name }));
+      toast.success("Comprovante enviado");
+    } catch {
+      toast.error("Erro ao enviar comprovante");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!form.vehicle_id) return;
+
+    // Validate: if completing, require financial fields
+    if (form.status === "completed" && !editing?.actual_cost && !form.actual_cost) {
+      toast.error("Preencha o custo real para finalizar a manutenção");
+      return;
+    }
+
     const payload: any = {
       vehicle_id: form.vehicle_id, maintenance_type: form.maintenance_type,
       maintenance_date: form.maintenance_date,
       km_at_maintenance: form.km_at_maintenance ? parseInt(form.km_at_maintenance) : null,
-      cost: form.cost ? parseFloat(form.cost) : null, supplier: form.supplier || null,
-      description: form.description || null, notes: form.notes || null, status: form.status,
-      priority: form.priority,
-      scheduled_date: form.scheduled_date || null,
-      assigned_to: form.assigned_to || null,
+      cost: form.cost ? parseFloat(form.cost) : null,
+      actual_cost: form.actual_cost ? parseFloat(form.actual_cost) : null,
+      supplier: form.supplier || null, description: form.description || null,
+      notes: form.notes || null, status: form.status, priority: form.priority,
+      scheduled_date: form.scheduled_date || null, assigned_to: form.assigned_to || null,
+      payment_date: form.payment_date || null, payment_method: form.payment_method || null,
+      financial_status: form.financial_status,
+      receipt_url: form.receipt_url || null, receipt_file_name: form.receipt_file_name || null,
     };
     if (editing) {
       await updateMaintenance.mutateAsync({ id: editing.id, ...payload });
@@ -139,7 +180,7 @@ export default function FleetMaintenances() {
         <Card><CardContent className="flex flex-col items-center justify-center py-12"><Wrench className="h-12 w-12 text-muted-foreground mb-4" /><p className="text-muted-foreground">Nenhuma manutenção encontrada</p></CardContent></Card>
       ) : (
         <Card>
-          <CardContent className="p-0">
+          <CardContent className="p-0 overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -147,9 +188,10 @@ export default function FleetMaintenances() {
                   <TableHead>Veículo</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Prioridade</TableHead>
-                  <TableHead className="hidden md:table-cell">KM</TableHead>
-                  <TableHead className="hidden md:table-cell">Valor</TableHead>
-                  <TableHead className="hidden lg:table-cell">Responsável</TableHead>
+                  <TableHead className="hidden md:table-cell">Estimado</TableHead>
+                  <TableHead className="hidden md:table-cell">Custo Real</TableHead>
+                  <TableHead className="hidden lg:table-cell">Financeiro</TableHead>
+                  <TableHead className="hidden lg:table-cell">Pagamento</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-20">Ações</TableHead>
                 </TableRow>
@@ -159,8 +201,10 @@ export default function FleetMaintenances() {
                   const v = vehicles.find(v => v.id === m.vehicle_id);
                   const priority = PRIORITY_MAP[m.priority] || PRIORITY_MAP.attention;
                   const PIcon = priority.icon;
+                  const isPaid = m.financial_status === "paid";
+                  const hasCost = !!(m.actual_cost || m.cost);
                   return (
-                    <TableRow key={m.id}>
+                    <TableRow key={m.id} className={cn(!isPaid && hasCost && "bg-red-500/5")}>
                       <TableCell>{format(new Date(m.maintenance_date), "dd/MM/yyyy", { locale: ptBR })}</TableCell>
                       <TableCell className="font-medium">{v?.name || "—"}</TableCell>
                       <TableCell>{getTypeName(m.maintenance_type)}</TableCell>
@@ -170,9 +214,14 @@ export default function FleetMaintenances() {
                           {priority.label}
                         </Badge>
                       </TableCell>
-                      <TableCell className="hidden md:table-cell">{m.km_at_maintenance?.toLocaleString("pt-BR") || "—"}</TableCell>
-                      <TableCell className="hidden md:table-cell">{m.cost ? `R$ ${Number(m.cost).toFixed(2)}` : "—"}</TableCell>
-                      <TableCell className="hidden lg:table-cell">{getProfileName(m.assigned_to)}</TableCell>
+                      <TableCell className="hidden md:table-cell tabular-nums">{m.cost ? `R$ ${Number(m.cost).toFixed(2)}` : "—"}</TableCell>
+                      <TableCell className="hidden md:table-cell tabular-nums font-medium">{m.actual_cost ? `R$ ${Number(m.actual_cost).toFixed(2)}` : "—"}</TableCell>
+                      <TableCell className="hidden lg:table-cell">
+                        <Badge variant={isPaid ? "default" : "outline"} className={cn("text-xs", !isPaid && hasCost && "text-red-600 border-red-600")}>
+                          {isPaid ? "Pago" : "Pendente"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell text-xs">{m.payment_method || "—"}</TableCell>
                       <TableCell><Badge variant={STATUS_MAP[m.status]?.variant || "outline"}>{STATUS_MAP[m.status]?.label || m.status}</Badge></TableCell>
                       <TableCell>
                         <div className="flex gap-1">
@@ -235,16 +284,70 @@ export default function FleetMaintenances() {
             <div className="grid grid-cols-3 gap-4">
               <div><Label>Data</Label><Input type="date" value={form.maintenance_date} onChange={e => setForm(f => ({ ...f, maintenance_date: e.target.value }))} /></div>
               <div><Label>KM</Label><Input type="number" value={form.km_at_maintenance} onChange={e => setForm(f => ({ ...f, km_at_maintenance: e.target.value }))} /></div>
-              <div><Label>Valor (R$)</Label><Input type="number" step="0.01" value={form.cost} onChange={e => setForm(f => ({ ...f, cost: e.target.value }))} /></div>
+              <div><Label>Agendamento</Label><Input type="date" value={form.scheduled_date} onChange={e => setForm(f => ({ ...f, scheduled_date: e.target.value }))} /></div>
             </div>
             <div><Label>Fornecedor / Oficina</Label><Input value={form.supplier} onChange={e => setForm(f => ({ ...f, supplier: e.target.value }))} /></div>
             <div><Label>Descrição do Serviço</Label><Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} /></div>
+
+            {/* Financial Section */}
+            <div className="border-t pt-4 space-y-4">
+              <h3 className="text-sm font-semibold flex items-center gap-2"><DollarSign className="h-4 w-4" /> Financeiro</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div><Label>Custo Estimado (R$)</Label><Input type="number" step="0.01" value={form.cost} onChange={e => setForm(f => ({ ...f, cost: e.target.value }))} placeholder="250,00" /></div>
+                <div>
+                  <Label>Custo Real (R$) {form.status === "completed" && "*"}</Label>
+                  <Input type="number" step="0.01" value={form.actual_cost} onChange={e => setForm(f => ({ ...f, actual_cost: e.target.value }))} placeholder="280,00" />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <Label>Data Pagamento</Label>
+                  <Input type="date" value={form.payment_date} onChange={e => setForm(f => ({ ...f, payment_date: e.target.value }))} />
+                </div>
+                <div>
+                  <Label>Forma de Pagamento</Label>
+                  <Select value={form.payment_method || "none"} onValueChange={v => setForm(f => ({ ...f, payment_method: v === "none" ? "" : v }))}>
+                    <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">—</SelectItem>
+                      {PAYMENT_METHODS.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Status Financeiro</Label>
+                  <Select value={form.financial_status} onValueChange={v => setForm(f => ({ ...f, financial_status: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">Pendente</SelectItem>
+                      <SelectItem value="paid">Pago</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div>
+                <Label>Comprovante</Label>
+                <div className="flex items-center gap-2 mt-1">
+                  <input ref={fileInputRef} type="file" accept="image/*,.pdf" className="hidden" onChange={handleFileUpload} />
+                  <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={uploading || !form.vehicle_id}>
+                    <Upload className="h-4 w-4 mr-1" /> {uploading ? "Enviando..." : "Upload"}
+                  </Button>
+                  {form.receipt_file_name && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span className="truncate max-w-[150px]">{form.receipt_file_name}</span>
+                      {form.receipt_url && (
+                        <Button variant="ghost" size="icon" className="h-6 w-6" asChild>
+                          <a href={form.receipt_url} target="_blank" rel="noopener"><Eye className="h-3 w-3" /></a>
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
             <div><Label>Observações</Label><Textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} /></div>
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Agendamento</Label>
-                <Input type="date" value={form.scheduled_date} onChange={e => setForm(f => ({ ...f, scheduled_date: e.target.value }))} />
-              </div>
               <div>
                 <Label>Status</Label>
                 <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>

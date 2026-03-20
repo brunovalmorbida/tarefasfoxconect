@@ -60,6 +60,12 @@ export interface FleetMaintenance {
   maintenance_date: string;
   km_at_maintenance: number | null;
   cost: number | null;
+  actual_cost: number | null;
+  payment_date: string | null;
+  payment_method: string | null;
+  financial_status: "pending" | "paid";
+  receipt_url: string | null;
+  receipt_file_name: string | null;
   supplier: string | null;
   description: string | null;
   notes: string | null;
