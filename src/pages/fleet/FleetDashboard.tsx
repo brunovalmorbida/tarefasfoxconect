@@ -182,7 +182,7 @@ export default function FleetDashboard() {
                 const s = scores.get(v.id)!;
                 return (
                   <div key={v.id} className="flex items-center justify-between">
-                    <span className="text-xs truncate max-w-[120px]">{v.name}</span>
+                    <span className="text-xs truncate max-w-[160px]">{v.name} <span className="text-muted-foreground font-mono">({v.plate})</span></span>
                     <VehicleScoreBadge score={s.score} classification={s.classification} compact />
                   </div>
                 );
