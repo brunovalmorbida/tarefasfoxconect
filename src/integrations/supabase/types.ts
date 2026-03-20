@@ -344,6 +344,7 @@ export type Database = {
       }
       fleet_maintenances: {
         Row: {
+          assigned_to: string | null
           cost: number | null
           created_at: string
           created_by: string
@@ -352,13 +353,18 @@ export type Database = {
           km_at_maintenance: number | null
           maintenance_date: string
           maintenance_type: string
+          missing_tools: string[] | null
           notes: string | null
+          priority: string
+          scheduled_date: string | null
+          scheduled_time: string | null
           status: string
           supplier: string | null
           updated_at: string
           vehicle_id: string
         }
         Insert: {
+          assigned_to?: string | null
           cost?: number | null
           created_at?: string
           created_by: string
@@ -367,13 +373,18 @@ export type Database = {
           km_at_maintenance?: number | null
           maintenance_date?: string
           maintenance_type?: string
+          missing_tools?: string[] | null
           notes?: string | null
+          priority?: string
+          scheduled_date?: string | null
+          scheduled_time?: string | null
           status?: string
           supplier?: string | null
           updated_at?: string
           vehicle_id: string
         }
         Update: {
+          assigned_to?: string | null
           cost?: number | null
           created_at?: string
           created_by?: string
@@ -382,7 +393,11 @@ export type Database = {
           km_at_maintenance?: number | null
           maintenance_date?: string
           maintenance_type?: string
+          missing_tools?: string[] | null
           notes?: string | null
+          priority?: string
+          scheduled_date?: string | null
+          scheduled_time?: string | null
           status?: string
           supplier?: string | null
           updated_at?: string
