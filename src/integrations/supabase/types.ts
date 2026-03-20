@@ -344,18 +344,24 @@ export type Database = {
       }
       fleet_maintenances: {
         Row: {
+          actual_cost: number | null
           assigned_to: string | null
           cost: number | null
           created_at: string
           created_by: string
           description: string | null
+          financial_status: string
           id: string
           km_at_maintenance: number | null
           maintenance_date: string
           maintenance_type: string
           missing_tools: string[] | null
           notes: string | null
+          payment_date: string | null
+          payment_method: string | null
           priority: string
+          receipt_file_name: string | null
+          receipt_url: string | null
           scheduled_date: string | null
           scheduled_time: string | null
           status: string
@@ -364,18 +370,24 @@ export type Database = {
           vehicle_id: string
         }
         Insert: {
+          actual_cost?: number | null
           assigned_to?: string | null
           cost?: number | null
           created_at?: string
           created_by: string
           description?: string | null
+          financial_status?: string
           id?: string
           km_at_maintenance?: number | null
           maintenance_date?: string
           maintenance_type?: string
           missing_tools?: string[] | null
           notes?: string | null
+          payment_date?: string | null
+          payment_method?: string | null
           priority?: string
+          receipt_file_name?: string | null
+          receipt_url?: string | null
           scheduled_date?: string | null
           scheduled_time?: string | null
           status?: string
@@ -384,18 +396,24 @@ export type Database = {
           vehicle_id: string
         }
         Update: {
+          actual_cost?: number | null
           assigned_to?: string | null
           cost?: number | null
           created_at?: string
           created_by?: string
           description?: string | null
+          financial_status?: string
           id?: string
           km_at_maintenance?: number | null
           maintenance_date?: string
           maintenance_type?: string
           missing_tools?: string[] | null
           notes?: string | null
+          payment_date?: string | null
+          payment_method?: string | null
           priority?: string
+          receipt_file_name?: string | null
+          receipt_url?: string | null
           scheduled_date?: string | null
           scheduled_time?: string | null
           status?: string
