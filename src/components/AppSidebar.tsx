@@ -27,6 +27,7 @@ const baseNav = [
   { title: "Notificações", url: "/notifications", icon: Bell },
   { title: "Configurações", url: "/settings", icon: Settings },
   { title: "Meu Perfil", url: "/profile", icon: UserCircle },
+  { title: "Visão Geral", url: "/features", icon: BookOpen },
 ];
 
 export function AppSidebar() {
