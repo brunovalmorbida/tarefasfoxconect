@@ -263,10 +263,12 @@ export default function AdminDashboard() {
                 key={alert.type}
                 className={cn(
                   "flex items-center gap-3 p-4 rounded-xl border transition-all",
+                  alert.type === "overdue" && "cursor-pointer hover:shadow-md",
                   alert.color === "text-destructive" ? "border-destructive/20 bg-destructive/5" :
                   alert.color === "text-warning" ? "border-amber-500/20 bg-amber-500/5" :
                   "border-blue-500/20 bg-blue-500/5"
                 )}
+                onClick={alert.type === "overdue" ? () => setShowOverdueTasks(!showOverdueTasks) : undefined}
               >
                 <div className={cn(
                   "w-10 h-10 rounded-xl flex items-center justify-center",
@@ -278,13 +280,59 @@ export default function AdminDashboard() {
                   {alert.type === "purchases" && <ShoppingCart className={cn("h-5 w-5", alert.color)} />}
                   {alert.type === "maintenance" && <Wrench className={cn("h-5 w-5", alert.color)} />}
                 </div>
-                <div>
+                <div className="flex-1">
                   <p className={cn("text-2xl font-extrabold", alert.color)}>{alert.count}</p>
                   <p className="text-xs text-muted-foreground">{alert.label}</p>
                 </div>
+                {alert.type === "overdue" && (
+                  showOverdueTasks 
+                    ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> 
+                    : <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                )}
               </div>
             ))}
           </div>
+
+          {/* Overdue tasks expanded list */}
+          {showOverdueTasks && overdueTasks.length > 0 && (
+            <div className="px-5 pb-5">
+              <div className="rounded-xl border border-destructive/20 bg-destructive/5 divide-y divide-destructive/10">
+                {overdueTasks.slice(0, 10).map((task) => (
+                  <div key={task.id} className="flex items-center justify-between px-4 py-3 gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">{task.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {task.boardName} · {task.columnName}
+                        {task.due_date && (
+                          <> · Venceu em {format(new Date(task.due_date), "dd/MM/yyyy")}</>
+                        )}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs text-destructive hover:text-destructive shrink-0"
+                      onClick={() => navigate("/boards")}
+                    >
+                      Ver quadro <ExternalLink className="h-3 w-3 ml-1" />
+                    </Button>
+                  </div>
+                ))}
+                {overdueTasks.length > 10 && (
+                  <div className="px-4 py-2 text-center">
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="text-xs text-destructive"
+                      onClick={() => navigate("/boards")}
+                    >
+                      Ver todas as {overdueTasks.length} tarefas atrasadas
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
