@@ -89,6 +89,16 @@ export default function AdminDashboard() {
     return tasks;
   }, [boards]);
 
+  // Overdue tasks list
+  const overdueTasks = useMemo(() => {
+    return allTasks.filter((t) => {
+      if (!t.due_date) return false;
+      const cn = t.columnName?.toLowerCase();
+      const isDone = cn?.includes("concluí") || cn?.includes("done") || cn?.includes("concluido");
+      return !isDone && isPast(new Date(t.due_date));
+    });
+  }, [allTasks]);
+
   // Stats
   const stats = useMemo(() => {
     const totalTasks = allTasks.length;
@@ -96,18 +106,12 @@ export default function AdminDashboard() {
       const cn = t.columnName?.toLowerCase();
       return cn?.includes("concluí") || cn?.includes("done") || cn?.includes("concluido");
     }).length;
-    const overdueTasks = allTasks.filter((t) => {
-      if (!t.due_date) return false;
-      const cn = t.columnName?.toLowerCase();
-      const isDone = cn?.includes("concluí") || cn?.includes("done") || cn?.includes("concluido");
-      return !isDone && isPast(new Date(t.due_date));
-    }).length;
 
     const pendingPurchases = purchases.filter((p) => p.status === "pending").length;
     const vehiclesInMaintenance = vehicles?.filter((v) => v.status === "maintenance").length || 0;
     const pendingMaintenances = maintenances?.filter((m) => m.status !== "completed").length || 0;
 
-    return { totalTasks, doneTasks, overdueTasks, pendingPurchases, vehiclesInMaintenance, pendingMaintenances };
+    return { totalTasks, doneTasks, overdueTasks: overdueTasks.length, pendingPurchases, vehiclesInMaintenance, pendingMaintenances };
   }, [allTasks, purchases, vehicles, maintenances]);
 
   // Most active users (by activity_log count in last 7 days)
