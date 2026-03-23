@@ -22,6 +22,8 @@ import {
 } from "recharts";
 
 export default function AdminDashboard() {
+  const navigate = useNavigate();
+  const [showOverdueTasks, setShowOverdueTasks] = useState(false);
   const { boards, isLoading: boardsLoading } = useBoards();
   const { purchases, isLoading: purchasesLoading } = usePurchases();
   const canViewFleet = useCanManage("can_view_fleet");
