@@ -11,7 +11,10 @@ import { cn } from "@/lib/utils";
 import {
   Users, ClipboardList, AlertTriangle, ShoppingCart, Wrench,
   Activity, TrendingUp, CheckCircle2, Clock, BarChart3, Crown, Zap,
+  ChevronDown, ChevronUp, ExternalLink,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 import { isPast, isToday, subDays, format, startOfWeek, endOfWeek, eachDayOfInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
