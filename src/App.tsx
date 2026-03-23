@@ -18,6 +18,7 @@ import ProfilePage from "./pages/ProfilePage";
 import Fleet from "./pages/Fleet";
 import VehicleDetail from "./pages/fleet/VehicleDetail";
 import SocialMedia from "./pages/SocialMedia";
+import FeaturesOverview from "./pages/FeaturesOverview";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
