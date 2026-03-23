@@ -18,6 +18,7 @@ import ProfilePage from "./pages/ProfilePage";
 import Fleet from "./pages/Fleet";
 import VehicleDetail from "./pages/fleet/VehicleDetail";
 import SocialMedia from "./pages/SocialMedia";
+import FeaturesOverview from "./pages/FeaturesOverview";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -44,6 +45,7 @@ const App = () => (
                 <Route path="/notifications" element={<Notifications />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/features" element={<FeaturesOverview />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>

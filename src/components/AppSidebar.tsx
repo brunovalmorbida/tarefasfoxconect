@@ -1,4 +1,4 @@
-import { LayoutDashboard, Columns3, Bell, Settings, LogOut, ListChecks, ShoppingCart, Sun, Moon, UserCircle, Car, Instagram } from "lucide-react";
+import { LayoutDashboard, Columns3, Bell, Settings, LogOut, ListChecks, ShoppingCart, Sun, Moon, UserCircle, Car, Instagram, BookOpen } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsAppAdmin, useCanManage } from "@/hooks/useUserRole";
@@ -27,6 +27,7 @@ const baseNav = [
   { title: "Notificações", url: "/notifications", icon: Bell },
   { title: "Configurações", url: "/settings", icon: Settings },
   { title: "Meu Perfil", url: "/profile", icon: UserCircle },
+  { title: "Visão Geral", url: "/features", icon: BookOpen },
 ];
 
 export function AppSidebar() {
