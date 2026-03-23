@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useBoards } from "@/hooks/useBoards";
@@ -11,7 +11,10 @@ import { cn } from "@/lib/utils";
 import {
   Users, ClipboardList, AlertTriangle, ShoppingCart, Wrench,
   Activity, TrendingUp, CheckCircle2, Clock, BarChart3, Crown, Zap,
+  ChevronDown, ChevronUp, ExternalLink,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 import { isPast, isToday, subDays, format, startOfWeek, endOfWeek, eachDayOfInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -19,6 +22,8 @@ import {
 } from "recharts";
 
 export default function AdminDashboard() {
+  const navigate = useNavigate();
+  const [showOverdueTasks, setShowOverdueTasks] = useState(false);
   const { boards, isLoading: boardsLoading } = useBoards();
   const { purchases, isLoading: purchasesLoading } = usePurchases();
   const canViewFleet = useCanManage("can_view_fleet");
@@ -84,6 +89,16 @@ export default function AdminDashboard() {
     return tasks;
   }, [boards]);
 
+  // Overdue tasks list
+  const overdueTasks = useMemo(() => {
+    return allTasks.filter((t) => {
+      if (!t.due_date) return false;
+      const cn = t.columnName?.toLowerCase();
+      const isDone = cn?.includes("concluí") || cn?.includes("done") || cn?.includes("concluido");
+      return !isDone && isPast(new Date(t.due_date));
+    });
+  }, [allTasks]);
+
   // Stats
   const stats = useMemo(() => {
     const totalTasks = allTasks.length;
@@ -91,18 +106,12 @@ export default function AdminDashboard() {
       const cn = t.columnName?.toLowerCase();
       return cn?.includes("concluí") || cn?.includes("done") || cn?.includes("concluido");
     }).length;
-    const overdueTasks = allTasks.filter((t) => {
-      if (!t.due_date) return false;
-      const cn = t.columnName?.toLowerCase();
-      const isDone = cn?.includes("concluí") || cn?.includes("done") || cn?.includes("concluido");
-      return !isDone && isPast(new Date(t.due_date));
-    }).length;
 
     const pendingPurchases = purchases.filter((p) => p.status === "pending").length;
     const vehiclesInMaintenance = vehicles?.filter((v) => v.status === "maintenance").length || 0;
     const pendingMaintenances = maintenances?.filter((m) => m.status !== "completed").length || 0;
 
-    return { totalTasks, doneTasks, overdueTasks, pendingPurchases, vehiclesInMaintenance, pendingMaintenances };
+    return { totalTasks, doneTasks, overdueTasks: overdueTasks.length, pendingPurchases, vehiclesInMaintenance, pendingMaintenances };
   }, [allTasks, purchases, vehicles, maintenances]);
 
   // Most active users (by activity_log count in last 7 days)
@@ -254,10 +263,12 @@ export default function AdminDashboard() {
                 key={alert.type}
                 className={cn(
                   "flex items-center gap-3 p-4 rounded-xl border transition-all",
+                  alert.type === "overdue" && "cursor-pointer hover:shadow-md",
                   alert.color === "text-destructive" ? "border-destructive/20 bg-destructive/5" :
                   alert.color === "text-warning" ? "border-amber-500/20 bg-amber-500/5" :
                   "border-blue-500/20 bg-blue-500/5"
                 )}
+                onClick={alert.type === "overdue" ? () => setShowOverdueTasks(!showOverdueTasks) : undefined}
               >
                 <div className={cn(
                   "w-10 h-10 rounded-xl flex items-center justify-center",
@@ -269,13 +280,59 @@ export default function AdminDashboard() {
                   {alert.type === "purchases" && <ShoppingCart className={cn("h-5 w-5", alert.color)} />}
                   {alert.type === "maintenance" && <Wrench className={cn("h-5 w-5", alert.color)} />}
                 </div>
-                <div>
+                <div className="flex-1">
                   <p className={cn("text-2xl font-extrabold", alert.color)}>{alert.count}</p>
                   <p className="text-xs text-muted-foreground">{alert.label}</p>
                 </div>
+                {alert.type === "overdue" && (
+                  showOverdueTasks 
+                    ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> 
+                    : <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                )}
               </div>
             ))}
           </div>
+
+          {/* Overdue tasks expanded list */}
+          {showOverdueTasks && overdueTasks.length > 0 && (
+            <div className="px-5 pb-5">
+              <div className="rounded-xl border border-destructive/20 bg-destructive/5 divide-y divide-destructive/10">
+                {overdueTasks.slice(0, 10).map((task) => (
+                  <div key={task.id} className="flex items-center justify-between px-4 py-3 gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">{task.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {task.boardName} · {task.columnName}
+                        {task.due_date && (
+                          <> · Venceu em {format(new Date(task.due_date), "dd/MM/yyyy")}</>
+                        )}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs text-destructive hover:text-destructive shrink-0"
+                      onClick={() => navigate("/boards")}
+                    >
+                      Ver quadro <ExternalLink className="h-3 w-3 ml-1" />
+                    </Button>
+                  </div>
+                ))}
+                {overdueTasks.length > 10 && (
+                  <div className="px-4 py-2 text-center">
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="text-xs text-destructive"
+                      onClick={() => navigate("/boards")}
+                    >
+                      Ver todas as {overdueTasks.length} tarefas atrasadas
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
