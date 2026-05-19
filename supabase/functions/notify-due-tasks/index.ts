@@ -186,10 +186,10 @@ Deno.serve(async (req) => {
         : `A tarefa "${task.title}" no quadro ${boardName} vence em 3 dias (${formattedDate}).`;
 
       if (task.assignee_id) {
-        await adminClient.from("notifications").insert({ user_id: task.assignee_id, title: notifTitle, message: notifMessage });
+        await adminClient.from("notifications").insert({ user_id: task.assignee_id, title: notifTitle, message: notifMessage, link: "/boards" });
       }
       if (masterUser && (!task.assignee_id || masterUser.id !== task.assignee_id)) {
-        await adminClient.from("notifications").insert({ user_id: masterUser.id, title: notifTitle, message: notifMessage });
+        await adminClient.from("notifications").insert({ user_id: masterUser.id, title: notifTitle, message: notifMessage, link: "/boards" });
       }
     }
 
