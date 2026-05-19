@@ -401,6 +401,15 @@ export function UsersTab() {
   const handleEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editUserId || !editName.trim()) return;
+    let normalizedEditWhats: string | null = null;
+    if (editWhatsapp.trim()) {
+      const n = normalizePhoneBR(editWhatsapp);
+      if (!n) {
+        toast.error("WhatsApp inválido. Use DDD + número (ex: 54999223558).");
+        return;
+      }
+      normalizedEditWhats = n;
+    }
     setSaving(true);
     try {
       const { data, error } = await supabase.functions.invoke("update-user", {
@@ -409,7 +418,7 @@ export function UsersTab() {
           name: editName.trim(),
           email: editEmail.trim() || undefined,
           jobTitle: editJobTitle.trim(),
-          whatsappNumber: editWhatsapp.trim() || null,
+          whatsappNumber: normalizedEditWhats,
           password: editPassword || undefined,
           teamIds: editTeams,
           isAdmin: isMasterAdmin ? editIsAdmin : undefined,
