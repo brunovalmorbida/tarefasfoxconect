@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTeams } from "@/hooks/useBoards";
 import { useAuth } from "@/hooks/useAuth";
 import { useLogActivity } from "@/hooks/useActivityLog";
+import { normalizePhoneBR } from "@/lib/phone";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
