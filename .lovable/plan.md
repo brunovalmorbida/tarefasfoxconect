@@ -1,90 +1,78 @@
+## Diagnóstico
 
+**Bug crítico identificado** no `whatsapp-webhook` (linhas 308–340):
+- O número do Bruno está cadastrado como `5499223558` (10 dígitos, **sem o 9 e sem código de país**).
+- O número do Eliseu está como `5554993107017` (13 dígitos, formato completo).
+- A função de matching usa **3 estratégias soltas em cascata**: igualdade exata, `endsWith` em ambos os lados, comparação de "últimos 8 dígitos" e extração de DDD+core. Como `endsWith` é frouxo e os números armazenados estão em formatos diferentes, a primeira coincidência parcial vence — o que produz falsos positivos (ex.: identificar a mensagem do Bruno como sendo do Eliseu).
+- A raiz do problema é dupla: **(1)** matching não-determinístico e **(2)** ausência de normalização ao salvar o `whatsapp_number` no perfil.
 
-## Plano: Sistema de Score de Veículos
+Outros pontos da revisão (escopo definido pelas suas respostas: **WhatsApp + Cron + links clicáveis in-app**):
+- Há **6 cron jobs ativos**; `notify-due-tasks-daily` e `notify-purchase-reminders-daily` rodam ambos às 12:00 UTC — ok, mas a verificação de horário comercial é feita em BRT dentro de cada função (cuidado com confusões UTC/BRT).
+- Notificações in-app têm coluna `link` na tabela `notifications`, mas a UI (`Notifications.tsx`) **não usa esse campo** — clicar numa notificação não leva a lugar nenhum.
+- Várias funções (`notify-*`) duplicam o mesmo bloco "horário comercial" — manutenção espalhada.
 
-### Resumo
-Implementar score automático (0-100) para cada veículo calculado no frontend com base em manutenções, check-ins e ferramentas. Sem alteração no banco de dados -- o score é computado em tempo real a partir dos dados já existentes. Isso mantém a estabilidade do V3.0 e evita migrações desnecessárias.
+---
 
-### Decisão Arquitetural: Score Calculado no Frontend
+## Plano de melhorias
 
-O score **não** será armazenado no banco. Será calculado via `useMemo` a partir dos dados já carregados (vehicles, checkins, maintenances). Razões:
-- Dados já estão disponíveis nos hooks existentes
-- Evita migrações e triggers complexos
-- Atualização automática ao recarregar dados
-- Preparado para futuro: pode migrar para DB function se necessário
+### 1. Corrigir identificação de telefone (prioridade máxima)
 
-### Novo Arquivo: `src/hooks/useVehicleScore.ts`
+**a) Criar utilitário canônico de normalização BR** (inline nas Edge Functions, sem import externo):
+- Remove tudo que não é dígito.
+- Remove código de país `55` se presente.
+- Para números brasileiros: garante DDD (2 dígitos) + 9 dígitos de assinante (insere o "nono dígito" se faltar para celular; remove se sobrar).
+- Retorna formato canônico único: `55 + DDD + 9 + 8 dígitos` (13 dígitos).
+- Para qualquer comparação, normaliza ambos os lados antes — **igualdade exata** apenas, sem `endsWith`.
 
-Função pura `calculateVehicleScore(vehicleId, maintenances, checkins)` que:
+**b) Aplicar normalização em duas frentes**:
+- **Webhook** (`whatsapp-webhook/index.ts`): substituir o bloco linhas 308–340 pela comparação canônica. Logar `raw → normalized` para auditoria.
+- **Salvamento** (`ProfilePage.tsx` + tela de criação/edição de usuário em `UsersTab.tsx`): normalizar antes de gravar em `profiles.whatsapp_number`, e mostrar o número formatado (`(54) 99922-3558`) na UI.
 
-```text
-Base: 100 pontos
+**c) Migração de dados**: rodar UPDATE único normalizando os 22 perfis existentes ao formato canônico de 13 dígitos. Isso elimina ambiguidades históricas (ex.: Bruno `5499223558` → `5554999223558`).
 
-Deduções:
-- Manutenção não-completed com priority=critical: -30
-- Manutenção não-completed com priority=attention: -15
-- Manutenção não-completed com priority=low: -5
-- Check-in da semana com tools_ok=false: -10
-- Cada item em missing_tools da manutenção: -3
-- Sem check-in answered na semana atual: -20
-- >2 manutenções nos últimos 30 dias: -15
-- >4 manutenções nos últimos 30 dias: -30 (substitui -15)
+**d) Conflito de duplicatas**: após normalização, se dois perfis tiverem o mesmo número canônico, logar warning e listar para revisão manual (não é o caso atual, mas previne futuro).
 
-Bônus:
-- 30 dias sem manutenção criada: +10
-- Check-in answered na semana: +5
+### 2. Centralizar regras compartilhadas das Edge Functions
 
-Clamp: Math.max(0, Math.min(100, score))
-```
+Criar um arquivo único de helpers reutilizado por todas as funções `notify-*` e pelo webhook:
+- `isBusinessHoursBRT()` — substitui o bloco copiado em 7+ arquivos.
+- `normalizePhoneBR(raw)` — normalização canônica descrita acima.
+- `sendWhatsAppText(zapi, phone, message)` — wrapper com retry simples e logs uniformes.
 
-Hook `useVehicleScores()` retorna `Map<vehicleId, { score, classification }>`.
+Cada função `notify-*` passa a importar de `supabase/functions/_shared/notifications.ts` (padrão suportado pelo Deno).
 
-Classificação:
-- 80-100: `healthy` (verde)
-- 50-79: `attention` (amarelo)
-- 0-49: `critical` (vermelho)
+### 3. Revisão dos cron jobs
 
-### Novo Componente: `src/components/fleet/VehicleScoreBadge.tsx`
+- Manter os 6 jobs atuais; eles cobrem casos distintos.
+- Adicionar **deduplicação por contexto** nas notificações in-app: antes de inserir em `notifications`, verificar se já existe uma com mesmo `user_id + title + message` criada nas últimas 6h. Evita spam quando o cron roda a cada 30 min e a tarefa continua atrasada.
+- Documentar no topo de cada função o horário UTC vs BRT que ela realmente executa.
 
-Badge compacto que exibe score + classificação com cor. Usado nos cards de veículos e no dashboard.
+### 4. Links clicáveis na central in-app
 
-```text
-[🟢 92 Saudável]  [🟡 65 Atenção]  [🔴 32 Crítico]
-```
+- Popular o campo `link` ao criar notificações em todas as Edge Functions (`/boards/:id`, `/fleet/maintenances`, `/purchases/:id`, `/recurring-tasks`, etc.).
+- Em `src/pages/Notifications.tsx`: tornar cada card clicável (`<Card>` com `onClick` que faz `navigate(link)` se houver), e adicionar cursor + hover. Marcar como lida automaticamente ao clicar.
+- Aplicar o mesmo no popover do sino na sidebar (se existir).
 
-Inclui barra de progresso circular ou linear opcional.
+### 5. Conteúdo das mensagens WhatsApp (ajustes pontuais)
 
-### Alterações em Arquivos Existentes
+- Padronizar cabeçalho (emoji + tipo) e rodapé (link curto para o sistema) em todas as mensagens via `sendWhatsAppText`.
+- Garantir que toda notificação tenha o **nome do destinatário** no topo (algumas hoje só dizem "Olá," sem nome).
 
-**1. `src/pages/fleet/FleetDashboard.tsx`**
-Adicionar seção de Score da Frota:
-- Card "Score Médio da Frota" com valor e cor
-- Card com contagem por classificação (X saudáveis, Y atenção, Z críticos)
-- Ranking: 5 piores veículos (menor score)
-- Ranking: 5 melhores veículos (maior score)
+---
 
-**2. `src/pages/fleet/FleetVehicles.tsx`**
-- Adicionar `VehicleScoreBadge` em cada card de veículo, entre stats e status badge
-- Permitir ordenação por score
+## Detalhes técnicos
 
-**3. `src/pages/fleet/VehicleDetail.tsx`**
-- Adicionar card de Score no topo da página com classificação visual
+**Arquivos afetados**:
+- `supabase/functions/_shared/notifications.ts` (novo)
+- `supabase/functions/whatsapp-webhook/index.ts` (matching)
+- `supabase/functions/notify-*/index.ts` (importar shared, popular `link`)
+- `src/pages/ProfilePage.tsx`, `src/components/settings/UsersTab.tsx` (normalizar no save + máscara de exibição)
+- `src/pages/Notifications.tsx` (navegação ao clicar)
+- 1 migração: UPDATE em `profiles.whatsapp_number` normalizando os 22 registros existentes.
 
-### Detalhes Técnicos
+**Sem mudanças** em: schema das tabelas (`notifications.link` já existe), RLS, configurações de Z-API, lógica de IA do bot.
 
-**Cálculo centralizado**: Uma única função pura testável. O hook `useVehicleScores` consome os mesmos hooks `useFleetMaintenances` e `useFleetCheckins` já usados no dashboard.
-
-**Performance**: O cálculo é O(n*m) onde n=veículos, m=manutenções+checkins. Com frotas pequenas (<100 veículos) é negligível. Usa `useMemo` com deps nos arrays de dados.
-
-**Preparação para futuro**: A interface `ScoreConfig` com pesos será exportada para permitir configuração futura via settings.
-
-### Arquivos Impactados
-1. `src/hooks/useVehicleScore.ts` (novo)
-2. `src/components/fleet/VehicleScoreBadge.tsx` (novo)
-3. `src/pages/fleet/FleetDashboard.tsx` (adicionar seção de scores)
-4. `src/pages/fleet/FleetVehicles.tsx` (adicionar badge nos cards)
-5. `src/pages/fleet/VehicleDetail.tsx` (adicionar card de score)
-
-### Sem Alterações no Banco
-Nenhuma migração necessária. Score é 100% calculado no frontend.
-
+**Validação após implementação**:
+1. Enviar mensagem WhatsApp dos números do Bruno e do Eliseu e verificar nos logs que `normalized` coincide com o perfil correto.
+2. Forçar disparo de `notify-overdue-tasks` duas vezes seguidas e confirmar deduplicação.
+3. Clicar numa notificação in-app e validar redirecionamento.
