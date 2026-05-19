@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
     // Update profile fields if provided
     const profileUpdates: Record<string, any> = {};
     if (whatsappNumber && typeof whatsappNumber === "string" && whatsappNumber.trim()) {
-      profileUpdates.whatsapp_number = whatsappNumber.trim();
+      profileUpdates.whatsapp_number = normalizePhoneBR(whatsappNumber) ?? whatsappNumber.trim();
     }
     if (jobTitle && typeof jobTitle === "string" && jobTitle.trim()) {
       profileUpdates.job_title = jobTitle.trim();
