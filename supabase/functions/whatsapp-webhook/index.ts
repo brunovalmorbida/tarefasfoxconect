@@ -296,48 +296,34 @@ Deno.serve(async (req) => {
     }
 
     const cleanPhone = phone.replace(/\D/g, "");
-    console.log("Received phone raw:", phone, "| cleaned:", cleanPhone);
+    const normalizedIncoming = normalizePhoneBR(cleanPhone);
+    console.log("Received phone raw:", phone, "| cleaned:", cleanPhone, "| normalized:", normalizedIncoming);
 
-    // Find user by WhatsApp number - try multiple matching strategies
+    // Find user by WhatsApp number - strict canonical match only
     const { data: profiles } = await supabase
       .from("profiles")
       .select("user_id, name, whatsapp_number");
 
-    console.log("Profiles found:", (profiles || []).map((p: any) => ({ name: p.name, wn: p.whatsapp_number })));
-
-    // Helper: extract DDD + subscriber from a Brazilian number (handles country code and nono dígito)
-    const extractBrNumber = (num: string) => {
-      let n = num;
-      // Remove country code 55 if present
-      if (n.length >= 12 && n.startsWith("55")) n = n.slice(2);
-      // Now n should be DDD (2 digits) + subscriber (8 or 9 digits)
-      if (n.length === 11) {
-        // Has nono dígito: DDD(2) + 9 + 8 digits
-        return { ddd: n.slice(0, 2), subscriber: n.slice(3) }; // 8-digit core
-      } else if (n.length === 10) {
-        // No nono dígito: DDD(2) + 8 digits
-        return { ddd: n.slice(0, 2), subscriber: n.slice(2) }; // 8-digit core
-      }
-      return { ddd: "", subscriber: n.slice(-8) }; // fallback: last 8
-    };
+    console.log(
+      "Profiles found:",
+      (profiles || []).map((p: any) => ({
+        name: p.name,
+        wn: p.whatsapp_number,
+        norm: normalizePhoneBR(p.whatsapp_number),
+      })),
+    );
 
     const userProfile = (profiles || []).find((p: any) => {
-      if (!p.whatsapp_number) return false;
-      const storedClean = p.whatsapp_number.replace(/\D/g, "");
-      // Exact match
-      if (storedClean === cleanPhone) return true;
-      // Suffix match
-      if (cleanPhone.endsWith(storedClean) || storedClean.endsWith(cleanPhone)) return true;
-      // Brazilian DDD + 8-digit core match (handles nono dígito difference)
-      const stored = extractBrNumber(storedClean);
-      const incoming = extractBrNumber(cleanPhone);
-      if (stored.ddd === incoming.ddd && stored.subscriber === incoming.subscriber && stored.subscriber.length === 8) return true;
-      // Last 8 fallback
-      const last8stored = storedClean.slice(-8);
-      const last8incoming = cleanPhone.slice(-8);
-      if (last8stored === last8incoming && storedClean.length >= 10 && cleanPhone.length >= 10) return true;
-      return false;
+      if (!p.whatsapp_number || !normalizedIncoming) return false;
+      const storedNorm = normalizePhoneBR(p.whatsapp_number);
+      return storedNorm !== null && storedNorm === normalizedIncoming;
     });
+
+    if (userProfile) {
+      console.log("Matched profile:", userProfile.name, "(user_id:", userProfile.user_id, ")");
+    } else {
+      console.warn("No profile matched for normalized phone:", normalizedIncoming);
+    }
 
     if (!userProfile) {
       await sendWhatsApp(supabase, cleanPhone, "❌ Seu número não está cadastrado no sistema TaskFox. Peça ao administrador para cadastrar seu WhatsApp no perfil.");
