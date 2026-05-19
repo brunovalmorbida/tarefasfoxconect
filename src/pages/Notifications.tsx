@@ -135,40 +135,49 @@ export default function Notifications() {
         </Card>
       ) : (
         <div className="space-y-2">
-          {notifications.map((n) => (
-            <Card
-              key={n.id}
-              className={`transition-colors ${!n.is_read ? "border-primary/40 bg-primary/5" : "opacity-75"}`}
-            >
-              <CardContent className="flex items-start gap-4 py-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold text-sm">{n.title}</p>
-                    {!n.is_read && <span className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />}
+          {notifications.map((n) => {
+            const clickable = !!n.link;
+            return (
+              <Card
+                key={n.id}
+                onClick={() => {
+                  if (!n.is_read) markRead.mutate(n.id);
+                  if (n.link) navigate(n.link);
+                }}
+                className={`transition-colors ${
+                  !n.is_read ? "border-primary/40 bg-primary/5" : "opacity-75"
+                } ${clickable ? "cursor-pointer hover:bg-accent/40" : ""}`}
+              >
+                <CardContent className="flex items-start gap-4 py-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-sm">{n.title}</p>
+                      {!n.is_read && <span className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />}
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">{n.message}</p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: ptBR })}
+                    </p>
                   </div>
-                  <p className="text-sm text-muted-foreground mt-1">{n.message}</p>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: ptBR })}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  {!n.is_read && (
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => markRead.mutate(n.id)}>
-                      <Check className="h-4 w-4" />
+                  <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                    {!n.is_read && (
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => markRead.mutate(n.id)}>
+                        <Check className="h-4 w-4" />
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      onClick={() => deleteNotification.mutate(n.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
                     </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-destructive hover:text-destructive"
-                    onClick={() => deleteNotification.mutate(n.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>
