@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { User, Phone, Briefcase, Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { normalizePhoneBR, formatPhoneBR } from "@/lib/phone";
 
 export default function ProfilePage() {
   const { user } = useAuth();
@@ -47,17 +48,26 @@ export default function ProfilePage() {
       toast.error("O nome é obrigatório");
       return;
     }
+    let normalizedWhatsapp: string | null = null;
+    if (whatsapp.trim()) {
+      normalizedWhatsapp = normalizePhoneBR(whatsapp);
+      if (!normalizedWhatsapp) {
+        toast.error("WhatsApp inválido. Use DDD + número (ex: 54999223558).");
+        return;
+      }
+    }
     setSaving(true);
     try {
       const { error } = await supabase
         .from("profiles")
         .update({
           name: name.trim(),
-          whatsapp_number: whatsapp.trim() || null,
+          whatsapp_number: normalizedWhatsapp,
           job_title: jobTitle.trim() || null,
         })
         .eq("user_id", user!.id);
       if (error) throw error;
+      if (normalizedWhatsapp) setWhatsapp(normalizedWhatsapp);
       queryClient.invalidateQueries({ queryKey: ["my-profile"] });
       toast.success("Perfil atualizado com sucesso!");
     } catch (err: any) {
@@ -127,10 +137,13 @@ export default function ProfilePage() {
             <Input
               value={whatsapp}
               onChange={(e) => setWhatsapp(e.target.value)}
-              placeholder="Ex: 5511999999999"
+              placeholder="Ex: 54999223558"
             />
             <p className="text-xs text-muted-foreground">
-              Usado para receber notificações via WhatsApp. Formato: código do país + DDD + número.
+              Será salvo no formato padrão (55 + DDD + 9 + número).{" "}
+              {whatsapp.trim() && normalizePhoneBR(whatsapp)
+                ? `Pré-visualização: ${formatPhoneBR(whatsapp)}`
+                : null}
             </p>
           </div>
 

@@ -170,6 +170,7 @@ Deno.serve(async (req) => {
           user_id: userId,
           title: notifTitle,
           message: notifMessage,
+          link: "/purchases",
         });
       }
     } else {
@@ -180,16 +181,16 @@ Deno.serve(async (req) => {
           results.push("WhatsApp sent to admin");
         }
         if (masterProfile) {
-          notifications.push({ user_id: masterProfile.user_id, title: notifTitle, message: notifMessage });
+          notifications.push({ user_id: masterProfile.user_id, title: notifTitle, message: notifMessage, link: "/purchases" });
         }
       } else if (action === "purchased") {
         if (requesterProfile?.whatsapp_number) {
           await sendWhatsApp(requesterProfile.whatsapp_number, msg);
           results.push("WhatsApp sent to requester");
         }
-        notifications.push({ user_id: list.requested_by, title: notifTitle, message: notifMessage });
+        notifications.push({ user_id: list.requested_by, title: notifTitle, message: notifMessage, link: "/purchases" });
         if (masterProfile && masterProfile.user_id !== list.requested_by) {
-          notifications.push({ user_id: masterProfile.user_id, title: notifTitle, message: `${buyerProfile?.name || "Alguém"} comprou a lista "${list.title}"` });
+          notifications.push({ user_id: masterProfile.user_id, title: notifTitle, message: `${buyerProfile?.name || "Alguém"} comprou a lista "${list.title}"`, link: "/purchases" });
         }
       } else if (action === "received") {
         if (masterProfile?.whatsapp_number) {
@@ -197,7 +198,7 @@ Deno.serve(async (req) => {
           results.push("WhatsApp sent to admin");
         }
         if (masterProfile) {
-          notifications.push({ user_id: masterProfile.user_id, title: notifTitle, message: notifMessage });
+          notifications.push({ user_id: masterProfile.user_id, title: notifTitle, message: notifMessage, link: "/purchases" });
         }
       }
     }

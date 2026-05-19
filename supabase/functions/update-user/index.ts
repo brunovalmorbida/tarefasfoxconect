@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { normalizePhoneBR } from "../_shared/notifications.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -47,7 +48,9 @@ Deno.serve(async (req) => {
     const profileUpdates: Record<string, any> = {};
     if (name !== undefined) profileUpdates.name = name.trim();
     if (jobTitle !== undefined) profileUpdates.job_title = jobTitle.trim() || null;
-    if (whatsappNumber !== undefined) profileUpdates.whatsapp_number = whatsappNumber || null;
+    if (whatsappNumber !== undefined) {
+      profileUpdates.whatsapp_number = whatsappNumber ? (normalizePhoneBR(whatsappNumber) ?? whatsappNumber) : null;
+    }
     if (isActive !== undefined) profileUpdates.is_active = isActive;
 
     if (Object.keys(profileUpdates).length > 0) {

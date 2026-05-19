@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTeams } from "@/hooks/useBoards";
 import { useAuth } from "@/hooks/useAuth";
 import { useLogActivity } from "@/hooks/useActivityLog";
+import { normalizePhoneBR } from "@/lib/phone";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -361,6 +362,15 @@ export function UsersTab() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim() || !newEmail.trim() || !newPassword) return;
+    let normalizedNewWhats: string | undefined;
+    if (newWhatsapp.trim()) {
+      const n = normalizePhoneBR(newWhatsapp);
+      if (!n) {
+        toast.error("WhatsApp inválido. Use DDD + número (ex: 54999223558).");
+        return;
+      }
+      normalizedNewWhats = n;
+    }
     setCreating(true);
     try {
       const { data, error } = await supabase.functions.invoke("create-user", {
@@ -368,7 +378,7 @@ export function UsersTab() {
           name: newName.trim(),
           email: newEmail.trim(),
           password: newPassword,
-          whatsappNumber: newWhatsapp.trim() || undefined,
+          whatsappNumber: normalizedNewWhats,
           jobTitle: newJobTitle.trim() || undefined,
           teamIds: selectedTeams,
         },
@@ -391,6 +401,15 @@ export function UsersTab() {
   const handleEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editUserId || !editName.trim()) return;
+    let normalizedEditWhats: string | null = null;
+    if (editWhatsapp.trim()) {
+      const n = normalizePhoneBR(editWhatsapp);
+      if (!n) {
+        toast.error("WhatsApp inválido. Use DDD + número (ex: 54999223558).");
+        return;
+      }
+      normalizedEditWhats = n;
+    }
     setSaving(true);
     try {
       const { data, error } = await supabase.functions.invoke("update-user", {
@@ -399,7 +418,7 @@ export function UsersTab() {
           name: editName.trim(),
           email: editEmail.trim() || undefined,
           jobTitle: editJobTitle.trim(),
-          whatsappNumber: editWhatsapp.trim() || null,
+          whatsappNumber: normalizedEditWhats,
           password: editPassword || undefined,
           teamIds: editTeams,
           isAdmin: isMasterAdmin ? editIsAdmin : undefined,
