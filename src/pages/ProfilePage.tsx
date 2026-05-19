@@ -137,10 +137,13 @@ export default function ProfilePage() {
             <Input
               value={whatsapp}
               onChange={(e) => setWhatsapp(e.target.value)}
-              placeholder="Ex: 5511999999999"
+              placeholder="Ex: 54999223558"
             />
             <p className="text-xs text-muted-foreground">
-              Usado para receber notificações via WhatsApp. Formato: código do país + DDD + número.
+              Será salvo no formato padrão (55 + DDD + 9 + número).{" "}
+              {whatsapp.trim() && normalizePhoneBR(whatsapp)
+                ? `Pré-visualização: ${formatPhoneBR(whatsapp)}`
+                : null}
             </p>
           </div>
 
