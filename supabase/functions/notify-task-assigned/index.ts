@@ -136,6 +136,7 @@ Deno.serve(async (req) => {
         user_id: assigneeId,
         title: isAssignment ? "Nova tarefa atribuída" : "Nova tarefa criada",
         message: `A tarefa "${taskTitle}" foi ${isAssignment ? "atribuída a você" : "criada"} no quadro ${boardName || "—"}.`,
+        link: "/boards",
       });
     }
     if (masterUser && (!assigneeId || masterUser.id !== assigneeId)) {
@@ -145,6 +146,7 @@ Deno.serve(async (req) => {
         message: isAssignment
           ? `A tarefa "${taskTitle}" foi atribuída a ${assigneeProfile?.name || "um usuário"} no quadro ${boardName || "—"}.`
           : `A tarefa "${taskTitle}" foi criada no quadro ${boardName || "—"}.`,
+        link: "/boards",
       });
     }
 
