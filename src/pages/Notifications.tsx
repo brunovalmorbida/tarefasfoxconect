@@ -43,6 +43,7 @@ import { Bell, Check, CheckCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useNavigate } from "react-router-dom";
 
 export default function Notifications() {
   const { user } = useAuth();
