@@ -362,6 +362,15 @@ export function UsersTab() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim() || !newEmail.trim() || !newPassword) return;
+    let normalizedNewWhats: string | undefined;
+    if (newWhatsapp.trim()) {
+      const n = normalizePhoneBR(newWhatsapp);
+      if (!n) {
+        toast.error("WhatsApp inválido. Use DDD + número (ex: 54999223558).");
+        return;
+      }
+      normalizedNewWhats = n;
+    }
     setCreating(true);
     try {
       const { data, error } = await supabase.functions.invoke("create-user", {
@@ -369,7 +378,7 @@ export function UsersTab() {
           name: newName.trim(),
           email: newEmail.trim(),
           password: newPassword,
-          whatsappNumber: newWhatsapp.trim() || undefined,
+          whatsappNumber: normalizedNewWhats,
           jobTitle: newJobTitle.trim() || undefined,
           teamIds: selectedTeams,
         },
