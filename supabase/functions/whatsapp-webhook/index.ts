@@ -796,10 +796,11 @@ async function sendWhatsApp(supabase: any, phone: string, message: string) {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (zapiConfig.client_token) headers["Client-Token"] = zapiConfig.client_token;
 
+    const normalized = normalizePhoneBR(phone) ?? phone.replace(/\D/g, "");
     await fetch(url, {
       method: "POST",
       headers,
-      body: JSON.stringify({ phone: phone.replace(/\D/g, ""), message }),
+      body: JSON.stringify({ phone: normalized, message }),
     });
   } catch (e) {
     console.error("Error sending WhatsApp:", e);
