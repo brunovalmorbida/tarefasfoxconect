@@ -48,17 +48,26 @@ export default function ProfilePage() {
       toast.error("O nome é obrigatório");
       return;
     }
+    let normalizedWhatsapp: string | null = null;
+    if (whatsapp.trim()) {
+      normalizedWhatsapp = normalizePhoneBR(whatsapp);
+      if (!normalizedWhatsapp) {
+        toast.error("WhatsApp inválido. Use DDD + número (ex: 54999223558).");
+        return;
+      }
+    }
     setSaving(true);
     try {
       const { error } = await supabase
         .from("profiles")
         .update({
           name: name.trim(),
-          whatsapp_number: whatsapp.trim() || null,
+          whatsapp_number: normalizedWhatsapp,
           job_title: jobTitle.trim() || null,
         })
         .eq("user_id", user!.id);
       if (error) throw error;
+      if (normalizedWhatsapp) setWhatsapp(normalizedWhatsapp);
       queryClient.invalidateQueries({ queryKey: ["my-profile"] });
       toast.success("Perfil atualizado com sucesso!");
     } catch (err: any) {
