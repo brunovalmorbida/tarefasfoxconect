@@ -170,6 +170,7 @@ Deno.serve(async (req) => {
           user_id: userId,
           title: notifTitle,
           message: notifMessage,
+          link: "/purchases",
         });
       }
     } else {
