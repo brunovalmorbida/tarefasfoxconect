@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
       const { data: callerAuth } = await adminClient.auth.admin.getUserById(caller.id);
       const callerEmail = callerAuth?.user?.email;
       
-      if (callerEmail !== "brunovalmorbida@live.com") {
+      if (callerEmail !== "brunovalmorbida@live.com" && callerEmail !== "brunovalmorbida@foxconect.net.br") {
         throw new Error("Apenas o administrador master pode alterar papéis");
       }
 
