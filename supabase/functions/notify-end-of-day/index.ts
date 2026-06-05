@@ -159,11 +159,12 @@ Deno.serve(async (req) => {
 
       const buildMessage = (recipientName: string) =>
         `🚨 *ATENÇÃO — Fim do Expediente Próximo!*\n\n` +
+        `📌 *Tipo:* Tarefa do Quadro Kanban\n` +
         `📋 *Tarefa:* ${task.title}\n` +
         `📊 *Quadro:* ${boardName}\n` +
         `🔴 *Prioridade:* ${priorityLabels[task.priority] || task.priority}\n` +
         (task.description ? `📝 *Descrição:* ${task.description}\n` : "") +
-        `\nOlá ${recipientName}, faltam apenas *1h30* para o fim do expediente (18:00) e esta tarefa ainda está pendente!\n` +
+        `\nOlá ${recipientName}, faltam apenas *1h30* para o fim do expediente (18:00) e esta tarefa do quadro Kanban ainda está pendente!\n` +
         `⏰ Finalize-a antes do encerramento do dia.`;
 
       // Send to assignee

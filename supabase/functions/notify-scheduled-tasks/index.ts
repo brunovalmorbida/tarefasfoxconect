@@ -177,13 +177,14 @@ Deno.serve(async (req) => {
       const timeLabel = minutesBefore === 10 ? "*10 minutos*" : "*1 hora*";
 
       const buildMessage = (recipientName: string) =>
-        `${emoji} *Lembrete de Horário*\n\n` +
+        `${emoji} *Lembrete de Horário — Tarefa do Quadro Kanban*\n\n` +
+        `📌 *Tipo:* Tarefa do Quadro Kanban\n` +
         `📋 *Tarefa:* ${task.title}\n` +
         `📊 *Quadro:* ${boardName}\n` +
         `⏰ *Horário:* ${scheduledTimeFormatted}\n` +
         `🔴 *Prioridade:* ${priorityLabels[task.priority] || task.priority}\n` +
         (task.description ? `📝 *Descrição:* ${task.description}\n` : "") +
-        `\nOlá ${recipientName}, faltam ${timeLabel} para o horário agendado desta tarefa. Por favor, finalize-a a tempo!`;
+        `\nOlá ${recipientName}, faltam ${timeLabel} para o horário agendado desta tarefa do quadro Kanban. Por favor, finalize-a a tempo!`;
 
       // Send to assignee
       const assigneeProfile = task.assignee_id ? profileMap.get(task.assignee_id) : null;
