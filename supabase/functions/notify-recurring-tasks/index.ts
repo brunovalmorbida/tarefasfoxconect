@@ -183,10 +183,10 @@ Deno.serve(async (req) => {
 
     // Build schedule label for message header
     const scheduleLabel = scheduleType === "daily"
-      ? `📅 *Tarefas de Hoje - ${weekdayNames[ourDay]}*`
+      ? `📅 *Tarefas Fixas de Hoje - ${weekdayNames[ourDay]}*`
       : scheduleType === "weekly"
-      ? `📅 *Tarefas da Semana*`
-      : `📅 *Tarefas do Mês*`;
+      ? `📅 *Tarefas Fixas da Semana*`
+      : `📅 *Tarefas Fixas do Mês*`;
 
     for (const [userId, { tasks: userTasks }] of tasksByUser) {
       const profile = profileMap.get(userId);
@@ -194,14 +194,15 @@ Deno.serve(async (req) => {
 
       // Build consolidated message
       let message = `${scheduleLabel}\n\n`;
+      message += `📌 *Tipo:* Tarefa Fixa (recorrente — não é do quadro Kanban)\n\n`;
       message += `Olá ${profile.name}! `;
 
       if (scheduleType === "daily") {
-        message += `Aqui estão suas tarefas fixas para hoje:\n\n`;
+        message += `Aqui estão suas *tarefas fixas* para hoje:\n\n`;
       } else if (scheduleType === "weekly") {
-        message += `Aqui estão suas tarefas fixas semanais:\n\n`;
+        message += `Aqui estão suas *tarefas fixas semanais*:\n\n`;
       } else {
-        message += `Aqui estão suas tarefas fixas mensais:\n\n`;
+        message += `Aqui estão suas *tarefas fixas mensais*:\n\n`;
       }
 
       for (const task of userTasks) {
@@ -230,9 +231,10 @@ Deno.serve(async (req) => {
       // Send WhatsApp to master admin (if different)
       if (masterProfile?.whatsapp_number && masterProfile.user_id !== userId) {
         const masterMessage = `${scheduleLabel}\n\n` +
-          `Resumo das tarefas de *${profile.name}*:\n\n` +
+          `📌 *Tipo:* Tarefas Fixas (recorrentes)\n\n` +
+          `Resumo das tarefas fixas de *${profile.name}*:\n\n` +
           userTasks.map((t: any) => `📋 *${t.title}* (${t.boardName})`).join("\n") +
-          `\n\nTotal: *${userTasks.length}* tarefa(s).`;
+          `\n\nTotal: *${userTasks.length}* tarefa(s) fixa(s).`;
         await sendWhatsApp(masterProfile.whatsapp_number, masterMessage, `master:${profile.name}`);
       }
 

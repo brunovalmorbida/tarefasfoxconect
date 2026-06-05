@@ -143,11 +143,11 @@ Deno.serve(async (req) => {
     const profileMap = new Map((profiles || []).map((p: any) => [p.user_id, p]));
 
     const headerTitle = label === "end_of_day"
-      ? "🕔 *Pendências de Fim de Expediente*"
-      : "🕐 *Pendências da Tarde*";
+      ? "🕔 *Pendências de Fim de Expediente — Tarefas Fixas*"
+      : "🕐 *Pendências da Tarde — Tarefas Fixas*";
     const headerHint = label === "end_of_day"
-      ? "Estas tarefas fixas ainda não foram concluídas hoje. Última chance antes do fim do expediente!"
-      : "Estas tarefas fixas ainda estão pendentes. Vamos concluir?";
+      ? "Estas *tarefas fixas* (recorrentes, não são do quadro Kanban) ainda não foram concluídas hoje. Última chance antes do fim do expediente!"
+      : "Estas *tarefas fixas* (recorrentes, não são do quadro Kanban) ainda estão pendentes. Vamos concluir?";
 
     const results: any[] = [];
     const sendWhatsApp = async (phone: string, message: string, tag: string) => {
@@ -176,6 +176,7 @@ Deno.serve(async (req) => {
       if (!profile) continue;
 
       let message = `${headerTitle}\n\n`;
+      message += `📌 *Tipo:* Tarefa Fixa (recorrente)\n\n`;
       message += `Olá ${profile.name}! ${headerHint}\n\n`;
       for (const task of userTasks) {
         message += `📋 *${task.title}*\n`;
