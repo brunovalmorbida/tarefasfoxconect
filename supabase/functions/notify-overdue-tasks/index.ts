@@ -155,12 +155,13 @@ Deno.serve(async (req) => {
         urgent: "🚨 Urgente",
       };
 
-      const message = `⚠️ *Tarefa Atrasada*\n\n` +
+      const message = `⚠️ *Tarefa Atrasada — Quadro Kanban*\n\n` +
+        `📌 *Tipo:* Tarefa do Quadro Kanban\n` +
         `📋 *Tarefa:* ${task.title}\n` +
         `📊 *Quadro:* ${boardName}\n` +
         `📅 *Prazo:* ${formattedDate}\n` +
         `🔴 *Prioridade:* ${priorityLabels[task.priority] || task.priority}\n\n` +
-        `Olá ${userName}, esta tarefa está atrasada. Por favor, verifique o mais breve possível.`;
+        `Olá ${userName}, esta tarefa do quadro Kanban está atrasada. Por favor, verifique o mais breve possível.`;
 
       // Send via Z-API
       try {

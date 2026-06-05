@@ -161,7 +161,8 @@ Deno.serve(async (req) => {
         : "Faltam *3 dias* para o prazo desta tarefa. Organize-se para concluí-la a tempo.";
 
       const buildMessage = (recipientName: string) =>
-        `${emoji} *Lembrete de Prazo*\n\n` +
+        `${emoji} *Lembrete de Prazo — Tarefa do Quadro Kanban*\n\n` +
+        `📌 *Tipo:* Tarefa do Quadro Kanban\n` +
         `📋 *Tarefa:* ${task.title}\n` +
         `📊 *Quadro:* ${boardName}\n` +
         `📅 *Prazo:* ${formattedDate}\n` +

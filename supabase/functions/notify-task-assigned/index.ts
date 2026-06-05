@@ -89,14 +89,15 @@ Deno.serve(async (req) => {
 
     const sendMessage = async (phone: string, recipientName: string, label: string) => {
       const formattedDueDate = dueDate ? new Date(dueDate).toLocaleDateString("pt-BR") : "—";
-      const message = `${emoji} *${title}*\n\n` +
+      const message = `${emoji} *${title} — Quadro Kanban*\n\n` +
+        `📌 *Tipo:* Tarefa do Quadro Kanban\n` +
         `📋 *Tarefa:* ${taskTitle}\n` +
         (description ? `📝 *Descrição:* ${description}\n` : "") +
         `📊 *Quadro:* ${boardName || "—"}\n` +
         `📅 *Prazo:* ${formattedDueDate}\n` +
         (isAssignment ? `👤 *Responsável:* ${assigneeProfile?.name || "—"}\n` : "") +
         `🔔 *Criada por:* ${assignedByName || "—"}\n\n` +
-        `Olá ${recipientName}, ${isAssignment ? "uma tarefa foi atribuída" : "uma nova tarefa foi criada"}. Verifique no sistema!`;
+        `Olá ${recipientName}, ${isAssignment ? "uma tarefa do quadro Kanban foi atribuída a você" : "uma nova tarefa foi criada no quadro Kanban"}. Verifique no sistema!`;
 
       try {
         const zapiUrl = `https://api.z-api.io/instances/${zapiConfig.instance_id}/token/${zapiConfig.token}/send-text`;
