@@ -1507,6 +1507,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_buyer_profiles: {
+        Args: never
+        Returns: {
+          name: string
+          user_id: string
+        }[]
+      }
       get_team_id_from_board: { Args: { _board_id: string }; Returns: string }
       get_team_id_from_column: { Args: { _column_id: string }; Returns: string }
       get_team_id_from_task: { Args: { _task_id: string }; Returns: string }

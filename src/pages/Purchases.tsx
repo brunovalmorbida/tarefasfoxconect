@@ -82,31 +82,16 @@ export default function Purchases() {
     enabled: !!user,
   });
 
-  // Fetch users with can_be_buyer permission or admin role for buyer selection
+  // Fetch users eligible to be buyers (server-side, bypasses RLS for non-admins)
   const { data: buyerProfiles = [] } = useQuery({
     queryKey: ["buyer-profiles"],
     queryFn: async () => {
-      // Get user IDs that have can_be_buyer permission
-      const { data: perms } = await supabase
-        .from("user_permissions")
-        .select("user_id")
-        .eq("can_be_buyer", true);
-      const buyerIds = new Set((perms || []).map((p: any) => p.user_id));
-
-      // Get admin user IDs
-      const { data: admins } = await supabase
-        .from("user_roles")
-        .select("user_id")
-        .eq("role", "admin");
-      (admins || []).forEach((a: any) => buyerIds.add(a.user_id));
-
-      if (buyerIds.size === 0) return [];
-
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("user_id, name")
-        .in("user_id", Array.from(buyerIds));
-      return profiles || [];
+      const { data, error } = await supabase.rpc("get_buyer_profiles");
+      if (error) {
+        console.error("get_buyer_profiles error", error);
+        return [];
+      }
+      return data || [];
     },
     enabled: !!user,
   });
