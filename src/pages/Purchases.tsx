@@ -417,7 +417,7 @@ export default function Purchases() {
 
       {/* Create Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto" onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader><DialogTitle>Nova Lista de Compras</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-3 gap-3">
@@ -535,7 +535,7 @@ export default function Purchases() {
 
       {/* Edit Dialog */}
       <Dialog open={!!showEditDialog} onOpenChange={(open) => { if (!open) setShowEditDialog(null); }}>
-        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto" onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader><DialogTitle>Editar Lista de Compras</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-3 gap-3">
