@@ -20,7 +20,9 @@ import {
 import { toast } from "sonner";
 import { CITIES, UNASSIGNED } from "@/lib/techSchedule";
 import { useTechAppointments, type TechAppointment } from "@/hooks/useTechAppointments";
+import { useTechColumnOrder } from "@/hooks/useTechColumnOrder";
 import { CityBoard } from "@/components/tech/CityBoard";
+
 import { AppointmentDialog } from "@/components/tech/AppointmentDialog";
 import { formatDate } from "@/components/tech/AppointmentCard";
 
@@ -35,6 +37,8 @@ export default function TechAppointments() {
     reorder,
   } = useTechAppointments(false);
   const { appointments: forwarded } = useTechAppointments(true);
+  const { getTechnicians, saveOrder } = useTechColumnOrder();
+
 
   const [tab, setTab] = useState<string>(CITIES[0].name);
   const [search, setSearch] = useState("");
@@ -63,12 +67,25 @@ export default function TechAppointments() {
   const cityItems = (cityName: string) => filtered.filter((a) => a.city === cityName);
 
   const handleDragEnd = (result: DropResult) => {
-    const { source, destination, draggableId } = result;
+    const { source, destination, draggableId, type } = result;
     if (!destination) return;
     if (source.droppableId === destination.droppableId && source.index === destination.index) return;
 
+    if (type === "COLUMN") {
+      const cityName = destination.droppableId.replace("columns::", "");
+      const current = [...getTechnicians(cityName)];
+      const [moved] = current.splice(source.index, 1);
+      current.splice(destination.index, 0, moved);
+      saveOrder.mutate(
+        { city: cityName, technicians: current },
+        { onError: () => toast.error("Não foi possível reordenar os técnicos") }
+      );
+      return;
+    }
+
     const [city, col] = destination.droppableId.split("::");
     const technician = col === UNASSIGNED ? null : col;
+
 
     const destItems = appointments
       .filter((a) => a.city === city && (technician ? a.technician === technician : !a.technician))
@@ -163,9 +180,10 @@ export default function TechAppointments() {
           <SelectContent>
             <SelectItem value="all">Todos os técnicos</SelectItem>
             <SelectItem value={UNASSIGNED}>{UNASSIGNED}</SelectItem>
-            {activeCity.technicians.map((t) => (
+            {getTechnicians(activeCity.name).map((t) => (
               <SelectItem key={t} value={t}>{t}</SelectItem>
             ))}
+
           </SelectContent>
         </Select>
       </div>
@@ -192,7 +210,9 @@ export default function TechAppointments() {
               )}
               <CityBoard
                 city={c}
+                technicians={getTechnicians(c.name)}
                 appointments={cityItems(c.name)}
+
                 onCardClick={(a) => {
                   setEditing(a);
                   setDialogOpen(true);
