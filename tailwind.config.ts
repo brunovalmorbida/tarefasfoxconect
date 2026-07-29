@@ -71,7 +71,14 @@ export default {
           high: "hsl(var(--priority-high))",
           urgent: "hsl(var(--priority-urgent))",
         },
+        city: {
+          ouro: "hsl(var(--city-ouro))",
+          passo: "hsl(var(--city-passo))",
+          pontao: "hsl(var(--city-pontao))",
+          lagoa: "hsl(var(--city-lagoa))",
+        },
       },
+
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",

@@ -1335,6 +1335,66 @@ export type Database = {
         }
         Relationships: []
       }
+      tech_appointments: {
+        Row: {
+          city: string
+          client_name: string
+          created_at: string
+          created_by: string
+          forwarded_at: string | null
+          forwarded_by: string | null
+          id: string
+          neighborhood: string | null
+          notes: string | null
+          os_number: string | null
+          phone: string | null
+          position: number
+          scheduled_date: string
+          scheduled_time: string | null
+          service_type: string | null
+          technician: string | null
+          updated_at: string
+        }
+        Insert: {
+          city: string
+          client_name: string
+          created_at?: string
+          created_by: string
+          forwarded_at?: string | null
+          forwarded_by?: string | null
+          id?: string
+          neighborhood?: string | null
+          notes?: string | null
+          os_number?: string | null
+          phone?: string | null
+          position?: number
+          scheduled_date: string
+          scheduled_time?: string | null
+          service_type?: string | null
+          technician?: string | null
+          updated_at?: string
+        }
+        Update: {
+          city?: string
+          client_name?: string
+          created_at?: string
+          created_by?: string
+          forwarded_at?: string | null
+          forwarded_by?: string | null
+          id?: string
+          neighborhood?: string | null
+          notes?: string | null
+          os_number?: string | null
+          phone?: string | null
+          position?: number
+          scheduled_date?: string
+          scheduled_time?: string | null
+          service_type?: string | null
+          technician?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_permissions: {
         Row: {
           can_be_buyer: boolean
