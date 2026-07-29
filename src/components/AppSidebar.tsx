@@ -64,8 +64,12 @@ export function AppSidebar() {
 
   const mainNav = useMemo(() => {
     const nav = [...baseNav];
+    if (isAdmin || canManageTasks) {
+      nav.splice(3, 0, { title: "Agendamentos Técnicos", url: "/tech-appointments", icon: CalendarClock });
+    }
     if (isAdmin || canViewPurchases) {
-      nav.splice(3, 0, { title: "Compras", url: "/purchases", icon: ShoppingCart });
+      const insertIdx = nav.findIndex(n => n.title === "Notificações");
+      nav.splice(insertIdx >= 0 ? insertIdx : nav.length, 0, { title: "Compras", url: "/purchases", icon: ShoppingCart });
     }
     if (isAdmin || canViewFleet || canManageFleet) {
       const insertIdx = nav.findIndex(n => n.title === "Notificações");
@@ -76,7 +80,7 @@ export function AppSidebar() {
       nav.splice(insertIdx >= 0 ? insertIdx : nav.length, 0, { title: "Social Media", url: "/social-media", icon: Instagram });
     }
     return nav;
-  }, [isAdmin, canViewPurchases, canViewFleet, canManageFleet, canViewSocial, canManageSocial]);
+  }, [isAdmin, canManageTasks, canViewPurchases, canViewFleet, canManageFleet, canViewSocial, canManageSocial]);
 
   return (
     <Sidebar>
