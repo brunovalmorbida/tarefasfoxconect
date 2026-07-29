@@ -1591,6 +1591,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_access_tech_appointments: { Args: never; Returns: boolean }
       get_buyer_profiles: {
         Args: never
         Returns: {

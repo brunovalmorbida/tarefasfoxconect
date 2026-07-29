@@ -24,7 +24,7 @@ const baseNav = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Quadros", url: "/boards", icon: Columns3 },
   { title: "Tarefas Fixas", url: "/recurring-tasks", icon: ListChecks },
-  { title: "Agendamentos Técnicos", url: "/tech-appointments", icon: CalendarClock },
+
 
   { title: "Notificações", url: "/notifications", icon: Bell },
   { title: "Configurações", url: "/settings", icon: Settings },
@@ -35,6 +35,7 @@ const baseNav = [
 export function AppSidebar() {
   const { signOut } = useAuth();
   const { data: isAdmin } = useIsAppAdmin();
+  const canManageTasks = useCanManage("can_manage_tasks");
   const canViewPurchases = useCanManage("can_view_purchases");
   const canViewFleet = useCanManage("can_view_fleet");
   const canManageFleet = useCanManage("can_manage_fleet");
@@ -63,8 +64,12 @@ export function AppSidebar() {
 
   const mainNav = useMemo(() => {
     const nav = [...baseNav];
+    if (isAdmin || canManageTasks) {
+      nav.splice(3, 0, { title: "Agendamentos Técnicos", url: "/tech-appointments", icon: CalendarClock });
+    }
     if (isAdmin || canViewPurchases) {
-      nav.splice(3, 0, { title: "Compras", url: "/purchases", icon: ShoppingCart });
+      const insertIdx = nav.findIndex(n => n.title === "Notificações");
+      nav.splice(insertIdx >= 0 ? insertIdx : nav.length, 0, { title: "Compras", url: "/purchases", icon: ShoppingCart });
     }
     if (isAdmin || canViewFleet || canManageFleet) {
       const insertIdx = nav.findIndex(n => n.title === "Notificações");
@@ -75,7 +80,7 @@ export function AppSidebar() {
       nav.splice(insertIdx >= 0 ? insertIdx : nav.length, 0, { title: "Social Media", url: "/social-media", icon: Instagram });
     }
     return nav;
-  }, [isAdmin, canViewPurchases, canViewFleet, canManageFleet, canViewSocial, canManageSocial]);
+  }, [isAdmin, canManageTasks, canViewPurchases, canViewFleet, canManageFleet, canViewSocial, canManageSocial]);
 
   return (
     <Sidebar>
