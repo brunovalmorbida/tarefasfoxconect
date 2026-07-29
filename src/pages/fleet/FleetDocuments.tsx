@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { useFleetDocuments, useFleetVehicles, useFleetMaintenances, FleetDocument, uploadFleetFile } from "@/hooks/useFleet";
+import { useFleetDocuments, useFleetVehicles, useFleetMaintenances, FleetDocument, uploadFleetFile, openFleetFile } from "@/hooks/useFleet";
 import { Plus, Search, FileText, Trash2, Download, Eye, Upload, Shield, ShieldAlert, ShieldCheck } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, isBefore, addDays } from "date-fns";
@@ -167,10 +167,11 @@ export default function FleetDocuments() {
                         <div className="flex gap-1">
                           {d.file_url && (
                             <>
-                              <Button variant="ghost" size="icon" asChild><a href={d.file_url} target="_blank" rel="noopener"><Eye className="h-4 w-4" /></a></Button>
-                              <Button variant="ghost" size="icon" asChild><a href={d.file_url} download={d.file_name}><Download className="h-4 w-4" /></a></Button>
+                              <Button variant="ghost" size="icon" onClick={() => openFleetFile(d.file_url!).catch(() => toast.error("Não foi possível abrir o arquivo"))}><Eye className="h-4 w-4" /></Button>
+                              <Button variant="ghost" size="icon" onClick={() => openFleetFile(d.file_url!, d.file_name || "documento").catch(() => toast.error("Não foi possível baixar o arquivo"))}><Download className="h-4 w-4" /></Button>
                             </>
                           )}
+
                           <Button variant="ghost" size="icon" onClick={() => setDeleteId(d.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                         </div>
                       </TableCell>

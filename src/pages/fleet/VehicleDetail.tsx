@@ -339,14 +339,15 @@ export default function VehicleDetail() {
                       </div>
                       {d.file_url && (
                         <div className="flex gap-1 shrink-0">
-                          <Button variant="ghost" size="icon" asChild>
-                            <a href={d.file_url} target="_blank" rel="noopener"><Eye className="h-4 w-4" /></a>
+                          <Button variant="ghost" size="icon" onClick={() => openFleetFile(d.file_url!)}>
+                            <Eye className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" asChild>
-                            <a href={d.file_url} download={d.file_name}><Download className="h-4 w-4" /></a>
+                          <Button variant="ghost" size="icon" onClick={() => openFleetFile(d.file_url!, d.file_name || "documento")}>
+                            <Download className="h-4 w-4" />
                           </Button>
                         </div>
                       )}
+
                     </div>
                   </Card>
                 );
