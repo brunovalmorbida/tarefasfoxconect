@@ -404,8 +404,23 @@ export async function uploadFleetFile(file: File, vehicleId: string): Promise<st
     .from("fleet-documents")
     .upload(fileName, file);
   if (error) throw error;
-  const { data } = supabase.storage
-    .from("fleet-documents")
-    .getPublicUrl(fileName);
-  return data.publicUrl;
+  // Bucket is private: store the object path and generate signed URLs on demand.
+  return fileName;
 }
+
+/** Accepts a storage path or a legacy public URL and returns a temporary signed URL. */
+export async function getFleetFileUrl(stored: string, download?: string | null): Promise<string> {
+  const marker = "/fleet-documents/";
+  const path = stored.includes(marker) ? stored.split(marker)[1] : stored;
+  const { data, error } = await supabase.storage
+    .from("fleet-documents")
+    .createSignedUrl(decodeURIComponent(path), 60 * 10, download ? { download } : undefined);
+  if (error) throw error;
+  return data.signedUrl;
+}
+
+export async function openFleetFile(stored: string, download?: string | null) {
+  const url = await getFleetFileUrl(stored, download);
+  window.open(url, "_blank", "noopener");
+}
+
