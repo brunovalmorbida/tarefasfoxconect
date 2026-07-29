@@ -1395,6 +1395,30 @@ export type Database = {
         }
         Relationships: []
       }
+      tech_column_order: {
+        Row: {
+          city: string
+          created_at: string
+          id: string
+          technicians: string[]
+          updated_at: string
+        }
+        Insert: {
+          city: string
+          created_at?: string
+          id?: string
+          technicians?: string[]
+          updated_at?: string
+        }
+        Update: {
+          city?: string
+          created_at?: string
+          id?: string
+          technicians?: string[]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_permissions: {
         Row: {
           can_be_buyer: boolean
