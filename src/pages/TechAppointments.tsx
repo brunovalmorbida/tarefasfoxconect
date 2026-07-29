@@ -5,26 +5,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { CITIES, UNASSIGNED } from "@/lib/techSchedule";
+import { ALL_TECHNICIANS, UNASSIGNED, WEEKDAYS } from "@/lib/techSchedule";
 import { useTechAppointments, type TechAppointment } from "@/hooks/useTechAppointments";
-import { useTechColumnOrder } from "@/hooks/useTechColumnOrder";
-import { CityBoard } from "@/components/tech/CityBoard";
-
+import { TechColumn } from "@/components/tech/TechColumn";
 import { AppointmentDialog } from "@/components/tech/AppointmentDialog";
-import { formatDate } from "@/components/tech/AppointmentCard";
+
+const DIST = "distribuicao";
 
 export default function TechAppointments() {
   const {
@@ -37,101 +29,87 @@ export default function TechAppointments() {
     reorder,
   } = useTechAppointments(false);
   const { appointments: forwarded } = useTechAppointments(true);
-  const { getTechnicians, saveOrder } = useTechColumnOrder();
 
-
-  const [tab, setTab] = useState<string>(CITIES[0].name);
+  const [tab, setTab] = useState<string>(DIST);
   const [search, setSearch] = useState("");
-  const [dateFilter, setDateFilter] = useState("");
-  const [techFilter, setTechFilter] = useState("all");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<TechAppointment | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
-
-  const activeCity = CITIES.find((c) => c.name === tab) ?? CITIES[0];
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return appointments.filter((a) => {
-      if (dateFilter && a.scheduled_date !== dateFilter) return false;
-      if (techFilter !== "all") {
-        if (techFilter === UNASSIGNED ? !!a.technician : a.technician !== techFilter) return false;
-      }
-      if (!term) return true;
-      return [a.client_name, a.os_number, a.neighborhood, a.phone, a.service_type]
-        .filter(Boolean)
-        .some((v) => String(v).toLowerCase().includes(term));
-    });
-  }, [appointments, search, dateFilter, techFilter]);
+    if (!term) return appointments;
+    return appointments.filter((a) =>
+      `${a.client_name} ${a.city}`.toLowerCase().includes(term)
+    );
+  }, [appointments, search]);
 
-  const cityItems = (cityName: string) => filtered.filter((a) => a.city === cityName);
+  const sortByPos = (list: TechAppointment[]) =>
+    [...list].sort((a, b) => a.position - b.position);
 
-  const handleDragEnd = (result: DropResult) => {
-    const { source, destination, draggableId, type } = result;
+  const waiting = sortByPos(filtered.filter((a) => !a.technician));
+  const byTech = (t: string) => sortByPos(filtered.filter((a) => a.technician === t));
+  const byTechDay = (t: string, day: number | null) =>
+    sortByPos(
+      filtered.filter(
+        (a) => a.technician === t && (day === null ? a.weekday == null : a.weekday === day)
+      )
+    );
+
+  const parseTarget = (droppableId: string): { technician: string | null; weekday: number | null } => {
+    if (droppableId === "waiting") return { technician: null, weekday: null };
+    const [kind, tech, day] = droppableId.split("::");
+    if (kind === "tech") return { technician: tech, weekday: null };
+    return { technician: tech, weekday: day === "none" ? null : Number(day) };
+  };
+
+  const handleDragEnd = ({ source, destination, draggableId }: DropResult) => {
     if (!destination) return;
     if (source.droppableId === destination.droppableId && source.index === destination.index) return;
 
-    if (type === "COLUMN") {
-      const cityName = destination.droppableId.replace("columns::", "");
-      const current = [...getTechnicians(cityName)];
-      const [moved] = current.splice(source.index, 1);
-      current.splice(destination.index, 0, moved);
-      saveOrder.mutate(
-        { city: cityName, technicians: current },
-        { onError: () => toast.error("Não foi possível reordenar os técnicos") }
-      );
-      return;
-    }
+    const { technician, weekday } = parseTarget(destination.droppableId);
 
-    const [city, col] = destination.droppableId.split("::");
-    const technician = col === UNASSIGNED ? null : col;
-
-
-    const destItems = appointments
-      .filter((a) => a.city === city && (technician ? a.technician === technician : !a.technician))
-      .filter((a) => a.id !== draggableId)
+    const inDest = appointments
+      .filter((a) => {
+        if (a.id === draggableId) return false;
+        if (!technician) return !a.technician;
+        if (a.technician !== technician) return false;
+        if (destination.droppableId.startsWith("tech::")) return true;
+        return weekday === null ? a.weekday == null : a.weekday === weekday;
+      })
       .sort((a, b) => a.position - b.position)
       .map((a) => a.id);
-    destItems.splice(destination.index, 0, draggableId);
+    inDest.splice(destination.index, 0, draggableId);
+
+    const moved = appointments.find((a) => a.id === draggableId);
+    const keepWeekday =
+      destination.droppableId.startsWith("tech::") && moved?.technician === technician
+        ? moved?.weekday ?? null
+        : weekday;
 
     reorder.mutate(
-      destItems.map((id, position) => ({ id, technician, city, position })),
-      { onError: () => toast.error("Não foi possível mover o agendamento") }
+      inDest.map((id, position) => ({
+        id,
+        technician,
+        weekday: id === draggableId ? keepWeekday : appointments.find((a) => a.id === id)?.weekday ?? null,
+        position,
+      })),
+      { onError: () => toast.error("Não foi possível mover o cliente") }
     );
   };
 
-  const handleSave = (values: Record<string, unknown>) => {
-    if (editing) {
-      updateAppointment.mutate(
-        { id: editing.id, ...values },
-        {
-          onSuccess: () => {
-            toast.success("Agendamento atualizado");
-            setDialogOpen(false);
-          },
-          onError: () => toast.error("Erro ao atualizar agendamento"),
-        }
-      );
-    } else {
-      createAppointment.mutate(values as never, {
-        onSuccess: () => {
-          toast.success("Agendamento criado");
-          setDialogOpen(false);
-        },
-        onError: () => toast.error("Erro ao criar agendamento"),
-      });
-    }
-  };
-
-  const handleForward = (a: TechAppointment) => {
+  const handleDone = (a: TechAppointment) =>
     forwardAppointment.mutate(a.id, {
-      onSuccess: () => toast.success("OS encaminhada e movida para o histórico"),
-      onError: () => toast.error("Erro ao encaminhar OS"),
+      onSuccess: () => toast.success("Cliente concluído e enviado ao histórico"),
+      onError: () => toast.error("Erro ao concluir"),
     });
-  };
+
+  const handleDelete = (a: TechAppointment) =>
+    deleteAppointment.mutate(a.id, {
+      onSuccess: () => toast.success("Cliente removido"),
+    });
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
+    <div className="space-y-5 p-4 md:p-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
@@ -139,117 +117,117 @@ export default function TechAppointments() {
             Agendamentos Técnicos
           </h1>
           <p className="text-sm text-muted-foreground">
-            Distribua as ordens de serviço entre os técnicos de cada cidade.
+            Adicione o cliente e a cidade, depois arraste para o técnico e o dia da semana.
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setHistoryOpen(true)}>
             <History className="mr-2 h-4 w-4" /> Histórico
           </Button>
-          <Button
-            onClick={() => {
-              setEditing(null);
-              setDialogOpen(true);
-            }}
-          >
-            <Plus className="mr-2 h-4 w-4" /> Novo agendamento
+          <Button onClick={() => setDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" /> Novo cliente
           </Button>
         </div>
       </header>
 
-      <div className="flex flex-wrap gap-3">
-        <div className="relative min-w-[200px] flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            className="pl-9"
-            placeholder="Buscar cliente, OS, bairro..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
-          type="date"
-          className="w-[170px]"
-          value={dateFilter}
-          onChange={(e) => setDateFilter(e.target.value)}
+          className="pl-9"
+          placeholder="Buscar cliente ou cidade..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
         />
-        <Select value={techFilter} onValueChange={setTechFilter}>
-          <SelectTrigger className="w-[210px]">
-            <SelectValue placeholder="Todos os técnicos" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos os técnicos</SelectItem>
-            <SelectItem value={UNASSIGNED}>{UNASSIGNED}</SelectItem>
-            {getTechnicians(activeCity.name).map((t) => (
-              <SelectItem key={t} value={t}>{t}</SelectItem>
-            ))}
-
-          </SelectContent>
-        </Select>
       </div>
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="flex-wrap">
-          {CITIES.map((c) => (
-            <TabsTrigger key={c.key} value={c.name}>
-              {c.name}
-              <span className="ml-2 rounded-full bg-muted px-1.5 text-[10px]">
-                {cityItems(c.name).length}
-              </span>
+      <DragDropContext onDragEnd={handleDragEnd}>
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList className="flex-wrap">
+            <TabsTrigger value={DIST}>
+              Distribuição
+              <span className="ml-2 rounded-full bg-muted px-1.5 text-[10px]">{waiting.length}</span>
             </TabsTrigger>
-          ))}
-        </TabsList>
+            {ALL_TECHNICIANS.map((t) => (
+              <TabsTrigger key={t} value={t}>
+                {t}
+                <span className="ml-2 rounded-full bg-muted px-1.5 text-[10px]">
+                  {byTech(t).length}
+                </span>
+              </TabsTrigger>
+            ))}
+          </TabsList>
 
-        <DragDropContext onDragEnd={handleDragEnd}>
-          {CITIES.map((c) => (
-            <TabsContent key={c.key} value={c.name} className="mt-4">
-              {c.technicians.length === 0 && (
-                <p className="mb-3 text-sm text-muted-foreground">
-                  Nenhum técnico cadastrado para esta cidade — os agendamentos ficam na coluna de espera.
-                </p>
-              )}
-              <CityBoard
-                city={c}
-                technicians={getTechnicians(c.name)}
-                appointments={cityItems(c.name)}
-
-                onCardClick={(a) => {
-                  setEditing(a);
-                  setDialogOpen(true);
-                }}
-                onForward={handleForward}
+          <TabsContent value={DIST} className="mt-4">
+            <div className="flex gap-4 overflow-x-auto pb-3">
+              <TechColumn
+                droppableId="waiting"
+                title={UNASSIGNED}
+                items={waiting}
+                className="border-dashed bg-muted/50"
+                onDone={handleDone}
+                onDelete={handleDelete}
               />
+              {ALL_TECHNICIANS.map((t) => (
+                <TechColumn
+                  key={t}
+                  droppableId={`tech::${t}`}
+                  title={t}
+                  items={byTech(t)}
+                  onDone={handleDone}
+                />
+              ))}
+            </div>
+          </TabsContent>
+
+          {ALL_TECHNICIANS.map((t) => (
+            <TabsContent key={t} value={t} className="mt-4">
+              <div className="flex gap-4 overflow-x-auto pb-3">
+                <TechColumn
+                  droppableId={`day::${t}::none`}
+                  title="Sem dia"
+                  items={byTechDay(t, null)}
+                  className="border-dashed bg-muted/50"
+                  onDone={handleDone}
+                />
+                {WEEKDAYS.map((w) => (
+                  <TechColumn
+                    key={w.value}
+                    droppableId={`day::${t}::${w.value}`}
+                    title={w.label}
+                    items={byTechDay(t, w.value)}
+                    onDone={handleDone}
+                  />
+                ))}
+              </div>
             </TabsContent>
           ))}
-        </DragDropContext>
-      </Tabs>
+        </Tabs>
+      </DragDropContext>
 
-      {isLoading && <p className="text-sm text-muted-foreground">Carregando agendamentos...</p>}
+      {isLoading && <p className="text-sm text-muted-foreground">Carregando...</p>}
 
       <AppointmentDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        appointment={editing}
-        defaultCity={tab}
-        onSave={handleSave}
-        onDelete={(id) =>
-          deleteAppointment.mutate(id, {
+        onSave={(values) =>
+          createAppointment.mutate(values as never, {
             onSuccess: () => {
-              toast.success("Agendamento excluído");
+              toast.success("Cliente adicionado");
               setDialogOpen(false);
             },
+            onError: () => toast.error("Erro ao adicionar cliente"),
           })
         }
-        isSaving={createAppointment.isPending || updateAppointment.isPending}
+        isSaving={createAppointment.isPending}
       />
 
       <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Histórico de OS encaminhadas</DialogTitle>
+            <DialogTitle>Histórico de atendimentos concluídos</DialogTitle>
           </DialogHeader>
           {forwarded.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhuma OS encaminhada ainda.</p>
+            <p className="text-sm text-muted-foreground">Nada por aqui ainda.</p>
           ) : (
             <ul className="divide-y">
               {forwarded.map((a) => (
@@ -257,9 +235,7 @@ export default function TechAppointments() {
                   <div>
                     <p className="text-sm font-medium">{a.client_name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {a.city} · {formatDate(a.scheduled_date)} ·{" "}
-                      {a.technician ?? UNASSIGNED}
-                      {a.os_number ? ` · OS ${a.os_number}` : ""}
+                      {a.city} · {a.technician ?? UNASSIGNED}
                     </p>
                   </div>
                   <Button
@@ -268,7 +244,7 @@ export default function TechAppointments() {
                     onClick={() =>
                       updateAppointment.mutate(
                         { id: a.id, forwarded_at: null, forwarded_by: null },
-                        { onSuccess: () => toast.success("Agendamento reaberto") }
+                        { onSuccess: () => toast.success("Cliente reaberto") }
                       )
                     }
                   >

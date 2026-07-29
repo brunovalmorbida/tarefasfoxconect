@@ -1349,11 +1349,12 @@ export type Database = {
           os_number: string | null
           phone: string | null
           position: number
-          scheduled_date: string
+          scheduled_date: string | null
           scheduled_time: string | null
           service_type: string | null
           technician: string | null
           updated_at: string
+          weekday: number | null
         }
         Insert: {
           city: string
@@ -1368,11 +1369,12 @@ export type Database = {
           os_number?: string | null
           phone?: string | null
           position?: number
-          scheduled_date: string
+          scheduled_date?: string | null
           scheduled_time?: string | null
           service_type?: string | null
           technician?: string | null
           updated_at?: string
+          weekday?: number | null
         }
         Update: {
           city?: string
@@ -1387,11 +1389,12 @@ export type Database = {
           os_number?: string | null
           phone?: string | null
           position?: number
-          scheduled_date?: string
+          scheduled_date?: string | null
           scheduled_time?: string | null
           service_type?: string | null
           technician?: string | null
           updated_at?: string
+          weekday?: number | null
         }
         Relationships: []
       }

@@ -44,3 +44,24 @@ export const CITIES: CityConfig[] = [
 
 export const getCity = (name?: string | null) =>
   CITIES.find((c) => c.name === name) ?? CITIES[0];
+
+/** Todos os técnicos, de todas as cidades */
+export const ALL_TECHNICIANS = CITIES.flatMap((c) => c.technicians);
+
+export interface Weekday {
+  value: number; // 1 = segunda ... 6 = sábado
+  label: string;
+  short: string;
+}
+
+export const WEEKDAYS: Weekday[] = [
+  { value: 1, label: "Segunda", short: "SEG" },
+  { value: 2, label: "Terça", short: "TER" },
+  { value: 3, label: "Quarta", short: "QUA" },
+  { value: 4, label: "Quinta", short: "QUI" },
+  { value: 5, label: "Sexta", short: "SEX" },
+  { value: 6, label: "Sábado", short: "SÁB" },
+];
+
+export const getWeekday = (value?: number | null) =>
+  WEEKDAYS.find((w) => w.value === value) ?? WEEKDAYS[0];
