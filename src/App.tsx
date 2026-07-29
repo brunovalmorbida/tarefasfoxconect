@@ -18,7 +18,9 @@ import ProfilePage from "./pages/ProfilePage";
 import Fleet from "./pages/Fleet";
 import VehicleDetail from "./pages/fleet/VehicleDetail";
 import SocialMedia from "./pages/SocialMedia";
+import TechAppointments from "./pages/TechAppointments";
 import FeaturesOverview from "./pages/FeaturesOverview";
+
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -42,6 +44,8 @@ const App = () => (
                 <Route path="/fleet" element={<Fleet />} />
                 <Route path="/fleet/vehicle/:vehicleId" element={<VehicleDetail />} />
                 <Route path="/social-media" element={<SocialMedia />} />
+                <Route path="/tech-appointments" element={<TechAppointments />} />
+
                 <Route path="/notifications" element={<Notifications />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
