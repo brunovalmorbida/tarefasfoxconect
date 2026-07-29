@@ -24,7 +24,7 @@ const baseNav = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Quadros", url: "/boards", icon: Columns3 },
   { title: "Tarefas Fixas", url: "/recurring-tasks", icon: ListChecks },
-  { title: "Agendamentos Técnicos", url: "/tech-appointments", icon: CalendarClock },
+
 
   { title: "Notificações", url: "/notifications", icon: Bell },
   { title: "Configurações", url: "/settings", icon: Settings },
