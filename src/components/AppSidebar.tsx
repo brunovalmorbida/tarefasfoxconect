@@ -35,6 +35,7 @@ const baseNav = [
 export function AppSidebar() {
   const { signOut } = useAuth();
   const { data: isAdmin } = useIsAppAdmin();
+  const canManageTasks = useCanManage("can_manage_tasks");
   const canViewPurchases = useCanManage("can_view_purchases");
   const canViewFleet = useCanManage("can_view_fleet");
   const canManageFleet = useCanManage("can_manage_fleet");
