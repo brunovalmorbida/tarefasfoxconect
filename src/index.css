@@ -54,7 +54,14 @@
     --priority-medium: 38 92% 50%;
     --priority-high: 0 72% 55%;
     --priority-urgent: 0 72% 45%;
+
+    /* City colors (Agendamentos Técnicos) */
+    --city-ouro: 200 60% 42%;
+    --city-passo: 262 45% 52%;
+    --city-pontao: 160 45% 38%;
+    --city-lagoa: 25 65% 48%;
   }
+
 
   .dark {
     --background: 222.2 84% 4.9%;
@@ -97,7 +104,13 @@
     --priority-medium: 38 80% 55%;
     --priority-high: 0 72% 55%;
     --priority-urgent: 0 72% 45%;
+
+    --city-ouro: 200 70% 62%;
+    --city-passo: 262 60% 72%;
+    --city-pontao: 160 50% 55%;
+    --city-lagoa: 25 75% 62%;
   }
+
 }
 
 @layer base {
