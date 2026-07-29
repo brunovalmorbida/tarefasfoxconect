@@ -37,6 +37,8 @@ export default function TechAppointments() {
     reorder,
   } = useTechAppointments(false);
   const { appointments: forwarded } = useTechAppointments(true);
+  const { getTechnicians, saveOrder } = useTechColumnOrder();
+
 
   const [tab, setTab] = useState<string>(CITIES[0].name);
   const [search, setSearch] = useState("");
@@ -178,9 +180,10 @@ export default function TechAppointments() {
           <SelectContent>
             <SelectItem value="all">Todos os técnicos</SelectItem>
             <SelectItem value={UNASSIGNED}>{UNASSIGNED}</SelectItem>
-            {activeCity.technicians.map((t) => (
+            {getTechnicians(activeCity.name).map((t) => (
               <SelectItem key={t} value={t}>{t}</SelectItem>
             ))}
+
           </SelectContent>
         </Select>
       </div>
@@ -207,7 +210,9 @@ export default function TechAppointments() {
               )}
               <CityBoard
                 city={c}
+                technicians={getTechnicians(c.name)}
                 appointments={cityItems(c.name)}
+
                 onCardClick={(a) => {
                   setEditing(a);
                   setDialogOpen(true);
