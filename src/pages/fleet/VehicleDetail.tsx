@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useFleetVehicles, useFleetDrivers, useFleetMaintenances, useFleetDocuments, useFleetCheckins } from "@/hooks/useFleet";
+import { useFleetVehicles, useFleetDrivers, useFleetMaintenances, useFleetDocuments, useFleetCheckins, openFleetFile } from "@/hooks/useFleet";
 import { useVehicleScores } from "@/hooks/useVehicleScore";
 import { VehicleScoreBadge } from "@/components/fleet/VehicleScoreBadge";
 import {
