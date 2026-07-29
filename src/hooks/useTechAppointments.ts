@@ -65,12 +65,14 @@ export function useTechAppointments(forwarded = false) {
   });
 
   const reorder = useMutation({
-    mutationFn: async (updates: { id: string; technician: string | null; city: string; position: number }[]) => {
+    mutationFn: async (
+      updates: { id: string; technician: string | null; weekday: number | null; position: number }[]
+    ) => {
       const results = await Promise.all(
         updates.map((u) =>
           supabase
             .from("tech_appointments")
-            .update({ technician: u.technician, city: u.city, position: u.position })
+            .update({ technician: u.technician, weekday: u.weekday, position: u.position })
             .eq("id", u.id)
         )
       );
@@ -79,6 +81,7 @@ export function useTechAppointments(forwarded = false) {
     },
     onSuccess: invalidate,
   });
+
 
   useEffect(() => {
     const channel = supabase
