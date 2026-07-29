@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useFleetVehicles, useFleetDrivers, useFleetMaintenances, useFleetDocuments, useFleetCheckins } from "@/hooks/useFleet";
+import { useFleetVehicles, useFleetDrivers, useFleetMaintenances, useFleetDocuments, useFleetCheckins, openFleetFile } from "@/hooks/useFleet";
 import { useVehicleScores } from "@/hooks/useVehicleScore";
 import { VehicleScoreBadge } from "@/components/fleet/VehicleScoreBadge";
 import {
@@ -339,14 +339,15 @@ export default function VehicleDetail() {
                       </div>
                       {d.file_url && (
                         <div className="flex gap-1 shrink-0">
-                          <Button variant="ghost" size="icon" asChild>
-                            <a href={d.file_url} target="_blank" rel="noopener"><Eye className="h-4 w-4" /></a>
+                          <Button variant="ghost" size="icon" onClick={() => openFleetFile(d.file_url!)}>
+                            <Eye className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" asChild>
-                            <a href={d.file_url} download={d.file_name}><Download className="h-4 w-4" /></a>
+                          <Button variant="ghost" size="icon" onClick={() => openFleetFile(d.file_url!, d.file_name || "documento")}>
+                            <Download className="h-4 w-4" />
                           </Button>
                         </div>
                       )}
+
                     </div>
                   </Card>
                 );

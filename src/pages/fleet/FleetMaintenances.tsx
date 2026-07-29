@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { useFleetMaintenances, useFleetVehicles, FleetMaintenance, uploadFleetFile } from "@/hooks/useFleet";
+import { useFleetMaintenances, useFleetVehicles, FleetMaintenance, uploadFleetFile, openFleetFile } from "@/hooks/useFleet";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Plus, Search, Wrench, Pencil, Trash2, ShieldAlert, AlertTriangle, ShieldCheck, Upload, Eye, DollarSign } from "lucide-react";
@@ -336,9 +336,10 @@ export default function FleetMaintenances() {
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <span className="truncate max-w-[150px]">{form.receipt_file_name}</span>
                       {form.receipt_url && (
-                        <Button variant="ghost" size="icon" className="h-6 w-6" asChild>
-                          <a href={form.receipt_url} target="_blank" rel="noopener"><Eye className="h-3 w-3" /></a>
+                        <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => openFleetFile(form.receipt_url)}>
+                          <Eye className="h-3 w-3" />
                         </Button>
+
                       )}
                     </div>
                   )}
